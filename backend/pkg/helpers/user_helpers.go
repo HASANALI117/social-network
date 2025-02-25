@@ -58,7 +58,7 @@ func (udb *UserDB) Create(user *models.User) error {
 // GetByID retrieves a user by ID
 func (udb *UserDB) GetByID(id string) (*models.User, error) {
 	query := `
-        SELECT id, username, email, password_hash, full_name, bio, created_at, updated_at
+        SELECT id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at
         FROM users
         WHERE id = ?
     `
