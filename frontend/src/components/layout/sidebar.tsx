@@ -52,7 +52,7 @@ export function AppSidebar() {
 
       <SidebarBody>
         <SidebarSection>
-          <SidebarItem href="/" current={pathname === '/'}>
+          <SidebarItem href="/feed" current={pathname === '/'}>
             <HomeIcon />
             <SidebarLabel>Feed</SidebarLabel>
           </SidebarItem>
