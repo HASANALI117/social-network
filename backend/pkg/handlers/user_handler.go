@@ -20,18 +20,6 @@ func NewUserHandler(userDB *helpers.UserDB) *UserHandler {
 	return &UserHandler{userDB: userDB}
 }
 
-// RegisterUserRequest represents a request to register a new user
-type RegisterUserRequest struct {
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	AvatarURL string `json:"avatar_url"`
-	AboutMe   string `json:"about_me"`
-	BirthDate string `json:"birth_date"`
-}
-
 // Register handles user registration
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
@@ -40,28 +28,20 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body
-	var req RegisterUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var user models.User
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Basic validation
-	if req.Username == "" || req.Email == "" || req.Password == "" {
-		http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
-		return
-	}
+	// if req.Username == "" || req.Email == "" || req.Password == "" {
+	// 	http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
+	// 	return
+	// }
 
-	// Create new user
-	user, err := models.NewUser(req.Username, req.Email, req.Password, req.FirstName, req.LastName, req.AvatarURL, req.AboutMe, req.BirthDate)
-	if err != nil {
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
-		return
-	}
-
-	// Save user to database
-	if err := h.userDB.Create(user); err != nil {
+	// Create and Save user to database
+	if err := h.userDB.Create(&user); err != nil {
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}

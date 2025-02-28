@@ -8,6 +8,8 @@ import (
 
 	"github.com/HASANALI117/social-network/pkg/db"
 	"github.com/HASANALI117/social-network/pkg/models"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -32,7 +34,18 @@ func (udb *UserDB) Create(user *models.User) error {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
 
-	_, err := udb.db.Exec(
+	// Generate password hash
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	user.ID = uuid.New().String()
+	user.PasswordHash = string(hashedPassword)
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
+
+	_, err = udb.db.Exec(
 		query,
 		user.ID,
 		user.Username,
