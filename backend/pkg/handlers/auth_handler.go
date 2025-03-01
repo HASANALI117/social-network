@@ -18,7 +18,16 @@ func NewAuthHandler(userDB *helpers.UserDB) *AuthHandler {
 	return &AuthHandler{userDB: userDB}
 }
 
-// SignIn handles user authentication
+// SignIn godoc
+// @Summary User login
+// @Description Authenticate a user and create a session
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param credentials body object true "Login credentials"
+// @Success 200 {object} map[string]interface{} "Login successful"
+// @Failure 400 {string} string "Invalid credentials"
+// @Router /auth/signin [post]
 func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != http.MethodPost {
@@ -71,7 +80,14 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Signout handles user logout
+// SignOut godoc
+// @Summary User logout
+// @Description End user session
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]string "Logged out successfully"
+// @Router /auth/signout [post]
 func (h *AuthHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != http.MethodPost {

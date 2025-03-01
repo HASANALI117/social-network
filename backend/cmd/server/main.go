@@ -1,3 +1,11 @@
+// cmd/server/cmain.go
+
+// @title Social Network API
+// @version 1.0
+// @description API server for Social Network application
+// @host localhost:8080
+// @BasePath /api
+
 package main
 
 import (

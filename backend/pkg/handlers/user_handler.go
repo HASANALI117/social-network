@@ -20,7 +20,17 @@ func NewUserHandler(userDB *helpers.UserDB) *UserHandler {
 	return &UserHandler{userDB: userDB}
 }
 
-// Register handles user registration
+// Register godoc
+// @Summary Register a new user
+// @Description Register a new user in the system
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body models.User true "User registration details"
+// @Success 201 {object} map[string]interface{} "User created successfully"
+// @Failure 400 {string} string "Invalid request body"
+// @Failure 500 {string} string "Failed to register user"
+// @Router /users/register [post]
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != http.MethodPost {
@@ -62,7 +72,18 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetUser handles requests to get a user by ID
+// GetUser godoc
+// @Summary Get user by ID
+// @Description Get user details by user ID
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id query string true "User ID"
+// @Success 200 {object} map[string]interface{} "User details"
+// @Failure 400 {string} string "User ID is required"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Failed to get user"
+// @Router /users/get [get]
 func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET requests
 	if r.Method != http.MethodGet {
@@ -104,7 +125,17 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ListUsers handles requests to list users
+// ListUsers godoc
+// @Summary List users
+// @Description Get a paginated list of users
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of users to return (default 10)"
+// @Param offset query int false "Number of users to skip (default 0)"
+// @Success 200 {object} map[string]interface{} "List of users"
+// @Failure 500 {string} string "Failed to list users"
+// @Router /users/list [get]
 func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET requests
 	if r.Method != http.MethodGet {
@@ -164,7 +195,19 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// UpdateUser handles requests to update a user
+// UpdateUser godoc
+// @Summary Update user
+// @Description Update user details
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id query string true "User ID"
+// @Param user body object true "User update details"
+// @Success 200 {object} map[string]interface{} "Updated user details"
+// @Failure 400 {string} string "Invalid request"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Failed to update user"
+// @Router /users/update [put]
 func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow PUT requests
 	if r.Method != http.MethodPut {
@@ -232,7 +275,18 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// DeleteUser handles requests to delete a user
+// DeleteUser godoc
+// @Summary Delete user
+// @Description Delete a user by ID
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id query string true "User ID"
+// @Success 200 {object} map[string]string "User deleted successfully"
+// @Failure 400 {string} string "User ID is required"
+// @Failure 404 {string} string "User not found"
+// @Failure 500 {string} string "Failed to delete user"
+// @Router /users/delete [delete]
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow DELETE requests
 	if r.Method != http.MethodDelete {

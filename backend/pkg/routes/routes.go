@@ -3,17 +3,25 @@ package routes
 import (
 	"net/http"
 
+	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // Setup sets up all API routes
 func Setup(userDB *helpers.UserDB) http.Handler {
+	// This will ensure the swagger docs are registered
+	docs.SwaggerInfo.BasePath = "/api"
+
 	mux := http.NewServeMux()
 
 	// Create handlers
 	userHandler := handlers.NewUserHandler(userDB)
 	authHandler := handlers.NewAuthHandler(userDB)
+
+	// Swagger Documentation
+	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
 	// Authentication routes
 	mux.HandleFunc("/api/auth/signin", authHandler.SignIn)
