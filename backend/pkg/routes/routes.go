@@ -13,6 +13,11 @@ func Setup(userDB *helpers.UserDB) http.Handler {
 
 	// Create handlers
 	userHandler := handlers.NewUserHandler(userDB)
+	authHandler := handlers.NewAuthHandler(userDB)
+
+	// Authentication routes
+	mux.HandleFunc("/api/auth/signin", authHandler.SignIn)
+	mux.HandleFunc("/api/auth/signout", authHandler.SignOut)
 
 	// User routes
 	mux.HandleFunc("/api/users/register", userHandler.Register)

@@ -35,13 +35,13 @@ func (udb *UserDB) Create(user *models.User) error {
     `
 
 	// Generate password hash
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
 	user.ID = uuid.New().String()
-	user.PasswordHash = string(hashedPassword)
+	user.Password = string(hashedPassword)
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
@@ -50,7 +50,7 @@ func (udb *UserDB) Create(user *models.User) error {
 		user.ID,
 		user.Username,
 		user.Email,
-		user.PasswordHash,
+		user.Password,
 		user.FirstName,
 		user.LastName,
 		user.AvatarURL,
@@ -83,7 +83,7 @@ func (udb *UserDB) GetByID(id string) (*models.User, error) {
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.PasswordHash,
+		&user.Password,
 		&user.FirstName,
 		&user.LastName,
 		&user.AvatarURL,
@@ -122,7 +122,7 @@ func (udb *UserDB) GetByUsername(username string) (*models.User, error) {
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.PasswordHash,
+		&user.Password,
 		&user.FirstName,
 		&user.LastName,
 		&user.AvatarURL,
@@ -161,7 +161,7 @@ func (udb *UserDB) GetByEmail(email string) (*models.User, error) {
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.PasswordHash,
+		&user.Password,
 		&user.FirstName,
 		&user.LastName,
 		&user.AvatarURL,
@@ -199,7 +199,7 @@ func (udb *UserDB) Update(user *models.User) error {
 		query,
 		user.Username,
 		user.Email,
-		user.PasswordHash,
+		user.Password,
 		user.FirstName,
 		user.LastName,
 		user.AvatarURL,
@@ -270,7 +270,7 @@ func (udb *UserDB) ListUsers(limit, offset int) ([]*models.User, error) {
 			&user.ID,
 			&user.Username,
 			&user.Email,
-			&user.PasswordHash,
+			&user.Password,
 			&user.FirstName,
 			&user.LastName,
 			&user.AvatarURL,
