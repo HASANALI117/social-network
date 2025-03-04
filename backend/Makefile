@@ -1,13 +1,13 @@
 # Database migrations
-mc:
+migrate-create:
 	@migrate create -ext sql -dir pkg/db/migrations/sqlite -seq $(name)
 
-mu:
+migrate-up:
 	@migrate -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite up
 
-md:
+migrate-down:
 	@migrate -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite down
 
-migrate-create: mc
-migrate-up: mu
-migrate-down: md
+mc: migrate-create
+mu: migrate-up
+md: migrate-down
