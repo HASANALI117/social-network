@@ -13,23 +13,19 @@ import (
 	"net/http"
 
 	"github.com/HASANALI117/social-network/pkg/db"
-	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/routes"
 )
 
 func main() {
 	// Initialize database
-	database, err := db.NewDB()
+	database, err := db.InitDB()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
 
-	// Initialize user db
-	userDB := helpers.NewUserDB(database)
-
 	// Setup HTTP routes
-	handler := routes.Setup(userDB)
+	handler := routes.Setup()
 
 	// Start HTTP server
 	addr := ":8080"

@@ -8,16 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// AuthHandler handles HTTP requests for users
-type AuthHandler struct {
-	userDB *helpers.UserDB
-}
-
-// NewAuthHandler creates a new AuthHandler
-func NewAuthHandler(userDB *helpers.UserDB) *AuthHandler {
-	return &AuthHandler{userDB: userDB}
-}
-
 // SignIn godoc
 // @Summary User login
 // @Description Authenticate a user and create a session
@@ -28,7 +18,7 @@ func NewAuthHandler(userDB *helpers.UserDB) *AuthHandler {
 // @Success 200 {object} map[string]interface{} "Login successful"
 // @Failure 400 {string} string "Invalid credentials"
 // @Router /auth/signin [post]
-func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
+func SignIn(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -46,7 +36,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate user
-	user, err := h.userDB.AuthenticateUser(credentials.Identifier, credentials.Password)
+	user, err := helpers.AuthenticateUser(credentials.Identifier, credentials.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -88,7 +78,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Success 200 {object} map[string]string "Logged out successfully"
 // @Router /auth/signout [post]
-func (h *AuthHandler) SignOut(w http.ResponseWriter, r *http.Request) {
+func SignOut(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

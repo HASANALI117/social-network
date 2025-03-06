@@ -10,16 +10,6 @@ import (
 	"github.com/HASANALI117/social-network/pkg/models"
 )
 
-// UserHandler handles HTTP requests for users
-type UserHandler struct {
-	userDB *helpers.UserDB
-}
-
-// NewUserHandler creates a new UserHandler
-func NewUserHandler(userDB *helpers.UserDB) *UserHandler {
-	return &UserHandler{userDB: userDB}
-}
-
 // Register godoc
 // @Summary Register a new user
 // @Description Register a new user in the system
@@ -31,7 +21,7 @@ func NewUserHandler(userDB *helpers.UserDB) *UserHandler {
 // @Failure 400 {string} string "Invalid request body"
 // @Failure 500 {string} string "Failed to register user"
 // @Router /users/register [post]
-func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
+func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -51,7 +41,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	// Create and Save user to database
-	if err := h.userDB.Create(&user); err != nil {
+	if err := helpers.CreateUser(&user); err != nil {
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
@@ -84,7 +74,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "User not found"
 // @Failure 500 {string} string "Failed to get user"
 // @Router /users/get [get]
-func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+func GetUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -99,7 +89,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from database
-	user, err := h.userDB.GetByID(userID)
+	user, err := helpers.GetUserByID(userID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -136,7 +126,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]interface{} "List of users"
 // @Failure 500 {string} string "Failed to list users"
 // @Router /users/list [get]
-func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+func ListUsers(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -162,7 +152,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get users from database
-	users, err := h.userDB.ListUsers(limit, offset)
+	users, err := helpers.ListUsers(limit, offset)
 	if err != nil {
 		http.Error(w, "Failed to list users", http.StatusInternalServerError)
 		return
@@ -208,7 +198,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "User not found"
 // @Failure 500 {string} string "Failed to update user"
 // @Router /users/update [put]
-func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow PUT requests
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -223,7 +213,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get existing user
-	user, err := h.userDB.GetByID(userID)
+	user, err := helpers.GetUserByID(userID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -255,7 +245,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	user.BirthDate = req.BirthDate
 
 	// Save updated user to database
-	if err := h.userDB.Update(user); err != nil {
+	if err := helpers.UpdateUser(user); err != nil {
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
 		return
 	}
@@ -287,7 +277,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "User not found"
 // @Failure 500 {string} string "Failed to delete user"
 // @Router /users/delete [delete]
-func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Only allow DELETE requests
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -302,7 +292,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete user from database
-	if err := h.userDB.Delete(userID); err != nil {
+	if err := helpers.DeleteUser(userID); err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
 		} else {

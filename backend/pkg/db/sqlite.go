@@ -24,8 +24,10 @@ type DB struct {
 	*sql.DB
 }
 
+var GlobalDB *sql.DB
+
 // NewDB creates a new database connection
-func NewDB() (*DB, error) {
+func InitDB() (*sql.DB, error) {
 	// Ensure directory exists
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
@@ -48,7 +50,10 @@ func NewDB() (*DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	return &DB{db}, nil
+	GlobalDB = db
+
+	log.Println("Database initialized successfully")
+	return GlobalDB, nil
 }
 
 // runMigrations runs database migrations

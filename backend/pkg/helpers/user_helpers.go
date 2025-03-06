@@ -17,18 +17,8 @@ var (
 	ErrUserAlreadyExists = errors.New("user already exists")
 )
 
-// UserDB handles database operations for users
-type UserDB struct {
-	db *db.DB
-}
-
-// NewUserDB creates a new UserDB
-func NewUserDB(db *db.DB) *UserDB {
-	return &UserDB{db: db}
-}
-
 // Create a new user to the database
-func (udb *UserDB) Create(user *models.User) error {
+func CreateUser(user *models.User) error {
 	query := `
         INSERT INTO users (id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -45,7 +35,7 @@ func (udb *UserDB) Create(user *models.User) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
-	_, err = udb.db.Exec(
+	_, err = db.GlobalDB.Exec(
 		query,
 		user.ID,
 		user.Username,
@@ -69,7 +59,7 @@ func (udb *UserDB) Create(user *models.User) error {
 }
 
 // GetByID retrieves a user by ID
-func (udb *UserDB) GetByID(id string) (*models.User, error) {
+func GetUserByID(id string) (*models.User, error) {
 	query := `
         SELECT id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at
         FROM users
@@ -79,7 +69,7 @@ func (udb *UserDB) GetByID(id string) (*models.User, error) {
 	var user models.User
 	var createdAt, updatedAt string
 
-	err := udb.db.QueryRow(query, id).Scan(
+	err := db.GlobalDB.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -108,7 +98,7 @@ func (udb *UserDB) GetByID(id string) (*models.User, error) {
 }
 
 // GetByUsername retrieves a user by username
-func (udb *UserDB) GetByUsername(username string) (*models.User, error) {
+func GetUserByUsername(username string) (*models.User, error) {
 	query := `
         SELECT id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at
         FROM users
@@ -118,7 +108,7 @@ func (udb *UserDB) GetByUsername(username string) (*models.User, error) {
 	var user models.User
 	var createdAt, updatedAt string
 
-	err := udb.db.QueryRow(query, username).Scan(
+	err := db.GlobalDB.QueryRow(query, username).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -147,7 +137,7 @@ func (udb *UserDB) GetByUsername(username string) (*models.User, error) {
 }
 
 // GetByEmail retrieves a user by email
-func (udb *UserDB) GetByEmail(email string) (*models.User, error) {
+func GetUserByEmail(email string) (*models.User, error) {
 	query := `
         SELECT id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at
         FROM users
@@ -157,7 +147,7 @@ func (udb *UserDB) GetByEmail(email string) (*models.User, error) {
 	var user models.User
 	var createdAt, updatedAt string
 
-	err := udb.db.QueryRow(query, email).Scan(
+	err := db.GlobalDB.QueryRow(query, email).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -186,7 +176,7 @@ func (udb *UserDB) GetByEmail(email string) (*models.User, error) {
 }
 
 // Update an existing user
-func (udb *UserDB) Update(user *models.User) error {
+func UpdateUser(user *models.User) error {
 	query := `
         UPDATE users
         SET username = ?, email = ?, password_hash = ?, first_name = ?, last_name = ?, avatar_url = ?, about_me = ?, birth_date = ?, updated_at = ?
@@ -195,7 +185,7 @@ func (udb *UserDB) Update(user *models.User) error {
 
 	user.UpdatedAt = time.Now()
 
-	result, err := udb.db.Exec(
+	result, err := db.GlobalDB.Exec(
 		query,
 		user.Username,
 		user.Email,
@@ -226,10 +216,10 @@ func (udb *UserDB) Update(user *models.User) error {
 }
 
 // Delete removes a user
-func (udb *UserDB) Delete(id string) error {
+func DeleteUser(id string) error {
 	query := "DELETE FROM users WHERE id = ?"
 
-	result, err := udb.db.Exec(query, id)
+	result, err := db.GlobalDB.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -247,7 +237,7 @@ func (udb *UserDB) Delete(id string) error {
 }
 
 // ListUsers returns a list of all users
-func (udb *UserDB) ListUsers(limit, offset int) ([]*models.User, error) {
+func ListUsers(limit, offset int) ([]*models.User, error) {
 	query := `
         SELECT id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at
         FROM users
@@ -255,7 +245,7 @@ func (udb *UserDB) ListUsers(limit, offset int) ([]*models.User, error) {
         LIMIT ? OFFSET ?
     `
 
-	rows, err := udb.db.Query(query, limit, offset)
+	rows, err := db.GlobalDB.Query(query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}

@@ -3,15 +3,13 @@ package helpers
 import (
 	"fmt"
 
+	"github.com/HASANALI117/social-network/pkg/db"
 	"github.com/HASANALI117/social-network/pkg/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // AuthenticateUser verifies user credentials and returns the user if valid
-func (udb *UserDB) AuthenticateUser(identifier string, password string) (*models.User, error) {
-	fmt.Println("identifier is: " + identifier)
-	fmt.Println("password is: " + password)
-
+func AuthenticateUser(identifier string, password string) (*models.User, error) {
 	query := `
         SELECT id, username, email, password_hash, first_name, last_name, avatar_url, about_me, birth_date, created_at, updated_at
         FROM users
@@ -21,10 +19,7 @@ func (udb *UserDB) AuthenticateUser(identifier string, password string) (*models
 	var user models.User
 	var hashedPassword string
 
-	fmt.Println(user)
-	fmt.Println("hash is: " + hashedPassword)
-
-	err := udb.db.QueryRow(query, identifier, identifier).Scan(
+	err := db.GlobalDB.QueryRow(query, identifier, identifier).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
