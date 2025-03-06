@@ -3,9 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
-	"github.com/google/uuid"
 )
 
 // SignIn godoc
@@ -42,7 +42,11 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionToken := uuid.New().String()
+	sessionToken, err := helpers.CreateSession(user.ID, 24*time.Hour)
+	if err != nil {
+		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
@@ -83,6 +87,12 @@ func SignOut(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	// Delete session from database
+	cookie, err := r.Cookie("session_token")
+	if err == nil {
+		helpers.DeleteSession(cookie.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{
