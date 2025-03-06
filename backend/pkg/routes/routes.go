@@ -5,34 +5,36 @@ import (
 
 	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
-	"github.com/HASANALI117/social-network/pkg/helpers"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // Setup sets up all API routes
-func Setup(userDB *helpers.UserDB) http.Handler {
+func Setup() http.Handler {
 	// This will ensure the swagger docs are registered
 	docs.SwaggerInfo.BasePath = "/api"
 
 	mux := http.NewServeMux()
 
-	// Create handlers
-	userHandler := handlers.NewUserHandler(userDB)
-	authHandler := handlers.NewAuthHandler(userDB)
-
 	// Swagger Documentation
 	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
 	// Authentication routes
-	mux.HandleFunc("/api/auth/signin", authHandler.SignIn)
-	mux.HandleFunc("/api/auth/signout", authHandler.SignOut)
+	mux.HandleFunc("/api/auth/signin", handlers.SignIn)
+	mux.HandleFunc("/api/auth/signout", handlers.SignOut)
 
 	// User routes
-	mux.HandleFunc("/api/users/register", userHandler.Register)
-	mux.HandleFunc("/api/users/get", userHandler.GetUser)
-	mux.HandleFunc("/api/users/list", userHandler.ListUsers)
-	mux.HandleFunc("/api/users/update", userHandler.UpdateUser)
-	mux.HandleFunc("/api/users/delete", userHandler.DeleteUser)
+	mux.HandleFunc("/api/users/register", handlers.RegisterUser)
+	mux.HandleFunc("/api/users/get", handlers.GetUser)
+	mux.HandleFunc("/api/users/list", handlers.ListUsers)
+	mux.HandleFunc("/api/users/update", handlers.UpdateUser)
+	mux.HandleFunc("/api/users/delete", handlers.DeleteUser)
+
+	// Post routes
+	mux.HandleFunc("/api/posts/create", handlers.CreatePost)
+	mux.HandleFunc("/api/posts/get", handlers.GetPost)
+	mux.HandleFunc("/api/posts/list", handlers.ListPosts)
+	// mux.HandleFunc("/api/posts/update", handlers.u)
+	mux.HandleFunc("/api/posts/delete", handlers.DeletePost)
 
 	return mux
 }

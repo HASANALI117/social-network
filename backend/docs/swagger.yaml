@@ -1,5 +1,22 @@
 basePath: /api
 definitions:
+  models.Post:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      privacy:
+        type: string
+      title:
+        type: string
+      userId:
+        type: string
+    type: object
   models.User:
     properties:
       about_me:
@@ -76,6 +93,135 @@ paths:
       summary: User logout
       tags:
       - auth
+  /posts/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new post in the system
+      parameters:
+      - description: Post creation details
+        in: body
+        name: post
+        required: true
+        schema:
+          $ref: '#/definitions/models.Post'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Post created successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request body
+          schema:
+            type: string
+        "500":
+          description: Failed to create post
+          schema:
+            type: string
+      summary: Create a new post
+      tags:
+      - posts
+  /posts/delete:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a post by ID
+      parameters:
+      - description: Post ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Post deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Post ID is required
+          schema:
+            type: string
+        "404":
+          description: Post not found
+          schema:
+            type: string
+        "500":
+          description: Failed to delete post
+          schema:
+            type: string
+      summary: Delete post
+      tags:
+      - posts
+  /posts/get:
+    get:
+      consumes:
+      - application/json
+      description: Get post details by post ID
+      parameters:
+      - description: Post ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Post details
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Post ID is required
+          schema:
+            type: string
+        "404":
+          description: Post not found
+          schema:
+            type: string
+        "500":
+          description: Failed to get post
+          schema:
+            type: string
+      summary: Get post by ID
+      tags:
+      - posts
+  /posts/list:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of posts
+      parameters:
+      - description: Number of posts to return (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Number of posts to skip (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of posts
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to list posts
+          schema:
+            type: string
+      summary: List posts
+      tags:
+      - posts
   /users/delete:
     delete:
       consumes:
