@@ -33,6 +33,7 @@ func Setup() http.Handler {
 	mux.HandleFunc("/api/posts/create", handlers.CreatePost)
 	mux.HandleFunc("/api/posts/get", handlers.GetPost)
 	mux.HandleFunc("/api/posts/list", handlers.ListPosts)
+	mux.HandleFunc("/api/posts/user", handlers.ListUserPosts)
 	// mux.HandleFunc("/api/posts/update", handlers.u)
 	mux.HandleFunc("/api/posts/delete", handlers.DeletePost)
 

@@ -171,6 +171,77 @@ func ListPosts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ListUserPosts godoc
+// @Summary List posts by user
+// @Description Get a paginated list of posts created by a specific user
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param user_id query string true "User ID"
+// @Param limit query int false "Number of posts to return (default 10)"
+// @Param offset query int false "Number of posts to skip (default 0)"
+// @Success 200 {object} map[string]interface{} "List of user's posts"
+// @Failure 400 {string} string "User ID is required"
+// @Failure 500 {string} string "Failed to list posts"
+// @Router /posts/user [get]
+func ListUserPosts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID := r.URL.Query().Get("id")
+	if userID == "" {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 10
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	posts, err := helpers.ListPostsByUser(userID, limit, offset)
+	if err != nil {
+		log.Printf("Failed to list user posts: %v", err)
+		http.Error(w, "Failed to list posts", http.StatusInternalServerError)
+		return
+	}
+
+	result := make([]map[string]interface{}, len(posts))
+	for i, post := range posts {
+		result[i] = map[string]interface{}{
+			"id":         post.ID,
+			"user_id":    post.UserID,
+			"title":      post.Title,
+			"content":    post.Content,
+			"image_url":  post.ImageURL,
+			"privacy":    post.Privacy,
+			"created_at": post.CreatedAt,
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts":  result,
+		"limit":  limit,
+		"offset": offset,
+		"count":  len(posts),
+	})
+}
+
 // UpdatePost godoc
 // @Summary Update post
 // @Description Update post details

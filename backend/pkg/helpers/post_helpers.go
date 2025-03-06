@@ -107,6 +107,42 @@ func ListPosts(limit, offset int) ([]*models.Post, error) {
 	return posts, nil
 }
 
+func ListPostsByUser(userID string, limit, offset int) ([]*models.Post, error) {
+	query := `
+        SELECT id, user_id, title, content, image_url, privacy, created_at
+        FROM posts
+		WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    `
+
+	rows, err := db.GlobalDB.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		post := &models.Post{}
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL,
+			&post.Privacy,
+			&post.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, nil
+}
+
 // func Update(post *models.Post) error {
 // 	post.UpdatedAt = time.Now()
 
