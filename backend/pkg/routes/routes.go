@@ -10,6 +10,9 @@ import (
 
 // Setup sets up all API routes
 func Setup() http.Handler {
+	// Initialize Websocket Hub
+	handlers.InitWebsocket()
+
 	// This will ensure the swagger docs are registered
 	docs.SwaggerInfo.BasePath = "/api"
 
@@ -17,6 +20,9 @@ func Setup() http.Handler {
 
 	// Swagger Documentation
 	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
+
+	// Websocket routes
+	mux.HandleFunc("/ws", handlers.HandleWebSocket)
 
 	// Authentication routes
 	mux.HandleFunc("/api/auth/signin", handlers.SignIn)
