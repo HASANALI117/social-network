@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/HASANALI117/social-network/pkg/helpers"
 	ws "github.com/HASANALI117/social-network/pkg/websocket"
 	"github.com/gorilla/websocket"
 )
@@ -21,13 +22,13 @@ func InitWebsocket() {
 }
 
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("id")
+	// userID := r.URL.Query().Get("id")
 
-	// user, err := helpers.GetUserByID("11")
-	// if err != nil {
-	// 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	// 	return
-	// }
+	user, err := helpers.GetUserFromSession(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -35,7 +36,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ws.NewClient(WebSocketHub, conn, userID)
+	client := ws.NewClient(WebSocketHub, conn, user.ID)
 
 	WebSocketHub.Register <- client
 

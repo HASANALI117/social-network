@@ -2,6 +2,9 @@ package ws
 
 import (
 	"fmt"
+
+	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/models"
 )
 
 type Hub struct {
@@ -59,6 +62,19 @@ func (h *Hub) Run() {
 				fmt.Printf("   To: User %s\n", message.ReceiverID)
 				fmt.Printf("   Content: %s\n", message.Content)
 				fmt.Printf("   Time: %s\n", message.CreatedAt)
+
+				msg := &models.Message{
+					SenderID:   message.SenderID,
+					ReceiverID: message.ReceiverID,
+					Content:    message.Content,
+					CreatedAt:  message.CreatedAt,
+				}
+
+				err := helpers.SaveMessage(msg)
+				if err != nil {
+					fmt.Printf("❌ Error storing message: %v\n", err)
+					continue
+				}
 
 				for client := range h.Clients {
 					if client.UserID == message.ReceiverID || client.UserID == message.SenderID {

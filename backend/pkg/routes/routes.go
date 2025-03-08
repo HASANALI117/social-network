@@ -43,5 +43,8 @@ func Setup() http.Handler {
 	// mux.HandleFunc("/api/posts/update", handlers.u)
 	mux.HandleFunc("/api/posts/delete", handlers.DeletePost)
 
+	// Message routes
+	mux.HandleFunc("/api/messages", handlers.GetMessages)
+
 	return mux
 }
