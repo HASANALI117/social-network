@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserType } from '@/types/User';
+import { Post } from '@/types/Post';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import EditProfileForm from '@/components/profile/EditProfileForm';
 import TabSwitcher from '@/components/profile/TabSwitcher';
@@ -17,38 +18,42 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, update } = useUserStore();
   const { put } = useRequest<UserType>();
+  const { get: getPosts, post: createPost } = useRequest<{ posts: Post[] }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [activeTab, setActiveTab] = useState('posts');
   const [isEditing, setIsEditing] = useState(false);
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      content: 'Just launched my new portfolio website! 🚀',
-      likes: 42,
-      comments: 12,
-      timestamp: '2024-03-01T10:00:00',
-    },
-    {
-      id: 2,
-      content: 'Learning something new everyday 💡 #coding',
-      likes: 28,
-      comments: 5,
-      timestamp: '2024-02-28T15:30:00',
-    },
-  ]);
+  const [posts, setPosts] = useState<Post[]>([]);
 
   useEffect(() => {
     // Handle store hydration
-    useUserStore.persist.rehydrate()
+    useUserStore.persist.rehydrate();
     
-    // Check authentication after hydration
-    if (!isAuthenticated) {
-      router.push('/login');
-    } else {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated, router]);
+    const init = async () => {
+      // Check authentication after hydration
+      if (!isAuthenticated) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        // Load user's posts
+        const result = await getPosts(`/api/posts/user?id=${user?.id}`);
+        if (result?.posts) {
+          setPosts(result.posts.map(post => ({
+            ...post,
+            createdAt: new Date(post.createdAt)
+          })));
+        }
+      } catch (error) {
+        toast.error('Failed to load posts');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    init();
+  }, [isAuthenticated, router, user?.id, getPosts]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -57,7 +62,7 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (userData: Partial<UserType>) => {
     if (!user) return;
     
-    const response = await put(`/api/users/update?id=${user.id}`, userData, (data) => {
+    await put(`/api/users/update?id=${user.id}`, userData, (data) => {
       console.log('User updated:', userData);
       toast.success('Profile updated successfully!');
       update(data);
@@ -69,17 +74,14 @@ export default function ProfilePage() {
     // TODO: Implement follow logic
   };
 
-  const handleCreatePost = (content: string) => {
-    setPosts([
-      {
-        id: posts.length + 1,
-        content,
-        likes: 0,
-        comments: 0,
-        timestamp: new Date().toISOString(),
-      },
-      ...posts,
-    ]);
+  const handleCreatePost = async (post: Post) => {
+    try {
+      setPosts(prevPosts => [post, ...prevPosts]);
+      toast.success('Post created successfully!');
+    } catch (error) {
+      toast.error('Failed to create post');
+      setPosts(prevPosts => prevPosts.filter(p => p.id !== post.id));
+    }
   };
 
   if (isLoading) {

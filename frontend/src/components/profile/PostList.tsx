@@ -1,13 +1,6 @@
 import { UserType } from '@/types/User';
-import PostCard from './PostCard';
-
-interface Post {
-  id: number;
-  content: string;
-  likes: number;
-  comments: number;
-  timestamp: string;
-}
+import { Post } from '@/types/Post';
+import { formatDistanceToNow } from 'date-fns';
 
 interface PostListProps {
   posts: Post[];
@@ -16,9 +9,30 @@ interface PostListProps {
 
 export default function PostList({ posts, user }: PostListProps) {
   return (
-    <div>
+    <div className="space-y-6">
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} user={user} />
+        <article key={post.id} className="bg-gray-800 rounded-lg p-6">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold mb-2">{post.title}</h2>
+            <p className="text-gray-300">{post.content}</p>
+            {post.imageUrl && (
+              <img
+                src={post.imageUrl}
+                alt={post.title}
+                className="mt-4 rounded-lg max-h-96 object-cover"
+              />
+            )}
+          </div>
+          <div className="flex items-center justify-between text-sm text-gray-400">
+            <div className="flex gap-4">
+              <span>{post.likes} likes</span>
+              <span>{post.comments} comments</span>
+            </div>
+            <time dateTime={post.createdAt.toString()}>
+              {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+            </time>
+          </div>
+        </article>
       ))}
     </div>
   );
