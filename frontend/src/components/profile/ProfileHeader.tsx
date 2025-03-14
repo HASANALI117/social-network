@@ -4,8 +4,9 @@ import { UserType } from '@/types/User';
 interface ProfileHeaderProps {
   user: UserType;
   isPublic: boolean;
-  onTogglePublic: () => void;
+  onTogglePublic?: () => void;
   onFollow: () => void;
+  isPreview?: boolean;
 }
 
 export default function ProfileHeader({
@@ -13,6 +14,7 @@ export default function ProfileHeader({
   isPublic,
   onTogglePublic,
   onFollow,
+  isPreview = false,
 }: ProfileHeaderProps) {
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
@@ -41,9 +43,11 @@ export default function ProfileHeader({
                 <FiUsers className="text-lg" />
                 Follow
               </button>
-              <button className="text-purple-400 hover:text-purple-300">
-                <FiEdit className="text-2xl" />
-              </button>
+              {!isPreview && (
+                <button className="text-purple-400 hover:text-purple-300">
+                  <FiEdit className="text-2xl" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -58,13 +62,15 @@ export default function ProfileHeader({
               <FiUsers />
               <span>856 following</span>
             </div>
-            <button
-              onClick={onTogglePublic}
-              className="flex items-center gap-2 ml-auto text-sm px-4 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-200"
-            >
-              {isPublic ? <FiUnlock /> : <FiLock />}
-              {isPublic ? 'Public Profile' : 'Private Profile'}
-            </button>
+            {!isPreview && onTogglePublic && (
+              <button
+                onClick={onTogglePublic}
+                className="flex items-center gap-2 ml-auto text-sm px-4 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-200"
+              >
+                {isPublic ? <FiUnlock /> : <FiLock />}
+                {isPublic ? 'Public Profile' : 'Private Profile'}
+              </button>
+            )}
           </div>
         </div>
       </div>
