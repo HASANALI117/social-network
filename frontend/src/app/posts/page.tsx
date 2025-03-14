@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import CreatePostForm from "@/components/profile/CreatePostForm"
-import { Post } from "@/types/Post"
+import { Post, PostResponse, transformPosts } from "@/types/Post"
 import { useRequest } from '@/hooks/useRequest';
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const { get: getPosts, isLoading } = useRequest<{ posts: Post[] }>();
+  const { get: getPosts, isLoading } = useRequest<{ posts: PostResponse[] }>();
 
   useEffect(() => {
     loadPosts();
@@ -16,7 +16,7 @@ export default function PostsPage() {
   const loadPosts = async () => {
     const result = await getPosts('/api/posts/list');
     if (result) {
-      setPosts(result.posts);
+      setPosts(transformPosts(result.posts));
     }
   };
 
@@ -40,9 +40,9 @@ export default function PostsPage() {
             {posts.map(post => (
               <div key={post.id} className="p-6 bg-gray-800 rounded-lg">
                 <h2 className="text-xl font-semibold mb-2">{post.title}</h2>
-                {post.imageUrl && (
+                {post.image_url && (
                   <img
-                    src={post.imageUrl}
+                    src={post.image_url}
                     alt={post.title}
                     className="mb-4 rounded-lg"
                   />

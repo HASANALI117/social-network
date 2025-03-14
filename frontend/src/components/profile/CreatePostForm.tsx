@@ -36,10 +36,15 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
     }
 
     try {
-      const result = await createPost('/api/posts/create', {
-        ...data,
-        userId: user.id
-      });
+      const postData = {
+        user_id: user.id,
+        title: data.title,
+        content: data.content,
+        image_url: data.imageUrl || '',
+        privacy: data.privacy
+      };
+
+      const result = await createPost('/api/posts/create', postData);
 
       if (result) {
         reset();

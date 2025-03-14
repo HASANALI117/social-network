@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserType } from '@/types/User';
-import { Post } from '@/types/Post';
+import { Post, PostResponse, transformPosts } from '@/types/Post';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import EditProfileForm from '@/components/profile/EditProfileForm';
 import TabSwitcher from '@/components/profile/TabSwitcher';
@@ -18,7 +18,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, update } = useUserStore();
   const { put } = useRequest<UserType>();
-  const { get: getPosts, post: createPost } = useRequest<{ posts: Post[] }>();
+  const { get: getPosts } = useRequest<{ posts: PostResponse[] }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [activeTab, setActiveTab] = useState('posts');
@@ -40,10 +40,7 @@ export default function ProfilePage() {
         // Load user's posts
         const result = await getPosts(`/api/posts/user?id=${user?.id}`);
         if (result?.posts) {
-          setPosts(result.posts.map(post => ({
-            ...post,
-            createdAt: new Date(post.createdAt)
-          })));
+          setPosts(transformPosts(result.posts));
         }
       } catch (error) {
         toast.error('Failed to load posts');
@@ -117,7 +114,7 @@ export default function ProfilePage() {
       {activeTab === 'posts' ? (
         <div>
           <CreatePostForm onSubmit={handleCreatePost} />
-          <PostList posts={posts} user={user} />
+          <PostList posts={posts} />
         </div>
       ) : (
         <FollowersList />
