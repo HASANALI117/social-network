@@ -1,5 +1,5 @@
 import { FiHeart, FiMessageSquare, FiShare } from 'react-icons/fi';
-import { User } from '@/types/User';
+import { UserType } from '@/types/User';
 
 interface Post {
   id: number;
@@ -11,20 +11,25 @@ interface Post {
 
 interface PostCardProps {
   post: Post;
-  user: User;
+  user: UserType;
 }
 
 export default function PostCard({ post, user }: PostCardProps) {
   return (
     <div className="bg-gray-800 rounded-lg shadow p-6 mb-4 hover:bg-gray-750 transition-colors">
       <div className="flex items-center gap-4 mb-4">
-        <img 
-          src={user.avatar_url || "https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff&bold=true"} 
-          alt="Avatar" 
+        <img
+          src={
+            user.avatar_url ||
+            'https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff&bold=true'
+          }
+          alt="Avatar"
           className="w-12 h-12 rounded-full border-2 border-gray-700"
         />
         <div>
-          <h3 className="font-semibold text-gray-100">{user.first_name} {user.last_name}</h3>
+          <h3 className="font-semibold text-gray-100">
+            {user.first_name} {user.last_name}
+          </h3>
           <p className="text-sm text-gray-400">
             {new Date(post.timestamp).toLocaleDateString()}
           </p>

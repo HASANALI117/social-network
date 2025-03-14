@@ -1,4 +1,4 @@
-import { User } from '@/types/User';
+import { UserType } from '@/types/User';
 import PostCard from './PostCard';
 
 interface Post {
@@ -11,13 +11,13 @@ interface Post {
 
 interface PostListProps {
   posts: Post[];
-  user: User;
+  user: UserType;
 }
 
 export default function PostList({ posts, user }: PostListProps) {
   return (
     <div>
-      {posts.map(post => (
+      {posts.map((post) => (
         <PostCard key={post.id} post={post} user={user} />
       ))}
     </div>

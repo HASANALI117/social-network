@@ -1,24 +1,25 @@
-"use client"
+'use client';
 
 import { useState } from 'react';
-import { User } from '@/types/User';
+import { UserType } from '@/types/User';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import CreatePostForm from '@/components/profile/CreatePostForm';
 import PostList from '@/components/profile/PostList';
 import FollowersList from '@/components/profile/FollowersList';
 
-const dummyUser: User = {
+const dummyUser: UserType = {
   id: '1',
   username: 'johndoe',
   email: 'john@example.com',
   first_name: 'John',
   last_name: 'Doe',
-  avatar_url: null,
-  about_me: 'Frontend developer passionate about creating beautiful user experiences',
+  avatar_url: undefined,
+  about_me:
+    'Frontend developer passionate about creating beautiful user experiences',
   birth_date: '1990-01-01',
   created_at: '2024-01-01',
-  updated_at: '2024-01-01'
+  updated_at: '2024-01-01',
 };
 
 export default function ProfilePage() {
@@ -30,15 +31,15 @@ export default function ProfilePage() {
       content: 'Just launched my new portfolio website! 🚀',
       likes: 42,
       comments: 12,
-      timestamp: '2024-03-01T10:00:00'
+      timestamp: '2024-03-01T10:00:00',
     },
     {
       id: 2,
       content: 'Learning something new everyday 💡 #coding',
       likes: 28,
       comments: 5,
-      timestamp: '2024-02-28T15:30:00'
-    }
+      timestamp: '2024-02-28T15:30:00',
+    },
   ]);
 
   const handleFollow = () => {
@@ -52,9 +53,9 @@ export default function ProfilePage() {
         content,
         likes: 0,
         comments: 0,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
-      ...posts
+      ...posts,
     ]);
   };
 
@@ -67,10 +68,7 @@ export default function ProfilePage() {
         onFollow={handleFollow}
       />
 
-      <TabSwitcher
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab === 'posts' ? (
         <div>

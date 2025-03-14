@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"fmt"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/models"
@@ -42,6 +43,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	// Create and Save user to database
 	if err := helpers.CreateUser(&user); err != nil {
+		fmt.Println(err)
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
