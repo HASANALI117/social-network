@@ -31,10 +31,10 @@ export default function ProfilePage() {
     
     const init = async () => {
       // Check authentication after hydration
-      if (!isAuthenticated) {
-        router.push('/login');
-        return;
-      }
+      // if (!isAuthenticated) {
+      //   router.push('/login');
+      //   return;
+      // }
 
       try {
         // Load user's posts
