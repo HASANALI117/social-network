@@ -15,14 +15,18 @@ import {
 import { useUserStore } from '@/store/useUserStore'
 import { useRouter } from 'next/navigation'
 import { Avatar } from '../ui/avatar'
+import { useRequest } from '@/hooks/useRequest'
 
 export function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' }) {
   const { user, logout } = useUserStore()
   const router = useRouter()
+  const { post } = useRequest()
 
   const handleLogout = () => {
-    logout()
-    router.push('/login')
+    post('/api/auth/signout', null, () => {
+      logout()
+      router.push('/login')
+    })
   }
 
   if (!user) return null
