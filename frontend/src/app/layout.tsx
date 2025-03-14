@@ -1,3 +1,5 @@
+'use client';
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import '@/styles/globals.css';
@@ -5,6 +7,8 @@ import { SidebarLayout } from '@/components/ui/sidebar-layout';
 import { AppSidebar } from '@/components/layout/sidebar';
 import { AppNavbar } from '@/components/layout/navbar';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
+import { useUserStore } from '@/store/useUserStore';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -16,16 +20,16 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
-  title: 'Social Network',
-  description: 'Stay connected with your friends and family.',
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Handle store hydration at the root level
+  useEffect(() => {
+    useUserStore.persist.rehydrate();
+  }, []);
+
   return (
     <html
       lang="en"

@@ -1,15 +1,17 @@
- 'use client'
+'use client'
  
- import { useForm } from 'react-hook-form'
- import { zodResolver } from '@hookform/resolvers/zod'
- import { z } from 'zod'
- import { Button } from '@/components/ui/button'
- import { Input } from '@/components/ui/input'
- import Link from 'next/link'
- import { Fieldset, Field, ErrorMessage } from '@/components/ui/fieldset'
- import { useRequest } from '@/hooks/useRequest'
- import { useRouter } from 'next/navigation'
- import toast from 'react-hot-toast'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import Link from 'next/link'
+import { Fieldset, Field, ErrorMessage } from '@/components/ui/fieldset'
+import { useRequest } from '@/hooks/useRequest'
+import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
+import { useUserStore } from '@/store/useUserStore'
 
 const formSchema = z.object({
   identifier: z.string().min(1, 'Email or username is required'),
@@ -37,6 +39,12 @@ export default function LoginPage() {
 
   const { isLoading, data, error, post } = useRequest()
   const router = useRouter()
+  const login = useUserStore(state => state.login)
+
+  // Handle store hydration
+  useEffect(() => {
+    useUserStore.persist.rehydrate()
+  }, [])
 
   return (
     <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md dark:bg-zinc-900">
@@ -45,12 +53,13 @@ export default function LoginPage() {
         post(
           '/api/auth/signin',
           data,
-          (userData) => {
-            toast.success('Logged in successfully!');
-            console.log('User logged in:', userData);
-            router.push('/profile');
+          (data) => {
+            login(data.user)
+            toast.success('Logged in successfully!')
+            console.log('User logged in:', {data})
+            router.push('/profile')
           }
-        );
+        )
       })}>
         <Fieldset className="space-y-6">
           <Field>

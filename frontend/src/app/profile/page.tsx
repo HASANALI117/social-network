@@ -1,28 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserType } from '@/types/User';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import CreatePostForm from '@/components/profile/CreatePostForm';
 import PostList from '@/components/profile/PostList';
 import FollowersList from '@/components/profile/FollowersList';
-
-const dummyUser: UserType = {
-  id: '1',
-  username: 'johndoe',
-  email: 'john@example.com',
-  first_name: 'John',
-  last_name: 'Doe',
-  avatar_url: undefined,
-  about_me:
-    'Frontend developer passionate about creating beautiful user experiences',
-  birth_date: '1990-01-01',
-  created_at: '2024-01-01',
-  updated_at: '2024-01-01',
-};
+import { useUserStore } from '@/store/useUserStore';
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { user, isAuthenticated } = useUserStore();
+  const [isLoading, setIsLoading] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [activeTab, setActiveTab] = useState('posts');
   const [posts, setPosts] = useState([
@@ -42,6 +33,18 @@ export default function ProfilePage() {
     },
   ]);
 
+  useEffect(() => {
+    // Handle store hydration
+    useUserStore.persist.rehydrate()
+    
+    // Check authentication after hydration
+    if (!isAuthenticated) {
+      router.push('/login');
+    } else {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, router]);
+
   const handleFollow = () => {
     // TODO: Implement follow logic
   };
@@ -59,10 +62,20 @@ export default function ProfilePage() {
     ]);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-900 min-h-screen text-gray-100">
       <ProfileHeader
-        user={dummyUser}
+        user={user}
         isPublic={isPublic}
         onTogglePublic={() => setIsPublic(!isPublic)}
         onFollow={handleFollow}
@@ -73,7 +86,7 @@ export default function ProfilePage() {
       {activeTab === 'posts' ? (
         <div>
           <CreatePostForm onSubmit={handleCreatePost} />
-          <PostList posts={posts} user={dummyUser} />
+          <PostList posts={posts} user={user} />
         </div>
       ) : (
         <FollowersList />

@@ -20,7 +20,7 @@ export default function ProfileHeader({
         <img
           src={
             user.avatar_url ||
-            'https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff&bold=true'
+            `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`
           }
           alt="Avatar"
           className="w-32 h-32 rounded-full border-4 border-purple-100"
