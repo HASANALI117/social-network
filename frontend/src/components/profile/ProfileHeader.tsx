@@ -6,6 +6,7 @@ interface ProfileHeaderProps {
   isPublic: boolean;
   onTogglePublic?: () => void;
   onFollow: () => void;
+  onEdit?: () => void;
   isPreview?: boolean;
 }
 
@@ -14,6 +15,7 @@ export default function ProfileHeader({
   isPublic,
   onTogglePublic,
   onFollow,
+  onEdit,
   isPreview = false,
 }: ProfileHeaderProps) {
   return (
@@ -44,7 +46,10 @@ export default function ProfileHeader({
                 Follow
               </button>
               {!isPreview && (
-                <button className="text-purple-400 hover:text-purple-300">
+                <button
+                  onClick={onEdit}
+                  className="text-purple-400 hover:text-purple-300"
+                >
                   <FiEdit className="text-2xl" />
                 </button>
               )}

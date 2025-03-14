@@ -4,18 +4,23 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserType } from '@/types/User';
 import ProfileHeader from '@/components/profile/ProfileHeader';
+import EditProfileForm from '@/components/profile/EditProfileForm';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import CreatePostForm from '@/components/profile/CreatePostForm';
 import PostList from '@/components/profile/PostList';
 import FollowersList from '@/components/profile/FollowersList';
 import { useUserStore } from '@/store/useUserStore';
+import { useRequest } from '@/hooks/useRequest';
+import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useUserStore();
+  const { user, isAuthenticated, update } = useUserStore();
+  const { put } = useRequest<UserType>();
   const [isLoading, setIsLoading] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [activeTab, setActiveTab] = useState('posts');
+  const [isEditing, setIsEditing] = useState(false);
   const [posts, setPosts] = useState([
     {
       id: 1,
@@ -44,6 +49,21 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   }, [isAuthenticated, router]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleUpdateProfile = async (userData: Partial<UserType>) => {
+    if (!user) return;
+    
+    const response = await put(`/api/users/update?id=${user.id}`, userData, (data) => {
+      console.log('User updated:', userData);
+      toast.success('Profile updated successfully!');
+      update(data);
+      setIsEditing(false);
+    });
+  };
 
   const handleFollow = () => {
     // TODO: Implement follow logic
@@ -74,12 +94,21 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-900 min-h-screen text-gray-100">
-      <ProfileHeader
-        user={user}
-        isPublic={isPublic}
-        onTogglePublic={() => setIsPublic(!isPublic)}
-        onFollow={handleFollow}
-      />
+      {isEditing ? (
+        <EditProfileForm
+          user={user}
+          onSubmit={handleUpdateProfile}
+          onCancel={() => setIsEditing(false)}
+        />
+      ) : (
+        <ProfileHeader
+          user={user}
+          isPublic={isPublic}
+          onTogglePublic={() => setIsPublic(!isPublic)}
+          onFollow={handleFollow}
+          onEdit={handleEdit}
+        />
+      )}
 
       <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
