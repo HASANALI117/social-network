@@ -83,13 +83,42 @@ func (h *Hub) Run() {
 				h.deliverMessage(message.ReceiverID, message)
 
 			case "group":
-				// TODO: Implement group message handling
-				fmt.Println("👥 Group messages not implemented yet")
+				fmt.Printf("\n👥 New group message received:\n")
+				fmt.Printf("   From: User %s\n", message.SenderID)
+				fmt.Printf("   To Group: %s\n", message.ReceiverID)
+				fmt.Printf("   Content: %s\n", message.Content)
+				fmt.Printf("   Time: %s\n", message.CreatedAt)
 
-				// case "typing":
-				// 	fmt.Printf("💭 User %s is typing to %s\n", message.SenderID, message.ReceiverID)
+				// Save the message to the database
+				groupMsg := &models.GroupMessage{
+					GroupID:   message.ReceiverID, // GroupID is in the ReceiverID field
+					SenderID:  message.SenderID,
+					Content:   message.Content,
+					CreatedAt: message.CreatedAt,
+				}
 
-				// 	h.deliverMessage(message.ReceiverID, message)
+				if err := helpers.SaveGroupMessage(groupMsg); err != nil {
+					fmt.Printf("❌ Error storing group message: %v\n", err)
+				}
+
+				// Check if sender is a member of the group
+				isMember, err := helpers.IsGroupMember(message.ReceiverID, message.SenderID)
+				if err != nil || !isMember {
+					fmt.Printf("❌ User %s is not a member of group %s\n", message.SenderID, message.ReceiverID)
+					continue
+				}
+
+				// Get all group members
+				members, err := helpers.ListGroupMembers(message.ReceiverID)
+				if err != nil {
+					fmt.Printf("❌ Error getting group members: %v\n", err)
+					continue
+				}
+
+				// Deliver the message to all online group members
+				for _, member := range members {
+					h.deliverMessage(member.ID, message)
+				}
 			}
 		}
 	}
