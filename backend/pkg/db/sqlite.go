@@ -68,8 +68,21 @@ func runMigrations(db *sql.DB) error {
 		return fmt.Errorf("failed to create migration instance: %w", err)
 	}
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("failed to run migrations: %w", err)
+	// Add this to check current version
+	version, dirty, err := m.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		log.Printf("Migration version error: %v", err)
+	} else {
+		log.Printf("Current migration version: %d, Dirty: %v", version, dirty)
+	}
+
+	if err := m.Up(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			log.Println("No new migrations to apply")
+		} else {
+			log.Printf("Migration error: %v", err)
+			return fmt.Errorf("failed to run migrations: %w", err)
+		}
 	}
 
 	log.Println("Database migrations completed successfully")
