@@ -8,6 +8,7 @@ import (
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Register godoc
@@ -205,15 +206,22 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user ID from URL query parameter
-	userID := r.URL.Query().Get("id")
-	if userID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
+	// Get current user from session for authorization
+	currentUser, err := helpers.GetUserFromSession(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
+	// Get user ID from URL query parameter
+	// userID := r.URL.Query().Get("id")
+	// if userID == "" {
+	// 	http.Error(w, "User ID is required", http.StatusBadRequest)
+	// 	return
+	// }
+
 	// Get existing user
-	user, err := helpers.GetUserByID(userID)
+	user, err := helpers.GetUserByID(currentUser.ID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -225,6 +233,9 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req struct {
+		Username  string `json:"username"`
+		Email     string `json:"email"`
+		Password  string `json:"password"`
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 		AvatarURL string `json:"avatar_url"`
@@ -237,12 +248,30 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Basic validation
+	if req.Username == "" || req.Email == "" {
+		http.Error(w, "Username and email are required", http.StatusBadRequest)
+		return
+	}
+
 	// Update user data
+	user.Username = req.Username
+	user.Email = req.Email
 	user.FirstName = req.FirstName
 	user.LastName = req.LastName
 	user.AvatarURL = req.AvatarURL
-	user.AboutMe = req.FirstName
+	user.AboutMe = req.AboutMe
 	user.BirthDate = req.BirthDate
+
+	// Only update password if provided
+	if req.Password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			return
+		}
+		user.Password = string(hashedPassword)
+	}
 
 	// Save updated user to database
 	if err := helpers.UpdateUser(user); err != nil {
@@ -262,6 +291,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		"about_me":   user.AboutMe,
 		"birth_date": user.BirthDate,
 		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
 	})
 }
 

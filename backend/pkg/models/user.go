@@ -2,8 +2,6 @@ package models
 
 import (
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // User represents a user in the system
@@ -19,15 +17,4 @@ type User struct {
 	BirthDate string    `json:"birth_date"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// UpdatePassword updates the user's password
-func (u *User) UpdatePassword(password string) error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	u.Password = string(hashedPassword)
-	u.UpdatedAt = time.Now()
-	return nil
 }
