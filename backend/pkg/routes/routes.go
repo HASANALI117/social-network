@@ -47,5 +47,20 @@ func Setup() http.Handler {
 	// Message routes
 	mux.HandleFunc("/api/messages", handlers.GetMessages)
 
+	// Group routes
+	mux.HandleFunc("/api/groups/create", handlers.CreateGroup)
+	mux.HandleFunc("/api/groups/get", handlers.GetGroup)
+	mux.HandleFunc("/api/groups/list", handlers.ListGroups)
+	mux.HandleFunc("/api/groups/update", handlers.UpdateGroup)
+	mux.HandleFunc("/api/groups/delete", handlers.DeleteGroup)
+
+	// Group membership routes
+	mux.HandleFunc("/api/groups/members/add", handlers.AddGroupMember)
+	mux.HandleFunc("/api/groups/members/remove", handlers.RemoveGroupMember)
+	mux.HandleFunc("/api/groups/members", handlers.ListGroupMembers)
+
+	// Group messages routes
+	mux.HandleFunc("/api/groups/messages", handlers.GetGroupMessages)
+
 	return mux
 }
