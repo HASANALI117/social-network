@@ -308,3 +308,45 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 		"message": "User deleted successfully",
 	})
 }
+
+// OnlineUsers godoc
+// @Summary Get online users
+// @Description Get a list of currently online users
+// @Tags users
+// @Accept json
+// @Produce json
+// @Success 200 {array} map[string]string "List of online users"
+// @Failure 401 {string} string "Unauthorized"
+// @Router /users/online [get]
+func OnlineUsers(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET requests
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get current user from session
+	currentUser, err := helpers.GetUserFromSession(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get online users from WebSocket hub
+	onlineUsers := WebSocketHub.GetUsersWithStatus()
+
+	// Filter out current user from the list
+	filteredUsers := make([]map[string]string, 0)
+	for _, user := range onlineUsers {
+		if user["id"] != currentUser.ID {
+			filteredUsers = append(filteredUsers, user)
+		}
+	}
+
+	// Return the list
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"online_users": filteredUsers,
+		"count":        len(filteredUsers),
+	})
+}

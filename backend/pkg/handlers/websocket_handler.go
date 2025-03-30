@@ -36,7 +36,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ws.NewClient(WebSocketHub, conn, user.ID)
+	client := ws.NewClient(WebSocketHub, conn, user.ID, user.Username, user.AvatarURL)
 
 	WebSocketHub.Register <- client
 

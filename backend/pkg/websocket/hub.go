@@ -2,13 +2,14 @@ package ws
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/models"
 )
 
 type Hub struct {
-	Clients    map[*Client]bool
+	Clients    map[string]*Client
 	Broadcast  chan *Message
 	Register   chan *Client
 	Unregister chan *Client
@@ -24,7 +25,7 @@ type Message struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		Clients:    map[*Client]bool{},
+		Clients:    make(map[string]*Client),
 		Broadcast:  make(chan *Message),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
@@ -35,23 +36,27 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
-			h.Clients[client] = true
+			h.Clients[client.UserID] = client
 			fmt.Printf("➡️  User %s connected to chat\n", client.UserID)
 			fmt.Printf("📊 Active users: %d\n", len(h.Clients))
 
 			// Log all connected users
 			fmt.Println("🟢 Connected users:")
-			for client := range h.Clients {
-				fmt.Printf("   - User ID: %s\n", client.UserID)
+			for userID := range h.Clients {
+				fmt.Printf("   - User ID: %s\n", userID)
 			}
 
+			go h.broadcastUserStatusChange()
+
 		case client := <-h.Unregister:
-			if _, ok := h.Clients[client]; ok {
-				delete(h.Clients, client)
+			if _, ok := h.Clients[client.UserID]; ok {
+				delete(h.Clients, client.UserID)
 				close(client.Send)
 
 				fmt.Printf("❌ User %s disconnected from chat\n", client.UserID)
 				fmt.Printf("📊 Remaining active users: %d\n", len(h.Clients))
+
+				go h.broadcastUserStatusChange()
 			}
 
 		case message := <-h.Broadcast:
@@ -70,34 +75,50 @@ func (h *Hub) Run() {
 					CreatedAt:  message.CreatedAt,
 				}
 
-				err := helpers.SaveMessage(msg)
-				if err != nil {
+				if err := helpers.SaveMessage(msg); err != nil {
 					fmt.Printf("❌ Error storing message: %v\n", err)
-					continue
 				}
 
-				for client := range h.Clients {
-					if client.UserID == message.ReceiverID || client.UserID == message.SenderID {
-						select {
-						case client.Send <- message:
-							fmt.Printf("✅ Message delivered to User %s\n", client.UserID)
-
-						default:
-							fmt.Printf("⚠️ Failed to deliver message to User %s - connection closed\n", client.UserID)
-							close(client.Send)
-							delete(h.Clients, client)
-						}
-					}
-				}
+				h.deliverMessage(message.SenderID, message)
+				h.deliverMessage(message.ReceiverID, message)
 
 			case "group":
 				// TODO: Implement group message handling
 				fmt.Println("👥 Group messages not implemented yet")
+
+				// case "typing":
+				// 	fmt.Printf("💭 User %s is typing to %s\n", message.SenderID, message.ReceiverID)
+
+				// 	h.deliverMessage(message.ReceiverID, message)
 			}
 		}
 	}
 }
 
-// func (h * Hub) sendDirectMessage() {
+func (h *Hub) deliverMessage(userID string, message *Message) {
+	client, ok := h.Clients[userID]
 
-// }
+	if ok {
+		select {
+		case client.Send <- message:
+			fmt.Printf("✅ Message delivered to User %s\n", userID)
+
+		default:
+			fmt.Printf("⚠️ Failed to deliver message to User %s - connection closed\n", userID)
+			delete(h.Clients, userID)
+			close(client.Send)
+		}
+	}
+}
+
+func (h *Hub) broadcastUserStatusChange() {
+	time.Sleep(500 * time.Millisecond)
+
+	message := &Message{
+		Type: "online_users",
+	}
+
+	for _, client := range h.Clients {
+		h.deliverMessage(client.UserID, message)
+	}
+}

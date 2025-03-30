@@ -34,6 +34,7 @@ func Setup() http.Handler {
 	mux.HandleFunc("/api/users/list", handlers.ListUsers)
 	mux.HandleFunc("/api/users/update", handlers.UpdateUser)
 	mux.HandleFunc("/api/users/delete", handlers.DeleteUser)
+	mux.HandleFunc("/api/users/online", handlers.OnlineUsers)
 
 	// Post routes
 	mux.HandleFunc("/api/posts/create", handlers.CreatePost)

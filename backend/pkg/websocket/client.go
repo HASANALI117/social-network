@@ -8,18 +8,22 @@ import (
 )
 
 type Client struct {
-	Hub    *Hub
-	Conn   *websocket.Conn
-	Send   chan *Message
-	UserID string
+	Hub      *Hub
+	Conn     *websocket.Conn
+	Send     chan *Message
+	UserID   string
+	Username string
+	Image    string
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, userID string) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, userID, username, image string) *Client {
 	return &Client{
-		Hub:    hub,
-		Conn:   conn,
-		Send:   make(chan *Message, 256),
-		UserID: userID,
+		Hub:      hub,
+		Conn:     conn,
+		Send:     make(chan *Message, 256),
+		UserID:   userID,
+		Username: username,
+		Image:    image,
 	}
 }
 
@@ -98,4 +102,18 @@ func (c *Client) WritePump() {
 		// 	return
 		// }
 	}
+}
+
+func (h *Hub) GetUsersWithStatus() []map[string]string {
+	onlineUsers := make([]map[string]string, 0, len(h.Clients))
+
+	for _, client := range h.Clients {
+		onlineUsers = append(onlineUsers, map[string]string{
+			"id":       client.UserID,
+			"username": client.Username,
+			"image":    client.Image,
+		})
+	}
+
+	return onlineUsers
 }
