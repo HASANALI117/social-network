@@ -3,67 +3,124 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/HASANALI117/social-network/pkg/apperrors"
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/models"
 )
 
+// --- DTOs ---
+
+// CreateGroupRequest defines the expected body for creating a group.
+type CreateGroupRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+// GroupResponse defines the group data returned by the API.
+type GroupResponse struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatorID   string    `json:"creator_id"`
+	AvatarURL   string    `json:"avatar_url"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ListGroupsResponse defines the structure for listing groups.
+type ListGroupsResponse struct {
+	Groups []GroupResponse `json:"groups"`
+	Limit  int             `json:"limit"`
+	Offset int             `json:"offset"`
+	Count  int             `json:"count"`
+}
+
+// UpdateGroupRequest defines the expected body for updating a group.
+type UpdateGroupRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+// DeleteGroupResponse defines the success message for group deletion.
+type DeleteGroupResponse struct {
+	Message string `json:"message"`
+}
+
+// --- Helper Function ---
+
+// mapModelGroupToGroupResponse converts a models.Group to a GroupResponse DTO.
+func mapModelGroupToGroupResponse(group *models.Group) GroupResponse {
+	return GroupResponse{
+		ID:          group.ID,
+		Name:        group.Name,
+		Description: group.Description,
+		CreatorID:   group.CreatorID,
+		AvatarURL:   group.AvatarURL,
+		CreatedAt:   group.CreatedAt,
+		UpdatedAt:   group.UpdatedAt,
+	}
+}
+
 // CreateGroup godoc
 // @Summary Create a new group
-// @Description Create a new group chat
+// @Description Create a new group chat. Requires authentication.
 // @Tags groups
 // @Accept json
 // @Produce json
-// @Param group body models.Group true "Group creation details"
-// @Success 201 {object} map[string]interface{} "Group created successfully"
-// @Failure 400 {string} string "Invalid request body"
-// @Failure 500 {string} string "Failed to create group"
+// @Param group body CreateGroupRequest true "Group creation details"
+// @Success 201 {object} GroupResponse "Group created successfully"
+// @Failure 400 {object} map[string]string "Invalid request body or missing group name"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 405 {object} map[string]string "Method not allowed"
+// @Failure 500 {object} map[string]string "Failed to create group"
 // @Router /groups/create [post]
-func CreateGroup(w http.ResponseWriter, r *http.Request) {
+func CreateGroup(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return apperrors.ErrMethodNotAllowed("", nil)
 	}
 
 	// Get current user from session
+	// TODO: Replace helpers.GetUserFromSession when auth middleware/service is added
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return apperrors.ErrUnauthorized("Unauthorized", err)
 	}
 
-	var group models.Group
-	if err := json.NewDecoder(r.Body).Decode(&group); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	var req CreateGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return apperrors.ErrBadRequest("Invalid request body", err)
 	}
-
-	// Set creator ID to current user
-	group.CreatorID = currentUser.ID
 
 	// Basic validation
-	if group.Name == "" {
-		http.Error(w, "Group name is required", http.StatusBadRequest)
-		return
+	if req.Name == "" {
+		return apperrors.ErrBadRequest("Group name is required", nil)
 	}
 
+	// Map request DTO to internal model
+	group := models.Group{
+		Name:        req.Name,
+		Description: req.Description,
+		AvatarURL:   req.AvatarURL,
+		CreatorID:   currentUser.ID, // Set creator ID to current user
+	}
+
+	// Create group in database
+	// TODO: Replace helpers.CreateGroup when service layer is added
 	if err := helpers.CreateGroup(&group); err != nil {
-		http.Error(w, "Failed to create group", http.StatusInternalServerError)
-		return
+		log.Printf("Failed to create group: %v", err)
+		return apperrors.ErrInternalServer("Failed to create group", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":          group.ID,
-		"name":        group.Name,
-		"description": group.Description,
-		"creator_id":  group.CreatorID,
-		"avatar_url":  group.AvatarURL,
-		"created_at":  group.CreatedAt,
-	})
+	// Return created group DTO
+	response := mapModelGroupToGroupResponse(&group)
+	return helpers.RespondJSON(w, http.StatusCreated, response)
 }
 
 // GetGroup godoc
@@ -73,43 +130,32 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id query string true "Group ID"
-// @Success 200 {object} map[string]interface{} "Group details"
-// @Failure 400 {string} string "Group ID is required"
-// @Failure 404 {string} string "Group not found"
-// @Failure 500 {string} string "Failed to get group"
+// @Success 200 {object} GroupResponse "Group details"
+// @Failure 400 {object} map[string]string "Group ID is required"
+// @Failure 404 {object} map[string]string "Group not found"
+// @Failure 405 {object} map[string]string "Method not allowed"
+// @Failure 500 {object} map[string]string "Failed to get group"
 // @Router /groups/get [get]
-func GetGroup(w http.ResponseWriter, r *http.Request) {
+func GetGroup(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return apperrors.ErrMethodNotAllowed("", nil)
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return apperrors.ErrBadRequest("Group ID is required", nil)
 	}
 
 	group, err := helpers.GetGroupByID(groupID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrGroupNotFound) {
-			http.Error(w, "Group not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to get group", http.StatusInternalServerError)
+			return apperrors.ErrNotFound("Group not found", err)
 		}
-		return
+		return apperrors.ErrInternalServer("Failed to get group", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":          group.ID,
-		"name":        group.Name,
-		"description": group.Description,
-		"creator_id":  group.CreatorID,
-		"avatar_url":  group.AvatarURL,
-		"created_at":  group.CreatedAt,
-		"updated_at":  group.UpdatedAt,
-	})
+	response := mapModelGroupToGroupResponse(group)
+	return helpers.RespondJSON(w, http.StatusOK, response)
 }
 
 // ListGroups godoc
@@ -118,15 +164,16 @@ func GetGroup(w http.ResponseWriter, r *http.Request) {
 // @Tags groups
 // @Accept json
 // @Produce json
-// @Param limit query int false "Number of groups to return (default 10)"
-// @Param offset query int false "Number of groups to skip (default 0)"
-// @Success 200 {object} map[string]interface{} "List of groups"
-// @Failure 500 {string} string "Failed to list groups"
+// @Param limit query int false "Number of groups to return (default 10)" minimum(1) maximum(100)
+// @Param offset query int false "Number of groups to skip (default 0)" minimum(0)
+// @Success 200 {object} ListGroupsResponse "List of groups"
+// @Failure 400 {object} map[string]string "Invalid limit or offset parameter"
+// @Failure 405 {object} map[string]string "Method not allowed"
+// @Failure 500 {object} map[string]string "Failed to list groups"
 // @Router /groups/list [get]
-func ListGroups(w http.ResponseWriter, r *http.Request) {
+func ListGroups(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return apperrors.ErrMethodNotAllowed("", nil)
 	}
 
 	// Parse pagination parameters
@@ -135,107 +182,96 @@ func ListGroups(w http.ResponseWriter, r *http.Request) {
 
 	limit := 10 // Default limit
 	if limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
-			limit = parsedLimit
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit <= 0 || parsedLimit > 100 {
+			return apperrors.ErrBadRequest("Invalid limit parameter", err)
 		}
+		limit = parsedLimit
 	}
 
 	offset := 0 // Default offset
 	if offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
-			offset = parsedOffset
+		parsedOffset, err := strconv.Atoi(offsetStr)
+		if err != nil || parsedOffset < 0 {
+			return apperrors.ErrBadRequest("Invalid offset parameter", err)
 		}
+		offset = parsedOffset
 	}
 
 	groups, err := helpers.ListGroups(limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to list groups", http.StatusInternalServerError)
-		return
+		return apperrors.ErrInternalServer("Failed to list groups", err)
 	}
 
-	result := make([]map[string]interface{}, len(groups))
+	groupResponses := make([]GroupResponse, len(groups))
 	for i, group := range groups {
-		result[i] = map[string]interface{}{
-			"id":          group.ID,
-			"name":        group.Name,
-			"description": group.Description,
-			"creator_id":  group.CreatorID,
-			"avatar_url":  group.AvatarURL,
-			"created_at":  group.CreatedAt,
-			"updated_at":  group.UpdatedAt,
-		}
+		groupResponses[i] = mapModelGroupToGroupResponse(group)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"groups": result,
-		"limit":  limit,
-		"offset": offset,
-		"count":  len(groups),
-	})
+	response := ListGroupsResponse{
+		Groups: groupResponses,
+		Limit:  limit,
+		Offset: offset,
+		Count:  len(groupResponses),
+	}
+	return helpers.RespondJSON(w, http.StatusOK, response)
 }
 
 // UpdateGroup godoc
 // @Summary Update group
-// @Description Update group details
+// @Description Update group details. Requires authentication and admin privileges.
 // @Tags groups
 // @Accept json
 // @Produce json
-// @Param id query string true "Group ID"
-// @Param group body object true "Group update details"
-// @Success 200 {object} map[string]interface{} "Updated group details"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 404 {string} string "Group not found"
-// @Failure 500 {string} string "Failed to update group"
-// @Router /groups/update [put]
-func UpdateGroup(w http.ResponseWriter, r *http.Request) {
+// @Param id path string true "Group ID"
+// @Param group body UpdateGroupRequest true "Group update details"
+// @Success 200 {object} GroupResponse "Updated group details"
+// @Failure 400 {object} map[string]string "Invalid request body or missing group name"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 403 {object} map[string]string "Forbidden - only admins can update group"
+// @Failure 404 {object} map[string]string "Group not found"
+// @Failure 405 {object} map[string]string "Method not allowed"
+// @Failure 500 {object} map[string]string "Failed to update group"
+// @Router /groups/update/{id} [put]
+func UpdateGroup(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return apperrors.ErrMethodNotAllowed("", nil)
 	}
 
 	// Get current user from session
+	// TODO: Replace helpers.GetUserFromSession when auth middleware/service is added
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return apperrors.ErrUnauthorized("Unauthorized", err)
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return apperrors.ErrBadRequest("Group ID is required", nil)
 	}
 
 	// Get existing group
 	group, err := helpers.GetGroupByID(groupID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrGroupNotFound) {
-			http.Error(w, "Group not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to get group", http.StatusInternalServerError)
+			return apperrors.ErrNotFound("Group not found", err)
 		}
-		return
+		return apperrors.ErrInternalServer("Failed to get group", err)
 	}
 
 	// Check if user is admin
 	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID)
-	if err != nil || !isAdmin {
-		http.Error(w, "Unauthorized - only admins can update group", http.StatusUnauthorized)
-		return
+	if err != nil {
+		return apperrors.ErrInternalServer("Failed to check admin status", err)
+	}
+	if !isAdmin {
+		return apperrors.ErrForbidden("Unauthorized - only admins can update group", nil)
 	}
 
 	// Parse request body
-	var req struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		AvatarURL   string `json:"avatar_url"`
-	}
-
+	var req UpdateGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return apperrors.ErrBadRequest("Invalid request body", err)
 	}
 
 	// Update group data
@@ -244,82 +280,63 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	group.AvatarURL = req.AvatarURL
 
 	if err := helpers.UpdateGroup(group); err != nil {
-		http.Error(w, "Failed to update group", http.StatusInternalServerError)
-		return
+		return apperrors.ErrInternalServer("Failed to update group", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":          group.ID,
-		"name":        group.Name,
-		"description": group.Description,
-		"creator_id":  group.CreatorID,
-		"avatar_url":  group.AvatarURL,
-		"created_at":  group.CreatedAt,
-		"updated_at":  group.UpdatedAt,
-	})
+	response := mapModelGroupToGroupResponse(group)
+	return helpers.RespondJSON(w, http.StatusOK, response)
 }
 
 // DeleteGroup godoc
 // @Summary Delete group
-// @Description Delete a group by ID
+// @Description Delete a group by ID. Requires authentication and group creator privileges.
 // @Tags groups
 // @Accept json
 // @Produce json
-// @Param id query string true "Group ID"
-// @Success 200 {object} map[string]string "Group deleted successfully"
-// @Failure 400 {string} string "Group ID is required"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 404 {string} string "Group not found"
-// @Failure 500 {string} string "Failed to delete group"
-// @Router /groups/delete [delete]
-func DeleteGroup(w http.ResponseWriter, r *http.Request) {
+// @Param id path string true "Group ID"
+// @Success 200 {object} DeleteGroupResponse "Group deleted successfully"
+// @Failure 400 {object} map[string]string "Group ID is required"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 403 {object} map[string]string "Forbidden - only the creator can delete the group"
+// @Failure 404 {object} map[string]string "Group not found"
+// @Failure 405 {object} map[string]string "Method not allowed"
+// @Failure 500 {object} map[string]string "Failed to delete group"
+// @Router /groups/delete/{id} [delete]
+func DeleteGroup(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return apperrors.ErrMethodNotAllowed("", nil)
 	}
 
 	// Get current user from session
+	// TODO: Replace helpers.GetUserFromSession when auth middleware/service is added
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return apperrors.ErrUnauthorized("Unauthorized", err)
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return apperrors.ErrBadRequest("Group ID is required", nil)
 	}
 
 	// Get group to check if user is creator
 	group, err := helpers.GetGroupByID(groupID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrGroupNotFound) {
-			http.Error(w, "Group not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to get group", http.StatusInternalServerError)
+			return apperrors.ErrNotFound("Group not found", err)
 		}
-		return
+		return apperrors.ErrInternalServer("Failed to get group", err)
 	}
 
 	// Only the creator can delete the group
 	if group.CreatorID != currentUser.ID {
-		http.Error(w, "Unauthorized - only the creator can delete the group", http.StatusUnauthorized)
-		return
+		return apperrors.ErrForbidden("Unauthorized - only the creator can delete the group", nil)
 	}
 
 	if err := helpers.DeleteGroup(groupID); err != nil {
-		if errors.Is(err, helpers.ErrGroupNotFound) {
-			http.Error(w, "Group not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to delete group", http.StatusInternalServerError)
-		}
-		return
+		return apperrors.ErrInternalServer("Failed to delete group", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Group deleted successfully",
-	})
+	response := DeleteGroupResponse{Message: "Group deleted successfully"}
+	return helpers.RespondJSON(w, http.StatusOK, response)
 }

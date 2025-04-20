@@ -5,6 +5,7 @@ import (
 
 	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
+	"github.com/HASANALI117/social-network/pkg/helpers" // Added import
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -22,45 +23,45 @@ func Setup() http.Handler {
 	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
 	// Websocket routes
-	mux.HandleFunc("/ws", handlers.HandleWebSocket)
+	mux.HandleFunc("/ws", handlers.HandleWebSocket) // Assuming HandleWebSocket doesn't need error wrapping yet
 
-	// Authentication routes
-	mux.HandleFunc("/api/auth/signin", handlers.SignIn)
-	mux.HandleFunc("/api/auth/signout", handlers.SignOut)
+	// Authentication routes (using MakeHandler)
+	mux.HandleFunc("/api/auth/signin", helpers.MakeHandler(handlers.SignIn))
+	mux.HandleFunc("/api/auth/signout", helpers.MakeHandler(handlers.SignOut))
 
-	// User routes
-	mux.HandleFunc("/api/users/register", handlers.RegisterUser)
-	mux.HandleFunc("/api/users/get", handlers.GetUser)
-	mux.HandleFunc("/api/users/list", handlers.ListUsers)
-	mux.HandleFunc("/api/users/update", handlers.UpdateUser)
-	mux.HandleFunc("/api/users/delete", handlers.DeleteUser)
-	mux.HandleFunc("/api/users/online", handlers.OnlineUsers)
+	// User routes (using MakeHandler)
+	mux.HandleFunc("/api/users/register", helpers.MakeHandler(handlers.RegisterUser))
+	mux.HandleFunc("/api/users/get", helpers.MakeHandler(handlers.GetUser))
+	mux.HandleFunc("/api/users/list", helpers.MakeHandler(handlers.ListUsers))
+	mux.HandleFunc("/api/users/update", helpers.MakeHandler(handlers.UpdateUser)) // Assumes UpdateUser is refactored
+	mux.HandleFunc("/api/users/delete", helpers.MakeHandler(handlers.DeleteUser))
+	mux.HandleFunc("/api/users/online", helpers.MakeHandler(handlers.OnlineUsers))
 
-	// Post routes
-	mux.HandleFunc("/api/posts/create", handlers.CreatePost)
-	mux.HandleFunc("/api/posts/get", handlers.GetPost)
-	mux.HandleFunc("/api/posts/list", handlers.ListPosts)
-	mux.HandleFunc("/api/posts/user", handlers.ListUserPosts)
-	// mux.HandleFunc("/api/posts/update", handlers.u)
-	mux.HandleFunc("/api/posts/delete", handlers.DeletePost)
+	// Post routes (using MakeHandler)
+	mux.HandleFunc("/api/posts/create", helpers.MakeHandler(handlers.CreatePost))
+	mux.HandleFunc("/api/posts/get", helpers.MakeHandler(handlers.GetPost))
+	mux.HandleFunc("/api/posts/list", helpers.MakeHandler(handlers.ListPosts))
+	mux.HandleFunc("/api/posts/user", helpers.MakeHandler(handlers.ListUserPosts))
+	// mux.HandleFunc("/api/posts/update", helpers.MakeHandler(handlers.UpdatePost)) // UpdatePost is commented out in handler
+	mux.HandleFunc("/api/posts/delete", helpers.MakeHandler(handlers.DeletePost))
 
-	// Message routes
-	mux.HandleFunc("/api/messages", handlers.GetMessages)
+	// Message routes (using MakeHandler)
+	mux.HandleFunc("/api/messages", helpers.MakeHandler(handlers.GetMessages))
 
-	// Group routes
-	mux.HandleFunc("/api/groups/create", handlers.CreateGroup)
-	mux.HandleFunc("/api/groups/get", handlers.GetGroup)
-	mux.HandleFunc("/api/groups/list", handlers.ListGroups)
-	mux.HandleFunc("/api/groups/update", handlers.UpdateGroup)
-	mux.HandleFunc("/api/groups/delete", handlers.DeleteGroup)
+	// Group routes (using MakeHandler)
+	mux.HandleFunc("/api/groups/create", helpers.MakeHandler(handlers.CreateGroup))
+	mux.HandleFunc("/api/groups/get", helpers.MakeHandler(handlers.GetGroup))
+	mux.HandleFunc("/api/groups/list", helpers.MakeHandler(handlers.ListGroups))
+	mux.HandleFunc("/api/groups/update", helpers.MakeHandler(handlers.UpdateGroup))
+	mux.HandleFunc("/api/groups/delete", helpers.MakeHandler(handlers.DeleteGroup))
 
-	// Group membership routes
-	mux.HandleFunc("/api/groups/members/add", handlers.AddGroupMember)
-	mux.HandleFunc("/api/groups/members/remove", handlers.RemoveGroupMember)
-	mux.HandleFunc("/api/groups/members", handlers.ListGroupMembers)
+	// Group membership routes (using MakeHandler)
+	mux.HandleFunc("/api/groups/members/add", helpers.MakeHandler(handlers.AddGroupMember))
+	mux.HandleFunc("/api/groups/members/remove", helpers.MakeHandler(handlers.RemoveGroupMember))
+	mux.HandleFunc("/api/groups/members", helpers.MakeHandler(handlers.ListGroupMembers))
 
-	// Group messages routes
-	mux.HandleFunc("/api/groups/messages", handlers.GetGroupMessages)
+	// Group messages routes (using MakeHandler)
+	mux.HandleFunc("/api/groups/messages", helpers.MakeHandler(handlers.GetGroupMessages))
 
 	return mux
 }
