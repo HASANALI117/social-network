@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
 	"github.com/HASANALI117/social-network/pkg/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,32 +20,22 @@ import (
 // @Produce json
 // @Param user body models.User true "User registration details"
 // @Success 201 {object} map[string]interface{} "User created successfully"
-// @Failure 400 {string} string "Invalid request body"
-// @Failure 500 {string} string "Failed to register user"
+// @Failure 400 {object} httperr.ErrorResponse "Invalid request body"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to register user"
 // @Router /users/register [post]
-func RegisterUser(w http.ResponseWriter, r *http.Request) {
-	// Only allow POST requests
+func RegisterUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	var user models.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(err, "Invalid request body")
 	}
-
-	// Basic validation
-	// if req.Username == "" || req.Email == "" || req.Password == "" {
-	// 	http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
-	// 	return
-	// }
 
 	// Create and Save user to database
 	if err := helpers.CreateUser(&user); err != nil {
-		http.Error(w, "Failed to register user", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to register user")
 	}
 
 	// Return created user (excluding password)
@@ -61,6 +52,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		"birth_date": user.BirthDate,
 		"created_at": user.CreatedAt,
 	})
+	return nil
 }
 
 // GetUser godoc
@@ -71,36 +63,28 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id query string true "User ID"
 // @Success 200 {object} map[string]interface{} "User details"
-// @Failure 400 {string} string "User ID is required"
-// @Failure 404 {string} string "User not found"
-// @Failure 500 {string} string "Failed to get user"
+// @Failure 400 {object} httperr.ErrorResponse "User ID is required"
+// @Failure 404 {object} httperr.ErrorResponse "User not found"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to get user"
 // @Router /users/get [get]
-func GetUser(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
+func GetUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
-	// Get user ID from URL query parameter
 	userID := r.URL.Query().Get("id")
 	if userID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
-	// Get user from database
 	user, err := helpers.GetUserByID(userID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
-			http.Error(w, "User not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to get user", http.StatusInternalServerError)
+			return httperr.NewNotFound(err, "User not found")
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to get user")
 	}
 
-	// Return user data
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":         user.ID,
@@ -114,6 +98,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		"created_at": user.CreatedAt,
 		"updated_at": user.UpdatedAt,
 	})
+	return nil
 }
 
 // ListUsers godoc
@@ -125,13 +110,11 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 // @Param limit query int false "Number of users to return (default 10)"
 // @Param offset query int false "Number of users to skip (default 0)"
 // @Success 200 {object} map[string]interface{} "List of users"
-// @Failure 500 {string} string "Failed to list users"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to list users"
 // @Router /users/list [get]
-func ListUsers(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
+func ListUsers(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Parse pagination parameters
@@ -152,11 +135,9 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get users from database
 	users, err := helpers.ListUsers(limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to list users", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to list users")
 	}
 
 	// Sanitize user data (remove password hash)
@@ -176,7 +157,6 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Return user list
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"users":  result,
@@ -184,6 +164,7 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 		"offset": offset,
 		"count":  len(users),
 	})
+	return nil
 }
 
 // UpdateUser godoc
@@ -195,40 +176,29 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Param id query string true "User ID"
 // @Param user body object true "User update details"
 // @Success 200 {object} map[string]interface{} "Updated user details"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 404 {string} string "User not found"
-// @Failure 500 {string} string "Failed to update user"
+// @Failure 400 {object} httperr.ErrorResponse "Invalid request"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
+// @Failure 404 {object} httperr.ErrorResponse "User not found"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to update user"
 // @Router /users/update [put]
-func UpdateUser(w http.ResponseWriter, r *http.Request) {
-	// Only allow PUT requests
+func UpdateUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Get current user from session for authorization
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return httperr.NewUnauthorized(err, "")
 	}
-
-	// Get user ID from URL query parameter
-	// userID := r.URL.Query().Get("id")
-	// if userID == "" {
-	// 	http.Error(w, "User ID is required", http.StatusBadRequest)
-	// 	return
-	// }
 
 	// Get existing user
 	user, err := helpers.GetUserByID(currentUser.ID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
-			http.Error(w, "User not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to get user", http.StatusInternalServerError)
+			return httperr.NewNotFound(err, "User not found")
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to get user")
 	}
 
 	// Parse request body
@@ -244,14 +214,12 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
 	// Basic validation
 	if req.Username == "" || req.Email == "" {
-		http.Error(w, "Username and email are required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Username and email are required")
 	}
 
 	// Update user data
@@ -267,19 +235,16 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-			return
+			return httperr.NewInternalServerError(err, "Failed to hash password")
 		}
 		user.Password = string(hashedPassword)
 	}
 
 	// Save updated user to database
 	if err := helpers.UpdateUser(user); err != nil {
-		http.Error(w, "Failed to update user", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to update user")
 	}
 
-	// Return updated user
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":         user.ID,
@@ -293,6 +258,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		"created_at": user.CreatedAt,
 		"updated_at": user.UpdatedAt,
 	})
+	return nil
 }
 
 // DeleteUser godoc
@@ -303,40 +269,33 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id query string true "User ID"
 // @Success 200 {object} map[string]string "User deleted successfully"
-// @Failure 400 {string} string "User ID is required"
-// @Failure 404 {string} string "User not found"
-// @Failure 500 {string} string "Failed to delete user"
+// @Failure 400 {object} httperr.ErrorResponse "User ID is required"
+// @Failure 404 {object} httperr.ErrorResponse "User not found"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to delete user"
 // @Router /users/delete [delete]
-func DeleteUser(w http.ResponseWriter, r *http.Request) {
-	// Only allow DELETE requests
+func DeleteUser(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
-	// Get user ID from URL query parameter
 	userID := r.URL.Query().Get("id")
 	if userID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
-	// Delete user from database
 	if err := helpers.DeleteUser(userID); err != nil {
 		if errors.Is(err, helpers.ErrUserNotFound) {
-			http.Error(w, "User not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+			return httperr.NewNotFound(err, "User not found")
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to delete user")
 	}
 
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "User deleted successfully",
 	})
+	return nil
 }
 
 // OnlineUsers godoc
@@ -346,20 +305,16 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Success 200 {array} map[string]string "List of online users"
-// @Failure 401 {string} string "Unauthorized"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
 // @Router /users/online [get]
-func OnlineUsers(w http.ResponseWriter, r *http.Request) {
-	// Only allow GET requests
+func OnlineUsers(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
-	// Get current user from session
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return httperr.NewUnauthorized(err, "")
 	}
 
 	// Get online users from WebSocket hub
@@ -373,10 +328,10 @@ func OnlineUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Return the list
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"online_users": filteredUsers,
 		"count":        len(filteredUsers),
 	})
+	return nil
 }

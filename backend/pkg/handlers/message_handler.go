@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
 )
 
 // GetMessages godoc
@@ -18,14 +19,20 @@ import (
 // @Param limit query int false "Number of messages to return (default 50)"
 // @Param offset query int false "Number of messages to skip (default 0)"
 // @Success 200 {object} []models.Message
+// @Failure 400 {object} httperr.ErrorResponse "Missing required parameters"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to fetch messages"
 // @Router /messages [get]
-func GetMessages(w http.ResponseWriter, r *http.Request) {
+func GetMessages(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != http.MethodGet {
+		return httperr.NewMethodNotAllowed(nil, "")
+	}
+
 	senderID := r.URL.Query().Get("sender_id")
 	receiverID := r.URL.Query().Get("receiver_id")
 
 	if senderID == "" || receiverID == "" {
-		http.Error(w, "Both sender_id and receiver_id are required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Both sender_id and receiver_id are required")
 	}
 
 	limit := 50
@@ -44,10 +51,10 @@ func GetMessages(w http.ResponseWriter, r *http.Request) {
 
 	messages, err := helpers.GetUserMessages(senderID, receiverID, limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to fetch messages")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(messages)
+	return nil
 }

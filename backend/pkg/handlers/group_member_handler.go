@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
 )
 
 // AddGroupMember godoc
@@ -18,35 +19,35 @@ import (
 // @Param user_id body string true "User ID to add"
 // @Param role body string false "Role (default: member)"
 // @Success 200 {object} map[string]string "Member added successfully"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 409 {string} string "User already in group"
-// @Failure 500 {string} string "Failed to add member"
+// @Failure 400 {object} httperr.ErrorResponse "Invalid request"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 409 {object} httperr.ErrorResponse "User already in group"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to add member"
 // @Router /groups/members/add [post]
-func AddGroupMember(w http.ResponseWriter, r *http.Request) {
+func AddGroupMember(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Get current user from session
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return httperr.NewUnauthorized(err, "")
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
 	// Check if current user is an admin
 	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID)
-	if err != nil || !isAdmin {
-		http.Error(w, "Unauthorized - only admins can add members", http.StatusUnauthorized)
-		return
+	if err != nil {
+		return httperr.NewInternalServerError(err, "Failed to check admin status")
+	}
+	if !isAdmin {
+		return httperr.NewUnauthorized(nil, "Only admins can add members")
 	}
 
 	// Parse request body
@@ -56,29 +57,26 @@ func AddGroupMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
 	if req.UserID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
 	// Add member to group
 	if err := helpers.AddGroupMember(groupID, req.UserID, req.Role); err != nil {
 		if errors.Is(err, helpers.ErrAlreadyGroupMember) {
-			http.Error(w, "User is already a member of this group", http.StatusConflict)
-		} else {
-			http.Error(w, "Failed to add member", http.StatusInternalServerError)
+			return httperr.NewHTTPError(http.StatusConflict, "User is already a member of this group", err)
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to add member")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Member added successfully",
 	})
+	return nil
 }
 
 // RemoveGroupMember godoc
@@ -90,28 +88,26 @@ func AddGroupMember(w http.ResponseWriter, r *http.Request) {
 // @Param group_id query string true "Group ID"
 // @Param user_id body string true "User ID to remove"
 // @Success 200 {object} map[string]string "Member removed successfully"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 404 {string} string "User not in group"
-// @Failure 500 {string} string "Failed to remove member"
+// @Failure 400 {object} httperr.ErrorResponse "Invalid request"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
+// @Failure 404 {object} httperr.ErrorResponse "User not in group"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to remove member"
 // @Router /groups/members/remove [post]
-func RemoveGroupMember(w http.ResponseWriter, r *http.Request) {
+func RemoveGroupMember(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Get current user from session
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return httperr.NewUnauthorized(err, "")
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
 	// Parse request body
@@ -120,36 +116,35 @@ func RemoveGroupMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
 	if req.UserID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
 	// Check if current user is an admin or removing self
 	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID)
-	if err != nil || (!isAdmin && currentUser.ID != req.UserID) {
-		http.Error(w, "Unauthorized - only admins can remove other members", http.StatusUnauthorized)
-		return
+	if err != nil {
+		return httperr.NewInternalServerError(err, "Failed to check admin status")
+	}
+	if !isAdmin && currentUser.ID != req.UserID {
+		return httperr.NewUnauthorized(nil, "Only admins can remove other members")
 	}
 
 	// Remove member from group
 	if err := helpers.RemoveGroupMember(groupID, req.UserID); err != nil {
 		if errors.Is(err, helpers.ErrNotGroupMember) {
-			http.Error(w, "User is not a member of this group", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to remove member", http.StatusInternalServerError)
+			return httperr.NewNotFound(err, "User is not a member of this group")
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to remove member")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Member removed successfully",
 	})
+	return nil
 }
 
 // ListGroupMembers godoc
@@ -160,40 +155,39 @@ func RemoveGroupMember(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id query string true "Group ID"
 // @Success 200 {object} map[string]interface{} "List of group members"
-// @Failure 400 {string} string "Group ID is required"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Failed to list members"
+// @Failure 400 {object} httperr.ErrorResponse "Group ID is required"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to list members"
 // @Router /groups/members [get]
-func ListGroupMembers(w http.ResponseWriter, r *http.Request) {
+func ListGroupMembers(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Get current user from session
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return httperr.NewUnauthorized(err, "")
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
 	// Check if current user is a member
 	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID)
-	if err != nil || !isMember {
-		http.Error(w, "Unauthorized - only members can view the member list", http.StatusUnauthorized)
-		return
+	if err != nil {
+		return httperr.NewInternalServerError(err, "Failed to check member status")
+	}
+	if !isMember {
+		return httperr.NewUnauthorized(nil, "Only members can view the member list")
 	}
 
 	members, err := helpers.ListGroupMembers(groupID)
 	if err != nil {
-		http.Error(w, "Failed to list group members", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to list group members")
 	}
 
 	// Sanitize user data (remove password hash)
@@ -215,4 +209,5 @@ func ListGroupMembers(w http.ResponseWriter, r *http.Request) {
 		"members": result,
 		"count":   len(members),
 	})
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
 )
 
 // GetGroupMessages godoc
@@ -18,34 +19,34 @@ import (
 // @Param limit query int false "Number of messages to return (default 50)"
 // @Param offset query int false "Number of messages to skip (default 0)"
 // @Success 200 {object} map[string]interface{} "Group messages"
-// @Failure 400 {string} string "Group ID is required"
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Failed to get messages"
+// @Failure 400 {object} httperr.ErrorResponse "Group ID is required"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to get messages"
 // @Router /groups/messages [get]
-func GetGroupMessages(w http.ResponseWriter, r *http.Request) {
+func GetGroupMessages(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Get current user from session
 	currentUser, err := helpers.GetUserFromSession(r)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return httperr.NewUnauthorized(err, "")
 	}
 
 	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
-		http.Error(w, "Group ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
 	// Check if user is a member of the group
 	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID)
-	if err != nil || !isMember {
-		http.Error(w, "Unauthorized - only members can view messages", http.StatusUnauthorized)
-		return
+	if err != nil {
+		return httperr.NewInternalServerError(err, "Failed to check member status")
+	}
+	if !isMember {
+		return httperr.NewUnauthorized(nil, "Only members can view messages")
 	}
 
 	// Parse pagination parameters
@@ -68,8 +69,7 @@ func GetGroupMessages(w http.ResponseWriter, r *http.Request) {
 
 	messages, err := helpers.GetGroupMessages(groupID, limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to get group messages", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to get group messages")
 	}
 
 	result := make([]map[string]interface{}, len(messages))
@@ -90,4 +90,5 @@ func GetGroupMessages(w http.ResponseWriter, r *http.Request) {
 		"offset":   offset,
 		"count":    len(messages),
 	})
+	return nil
 }
