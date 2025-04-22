@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -38,7 +39,10 @@ func SignIn(w http.ResponseWriter, r *http.Request) error {
 	// Authenticate user
 	user, err := helpers.AuthenticateUser(credentials.Identifier, credentials.Password)
 	if err != nil {
-		return httperr.NewBadRequest(err, err.Error())
+		if errors.Is(err, helpers.ErrUserNotFound) {
+			return httperr.NewBadRequest(nil, "Email Not Found")
+		}
+		return httperr.NewBadRequest(err, "Invalid credentials")
 	}
 
 	sessionToken, err := helpers.CreateSession(user.ID, 24*time.Hour)
