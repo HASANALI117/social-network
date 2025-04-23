@@ -1,13 +1,28 @@
 package handlers
 
 import (
-	"encoding/json"
-	"net/http"
-	"strconv"
+"encoding/json"
+"errors" // Import errors
+"net/http"
+"strconv"
 
-	"github.com/HASANALI117/social-network/pkg/helpers"
-	"github.com/HASANALI117/social-network/pkg/httperr"
+"github.com/HASANALI117/social-network/pkg/helpers"
+"github.com/HASANALI117/social-network/pkg/httperr"
+"github.com/HASANALI117/social-network/pkg/services" // Import services
 )
+
+// GroupMessageHandler handles group message requests
+type GroupMessageHandler struct {
+authService services.AuthService
+// TODO: Inject GroupMessageService when created
+}
+
+// NewGroupMessageHandler creates a new GroupMessageHandler
+func NewGroupMessageHandler(authService services.AuthService) *GroupMessageHandler {
+return &GroupMessageHandler{
+authService: authService,
+}
+}
 
 // GetGroupMessages godoc
 // @Summary Get group messages
@@ -22,20 +37,23 @@ import (
 // @Failure 400 {object} httperr.ErrorResponse "Group ID is required"
 // @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
-// @Failure 500 {object} httperr.ErrorResponse "Failed to get messages"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to get messages or session error"
 // @Router /groups/messages [get]
-func GetGroupMessages(w http.ResponseWriter, r *http.Request) error {
-	if r.Method != http.MethodGet {
-		return httperr.NewMethodNotAllowed(nil, "")
-	}
+func (h *GroupMessageHandler) GetGroupMessages(w http.ResponseWriter, r *http.Request) error {
+if r.Method != http.MethodGet {
+return httperr.NewMethodNotAllowed(nil, "")
+}
 
-	// Get current user from session
-	currentUser, err := helpers.GetUserFromSession(r)
-	if err != nil {
-		return httperr.NewUnauthorized(err, "")
-	}
+// Get current user from session using AuthService
+currentUser, err := helpers.GetUserFromSession(r, h.authService)
+if err != nil {
+if errors.Is(err, helpers.ErrInvalidSession) {
+return httperr.NewUnauthorized(err, "Invalid session")
+}
+return httperr.NewInternalServerError(err, "Failed to get current user")
+}
 
-	groupID := r.URL.Query().Get("id")
+groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}

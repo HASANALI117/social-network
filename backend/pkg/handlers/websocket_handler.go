@@ -1,11 +1,14 @@
 package handlers
 
 import (
-	"net/http"
+"errors" // Import errors
+"fmt"    // Import fmt
+"net/http"
 
-	"github.com/HASANALI117/social-network/pkg/helpers"
-	ws "github.com/HASANALI117/social-network/pkg/websocket"
-	"github.com/gorilla/websocket"
+"github.com/HASANALI117/social-network/pkg/helpers"
+"github.com/HASANALI117/social-network/pkg/services" // Import services
+ws "github.com/HASANALI117/social-network/pkg/websocket"
+"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
@@ -18,28 +21,41 @@ var WebSocketHub *ws.Hub
 
 func InitWebsocket() {
 	WebSocketHub = ws.NewHub()
-	go WebSocketHub.Run()
+go WebSocketHub.Run()
 }
 
-func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// userID := r.URL.Query().Get("id")
+// HandleWebSocket now accepts AuthService
+func HandleWebSocket(authService services.AuthService) http.HandlerFunc {
+return func(w http.ResponseWriter, r *http.Request) {
+// userID := r.URL.Query().Get("id")
 
-	user, err := helpers.GetUserFromSession(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+// Pass authService to GetUserFromSession
+userResponse, err := helpers.GetUserFromSession(r, authService)
+if err != nil {
+// Check for specific session error
+if errors.Is(err, helpers.ErrInvalidSession) {
+http.Error(w, "Unauthorized: Invalid session", http.StatusUnauthorized)
+} else {
+// Log other errors for debugging
+fmt.Printf("WebSocket Auth Error: %v\n", err)
+http.Error(w, "Unauthorized", http.StatusUnauthorized) // Generic error to client
+}
+return
+}
+// Use userResponse which is *services.UserResponse
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
 		return
-	}
+}
 
-	client := ws.NewClient(WebSocketHub, conn, user.ID, user.Username, user.AvatarURL)
+// Use fields from userResponse
+client := ws.NewClient(WebSocketHub, conn, userResponse.ID, userResponse.Username, userResponse.AvatarURL)
 
-	WebSocketHub.Register <- client
+WebSocketHub.Register <- client
 
-	go client.WritePump()
-	go client.ReadPump()
+go client.WritePump()
+go client.ReadPump()
+}
 }

@@ -1,13 +1,27 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
-	"net/http"
+"encoding/json"
+"errors"
+"net/http"
 
-	"github.com/HASANALI117/social-network/pkg/helpers"
-	"github.com/HASANALI117/social-network/pkg/httperr"
+"github.com/HASANALI117/social-network/pkg/helpers"
+"github.com/HASANALI117/social-network/pkg/httperr"
+"github.com/HASANALI117/social-network/pkg/services" // Import services
 )
+
+// GroupMemberHandler handles group membership requests
+type GroupMemberHandler struct {
+authService services.AuthService
+// TODO: Inject GroupService/GroupMemberService when created
+}
+
+// NewGroupMemberHandler creates a new GroupMemberHandler
+func NewGroupMemberHandler(authService services.AuthService) *GroupMemberHandler {
+return &GroupMemberHandler{
+authService: authService,
+}
+}
 
 // AddGroupMember godoc
 // @Summary Add a member to a group
@@ -23,20 +37,23 @@ import (
 // @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
 // @Failure 409 {object} httperr.ErrorResponse "User already in group"
-// @Failure 500 {object} httperr.ErrorResponse "Failed to add member"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to add member or session error"
 // @Router /groups/members/add [post]
-func AddGroupMember(w http.ResponseWriter, r *http.Request) error {
-	if r.Method != http.MethodPost {
-		return httperr.NewMethodNotAllowed(nil, "")
-	}
+func (h *GroupMemberHandler) AddGroupMember(w http.ResponseWriter, r *http.Request) error {
+if r.Method != http.MethodPost {
+return httperr.NewMethodNotAllowed(nil, "")
+}
 
-	// Get current user from session
-	currentUser, err := helpers.GetUserFromSession(r)
-	if err != nil {
-		return httperr.NewUnauthorized(err, "")
-	}
+// Get current user from session using AuthService
+currentUser, err := helpers.GetUserFromSession(r, h.authService)
+if err != nil {
+if errors.Is(err, helpers.ErrInvalidSession) {
+return httperr.NewUnauthorized(err, "Invalid session")
+}
+return httperr.NewInternalServerError(err, "Failed to get current user")
+}
 
-	groupID := r.URL.Query().Get("id")
+groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
@@ -92,20 +109,23 @@ func AddGroupMember(w http.ResponseWriter, r *http.Request) error {
 // @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
 // @Failure 404 {object} httperr.ErrorResponse "User not in group"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
-// @Failure 500 {object} httperr.ErrorResponse "Failed to remove member"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to remove member or session error"
 // @Router /groups/members/remove [post]
-func RemoveGroupMember(w http.ResponseWriter, r *http.Request) error {
-	if r.Method != http.MethodPost {
-		return httperr.NewMethodNotAllowed(nil, "")
-	}
+func (h *GroupMemberHandler) RemoveGroupMember(w http.ResponseWriter, r *http.Request) error {
+if r.Method != http.MethodPost {
+return httperr.NewMethodNotAllowed(nil, "")
+}
 
-	// Get current user from session
-	currentUser, err := helpers.GetUserFromSession(r)
-	if err != nil {
-		return httperr.NewUnauthorized(err, "")
-	}
+// Get current user from session using AuthService
+currentUser, err := helpers.GetUserFromSession(r, h.authService)
+if err != nil {
+if errors.Is(err, helpers.ErrInvalidSession) {
+return httperr.NewUnauthorized(err, "Invalid session")
+}
+return httperr.NewInternalServerError(err, "Failed to get current user")
+}
 
-	groupID := r.URL.Query().Get("id")
+groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
@@ -158,20 +178,23 @@ func RemoveGroupMember(w http.ResponseWriter, r *http.Request) error {
 // @Failure 400 {object} httperr.ErrorResponse "Group ID is required"
 // @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
-// @Failure 500 {object} httperr.ErrorResponse "Failed to list members"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to list members or session error"
 // @Router /groups/members [get]
-func ListGroupMembers(w http.ResponseWriter, r *http.Request) error {
-	if r.Method != http.MethodGet {
-		return httperr.NewMethodNotAllowed(nil, "")
-	}
+func (h *GroupMemberHandler) ListGroupMembers(w http.ResponseWriter, r *http.Request) error {
+if r.Method != http.MethodGet {
+return httperr.NewMethodNotAllowed(nil, "")
+}
 
-	// Get current user from session
-	currentUser, err := helpers.GetUserFromSession(r)
-	if err != nil {
-		return httperr.NewUnauthorized(err, "")
-	}
+// Get current user from session using AuthService
+currentUser, err := helpers.GetUserFromSession(r, h.authService)
+if err != nil {
+if errors.Is(err, helpers.ErrInvalidSession) {
+return httperr.NewUnauthorized(err, "Invalid session")
+}
+return httperr.NewInternalServerError(err, "Failed to get current user")
+}
 
-	groupID := r.URL.Query().Get("id")
+groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
