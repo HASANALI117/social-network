@@ -1,21 +1,30 @@
 package routes
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
+	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/services"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // Setup sets up all API routes
-func Setup() http.Handler {
+func Setup(dbConn *sql.DB) http.Handler {
 	// Initialize Websocket Hub
 	handlers.InitWebsocket()
 
 	// This will ensure the swagger docs are registered
 	docs.SwaggerInfo.BasePath = "/api"
+
+	// --- Dependency Injection ---
+	userRepo := repositories.NewUserRepository(dbConn) // Use passed-in dbConn
+	userService := services.NewUserService(userRepo)
+	userHandler := handlers.NewUserHandler(userService)
+	// --- End Dependency Injection ---
 
 	mux := http.NewServeMux()
 
@@ -29,12 +38,8 @@ func Setup() http.Handler {
 	mux.HandleFunc("/api/auth/signin", httperr.ErrorHandler(handlers.SignIn))
 	mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(handlers.SignOut))
 
-	// User routes
-	mux.HandleFunc("/api/users/register", httperr.ErrorHandler(handlers.RegisterUser))
-	mux.HandleFunc("/api/users/get", httperr.ErrorHandler(handlers.GetUser))
-	mux.HandleFunc("/api/users/list", httperr.ErrorHandler(handlers.ListUsers))
-	mux.HandleFunc("/api/users/update", httperr.ErrorHandler(handlers.UpdateUser))
-	mux.HandleFunc("/api/users/delete", httperr.ErrorHandler(handlers.DeleteUser))
+	mux.Handle("/api/users/", httperr.ErrorHandler(userHandler.ServeHTTP)) // Note the trailing slash for prefix matching
+	// Keep OnlineUsers separate for now
 	mux.HandleFunc("/api/users/online", httperr.ErrorHandler(handlers.OnlineUsers))
 
 	// Post routes
