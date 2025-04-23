@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
-	"net/http"
-	"strconv"
-	"strings"
+"encoding/json"
+"errors"
+"log" // Import log package
+"net/http"
+"strconv"
+"strings"
 
-	"github.com/HASANALI117/social-network/pkg/helpers" // Keep for GetUserFromSession if needed for auth/online users
+"github.com/HASANALI117/social-network/pkg/helpers" // Keep for GetUserFromSession if needed for auth/online users
 	"github.com/HASANALI117/social-network/pkg/httperr"
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories" // For ErrUserNotFound comparison
@@ -47,12 +48,14 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 		id = parts[0]
 	} else if len(parts) > 1 {
 		// Handle potential sub-routes if any, e.g., /api/users/123/posts
-		// For now, assume only /api/users/ and /api/users/{id}
-		return httperr.NewNotFound(nil, "Invalid user path")
-	}
+// For now, assume only /api/users/ and /api/users/{id}
+return httperr.NewNotFound(nil, "Invalid user path")
+}
 
-	switch r.Method {
-	case http.MethodPost:
+log.Printf("UserHandler: Method=%s, Path=%s, ID='%s'\n", r.Method, r.URL.Path, id) // Add logging
+
+switch r.Method {
+case http.MethodPost:
 		// POST /api/users/ -> Create User
 		if id != "" {
 			return httperr.NewMethodNotAllowed(nil, "Cannot POST to a specific user ID")
@@ -89,42 +92,43 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) error {
 		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
-	// Basic validation (can be expanded in service layer if needed)
-	if user.Email == "" || user.Password == "" || user.Username == "" {
-		return httperr.NewBadRequest(nil, "Username, email, and password are required")
-	}
+// Validation moved to service layer
 
-	if err := h.userService.Register(&user); err != nil {
-		// Check for specific duplicate user error from the repository/service layer
-		if errors.Is(err, repositories.ErrUserAlreadyExists) {
-			// Could check the original error string if we need to differentiate between email/username
-			// For now, assume email based on the last error message.
-			return httperr.NewConflict(err, "user already exists") // Return 409 Conflict
-		}
-		// Handle other errors as internal server error
-		return httperr.NewInternalServerError(err, "Failed to register user")
-	}
+createdUserResponse, err := h.userService.Register(&user)
+if err != nil {
+// Check for specific duplicate user error from the repository/service layer
+if errors.Is(err, repositories.ErrUserAlreadyExists) {
+return httperr.NewConflict(err, "User already exists") // Return 409 Conflict
+}
+// Check for generic validation errors (assuming service returns fmt.Errorf for now)
+// TODO: Implement custom validation error types in service for better checking
+if err.Error() == "username is required" || err.Error() == "email is required" || err.Error() == "password is required" || err.Error() == "password must be at least 8 characters" {
+return httperr.NewBadRequest(err, err.Error())
+}
+// Handle other errors as internal server error
+return httperr.NewInternalServerError(err, "Failed to register user")
+}
 
-	// Return created user (excluding password)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(sanitizeUser(&user)) // Use sanitize helper
-	return nil
+// Return created user response DTO from service
+w.Header().Set("Content-Type", "application/json")
+w.WriteHeader(http.StatusCreated)
+json.NewEncoder(w).Encode(createdUserResponse)
+return nil
 }
 
 // getUserByID handles GET /api/users/{id}
 func (h *UserHandler) getUserByID(w http.ResponseWriter, r *http.Request, id string) error {
-	user, err := h.userService.GetByID(id)
-	if err != nil {
-		if errors.Is(err, repositories.ErrUserNotFound) {
-			return httperr.NewNotFound(err, "User not found")
-		}
-		return httperr.NewInternalServerError(err, "Failed to get user")
-	}
+userResponse, err := h.userService.GetByID(id)
+if err != nil {
+if errors.Is(err, repositories.ErrUserNotFound) {
+return httperr.NewNotFound(err, "User not found")
+}
+return httperr.NewInternalServerError(err, "Failed to get user")
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sanitizeUser(user))
-	return nil
+w.Header().Set("Content-Type", "application/json")
+json.NewEncoder(w).Encode(userResponse) // Encode the response DTO directly
+return nil
 }
 
 // listUsers handles GET /api/users/
@@ -150,22 +154,17 @@ func (h *UserHandler) listUsers(w http.ResponseWriter, r *http.Request) error {
 	users, err := h.userService.List(limit, offset)
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to list users")
-	}
+}
 
-	// Sanitize user data
-	sanitizedUsers := make([]map[string]interface{}, len(users))
-	for i, user := range users {
-		sanitizedUsers[i] = sanitizeUser(user)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"users":  sanitizedUsers,
-		"limit":  limit,
-		"offset": offset,
-		"count":  len(users), // Note: This is count of returned users, not total count
-	})
-	return nil
+// Service now returns sanitized UserResponse DTOs
+w.Header().Set("Content-Type", "application/json")
+json.NewEncoder(w).Encode(map[string]interface{}{
+"users":  users, // Encode the list of DTOs directly
+"limit":  limit,
+"offset": offset,
+"count":  len(users), // Note: This is count of returned users, not total count
+})
+return nil
 }
 
 // updateUser handles PUT /api/users/{id}
@@ -192,12 +191,12 @@ func (h *UserHandler) updateUser(w http.ResponseWriter, r *http.Request, id stri
 			return httperr.NewNotFound(err, "User not found")
 		}
 		// Handle other potential errors like validation errors if service adds them
-		return httperr.NewInternalServerError(err, "Failed to update user")
-	}
+return httperr.NewInternalServerError(err, "Failed to update user")
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sanitizeUser(updatedUser))
-	return nil
+w.Header().Set("Content-Type", "application/json")
+json.NewEncoder(w).Encode(updatedUser) // Encode the response DTO directly
+return nil
 }
 
 // deleteUser handles DELETE /api/users/{id}
@@ -216,27 +215,10 @@ func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request, id stri
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "User deleted successfully",
 	})
-	return nil
+return nil
 }
 
-// sanitizeUser removes sensitive fields like password hash before sending response
-func sanitizeUser(user *models.User) map[string]interface{} {
-	if user == nil {
-		return nil
-	}
-	return map[string]interface{}{
-		"id":         user.ID,
-		"username":   user.Username,
-		"email":      user.Email, // Consider if email should always be public
-		"first_name": user.FirstName,
-		"last_name":  user.LastName,
-		"avatar_url": user.AvatarURL,
-		"about_me":   user.AboutMe,
-		"birth_date": user.BirthDate,
-		"created_at": user.CreatedAt,
-		"updated_at": user.UpdatedAt,
-	}
-}
+// sanitizeUser function removed as sanitization is now handled by the service layer returning UserResponse DTOs
 
 // OnlineUsers might need separate handling or integration with the new structure
 // if it relies on different mechanisms (like WebSockets) than the standard CRUD operations.

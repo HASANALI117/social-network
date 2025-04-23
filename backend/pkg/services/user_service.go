@@ -10,15 +10,29 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserResponse defines the sanitized user data returned by service methods
+type UserResponse struct {
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	AvatarURL string    `json:"avatar_url"`
+	AboutMe   string    `json:"about_me"`
+	BirthDate string    `json:"birth_date"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // UserService defines the interface for user business logic
 type UserService interface {
-	Register(user *models.User) error
-	GetByID(id string) (*models.User, error)
-	GetByUsername(username string) (*models.User, error)
-	GetByEmail(email string) (*models.User, error)
-	Update(id string, updateData map[string]interface{}) (*models.User, error)
+	Register(user *models.User) (*UserResponse, error)
+	GetByID(id string) (*UserResponse, error)
+	GetByUsername(username string) (*UserResponse, error)
+	GetByEmail(email string) (*UserResponse, error)
+	Update(id string, updateData map[string]interface{}) (*UserResponse, error)
 	Delete(id string) error
-	List(limit, offset int) ([]*models.User, error)
+	List(limit, offset int) ([]*UserResponse, error)
 }
 
 // userService implements UserService interface
@@ -33,16 +47,29 @@ func NewUserService(userRepo repositories.UserRepository) UserService {
 	}
 }
 
-func (s *userService) Register(user *models.User) error {
+func (s *userService) Register(user *models.User) (*UserResponse, error) {
+	// Validate input
+	if user.Username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+	if user.Email == "" {
+		return nil, fmt.Errorf("email is required")
+	}
+	if user.Password == "" {
+		return nil, fmt.Errorf("password is required")
+	}
+	if len(user.Password) < 8 {
+		return nil, fmt.Errorf("password must be at least 8 characters")
+	}
 	// Generate UUID for new user
 	user.ID = uuid.New().String()
 
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-	user.Password = string(hashedPassword)
+// Hash password
+hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+if err != nil {
+return nil, fmt.Errorf("failed to hash password: %w", err) // Return nil UserResponse on error
+}
+user.Password = string(hashedPassword)
 
 	// Set timestamps
 	now := time.Now()
@@ -51,26 +78,82 @@ func (s *userService) Register(user *models.User) error {
 
 	// Create user in repository
 	if err := s.userRepo.Create(user); err != nil {
-		// Handle potential duplicate errors if necessary
-		return err
+		return nil, err
 	}
 
-	return nil
+	// Return sanitized response
+	return &UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		AvatarURL: user.AvatarURL,
+		AboutMe:   user.AboutMe,
+		BirthDate: user.BirthDate,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
-func (s *userService) GetByID(id string) (*models.User, error) {
-	return s.userRepo.GetByID(id)
+func (s *userService) GetByID(id string) (*UserResponse, error) {
+	user, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return &UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		AvatarURL: user.AvatarURL,
+		AboutMe:   user.AboutMe,
+		BirthDate: user.BirthDate,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
-func (s *userService) GetByUsername(username string) (*models.User, error) {
-	return s.userRepo.GetByUsername(username)
+func (s *userService) GetByUsername(username string) (*UserResponse, error) {
+	user, err := s.userRepo.GetByUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	return &UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		AvatarURL: user.AvatarURL,
+		AboutMe:   user.AboutMe,
+		BirthDate: user.BirthDate,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
-func (s *userService) GetByEmail(email string) (*models.User, error) {
-	return s.userRepo.GetByEmail(email)
+func (s *userService) GetByEmail(email string) (*UserResponse, error) {
+	user, err := s.userRepo.GetByEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	return &UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		AvatarURL: user.AvatarURL,
+		AboutMe:   user.AboutMe,
+		BirthDate: user.BirthDate,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
-func (s *userService) Update(id string, updateData map[string]interface{}) (*models.User, error) {
+func (s *userService) Update(id string, updateData map[string]interface{}) (*UserResponse, error) {
 	user, err := s.userRepo.GetByID(id)
 	if err != nil {
 		return nil, err // Handles ErrUserNotFound from repo
@@ -116,13 +199,45 @@ func (s *userService) Update(id string, updateData map[string]interface{}) (*mod
 		return nil, err
 	}
 
-	return user, nil
+	// Return sanitized response
+return &UserResponse{
+ID:        user.ID,
+Username:  user.Username,
+Email:     user.Email,
+FirstName: user.FirstName,
+LastName:  user.LastName,
+AvatarURL: user.AvatarURL,
+AboutMe:   user.AboutMe,
+BirthDate: user.BirthDate,
+CreatedAt: user.CreatedAt,
+UpdatedAt: user.UpdatedAt,
+}, nil
 }
 
 func (s *userService) Delete(id string) error {
 	return s.userRepo.Delete(id)
 }
 
-func (s *userService) List(limit, offset int) ([]*models.User, error) {
-	return s.userRepo.List(limit, offset)
+func (s *userService) List(limit, offset int) ([]*UserResponse, error) {
+	users, err := s.userRepo.List(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	var responses []*UserResponse
+	for _, user := range users {
+		responses = append(responses, &UserResponse{
+			ID:        user.ID,
+			Username:  user.Username,
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			AvatarURL: user.AvatarURL,
+			AboutMe:   user.AboutMe,
+			BirthDate: user.BirthDate,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		})
+	}
+	return responses, nil
 }
