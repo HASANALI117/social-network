@@ -7,8 +7,8 @@ import (
 	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
-	"github.com/HASANALI117/social-network/pkg/repositories"
-	"github.com/HASANALI117/social-network/pkg/services"
+	"github.com/HASANALI117/social-network/pkg/repositories" // Import repositories for Init
+	"github.com/HASANALI117/social-network/pkg/services"     // Import services for Init
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -21,9 +21,9 @@ func Setup(dbConn *sql.DB) http.Handler {
 	docs.SwaggerInfo.BasePath = "/api"
 
 	// --- Dependency Injection ---
-	userRepo := repositories.NewUserRepository(dbConn) // Use passed-in dbConn
-	userService := services.NewUserService(userRepo)
-	userHandler := handlers.NewUserHandler(userService)
+	repos := repositories.InitRepositories(dbConn) // Initialize all repositories
+	services := services.InitServices(repos)       // Initialize all services using the repositories
+	controllers := handlers.InitHandlers(services) // Initialize all handlers
 	// --- End Dependency Injection ---
 
 	mux := http.NewServeMux()
@@ -38,7 +38,7 @@ func Setup(dbConn *sql.DB) http.Handler {
 	mux.HandleFunc("/api/auth/signin", httperr.ErrorHandler(handlers.SignIn))
 	mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(handlers.SignOut))
 
-	mux.Handle("/api/users/", httperr.ErrorHandler(userHandler.ServeHTTP)) // Note the trailing slash for prefix matching
+	mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Note the trailing slash for prefix matching
 	// Keep OnlineUsers separate for now
 	mux.HandleFunc("/api/users/online", httperr.ErrorHandler(handlers.OnlineUsers))
 
