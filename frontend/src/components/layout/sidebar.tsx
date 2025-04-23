@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from 'react'
 import { Avatar } from "@/components/ui/avatar"
 import {
   Sidebar,
@@ -38,9 +39,41 @@ import { AccountDropdownMenu } from './account-dropdown-menu'
 import { NotificationsDropdown } from './notifications-dropdown'
 import { Link } from "../ui/link"
 import { ChevronDownIcon, Cog8ToothIcon } from "@heroicons/react/20/solid"
+import { useUserStore } from '@/store/useUserStore'
 
 export function AppSidebar() {
-    let pathname = usePathname()
+  const pathname = usePathname()
+  const { user, isAuthenticated } = useUserStore()
+
+  useEffect(() => {
+    useUserStore.persist.rehydrate()
+  }, [])
+
+  if (!isAuthenticated) {
+    return (
+      <Sidebar>
+        <SidebarHeader>
+          <SidebarItem href="/">
+            <Avatar src="https://ui-avatars.com/api/?name=Social+Network&background=6366f1&color=fff&bold=true" className="bg-indigo-500" />
+            <SidebarLabel>Social Network</SidebarLabel>
+          </SidebarItem>
+        </SidebarHeader>
+        <SidebarBody>
+          <SidebarSection>
+            <SidebarItem href="/login">
+              <UserCircleIcon />
+              <SidebarLabel>Sign In</SidebarLabel>
+            </SidebarItem>
+            <SidebarItem href="/register">
+              <UsersIconOutline />
+              <SidebarLabel>Register</SidebarLabel>
+            </SidebarItem>
+          </SidebarSection>
+        </SidebarBody>
+      </Sidebar>
+    )
+  }
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -109,21 +142,30 @@ export function AppSidebar() {
       </SidebarBody>
 
       <SidebarFooter className="max-lg:hidden">
-        <Dropdown>
-          <DropdownButton as={SidebarItem}>
-            <span className="flex min-w-0 items-center gap-3">
-              <Avatar src="https://ui-avatars.com/api/?name=Erica+Jones&background=3b82f6&color=fff&bold=true" className="size-10" square alt="Erica Jones" />
-              <span className="min-w-0">
-                <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">Erica</span>
-                <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
-                  erica@example.com
+        {user && (
+          <Dropdown>
+            <DropdownButton as={SidebarItem}>
+              <span className="flex min-w-0 items-center gap-3">
+                <Avatar 
+                  src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`} 
+                  className="size-10" 
+                  square 
+                  alt={`${user.first_name} ${user.last_name}`} 
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
+                    {user.first_name}
+                  </span>
+                  <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
+                    {user.email}
+                  </span>
                 </span>
               </span>
-            </span>
-            <ChevronUpIcon />
-          </DropdownButton>
-          <AccountDropdownMenu anchor="top start" />
-        </Dropdown>
+              <ChevronUpIcon />
+            </DropdownButton>
+            <AccountDropdownMenu anchor="top start" />
+          </Dropdown>
+        )}
       </SidebarFooter>
     </Sidebar>
   )

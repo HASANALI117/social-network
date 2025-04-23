@@ -1,5 +1,6 @@
- 'use client'
-
+'use client'
+ 
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,9 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { Fieldset, Field, ErrorMessage } from '@/components/ui/fieldset'
+import { useRequest } from '@/hooks/useRequest'
+import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
+import { useUserStore } from '@/store/useUserStore'
 
 const formSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  identifier: z.string().min(1, 'Email or username is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   rememberMe: z.boolean().optional()
 })
@@ -26,29 +31,49 @@ export default function LoginPage() {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
+      identifier: '',
       password: '',
       rememberMe: false
     }
   })
 
+  const { isLoading, data, error, post } = useRequest()
+  const router = useRouter()
+  const login = useUserStore(state => state.login)
+
+  // Handle store hydration
+  useEffect(() => {
+    useUserStore.persist.rehydrate()
+  }, [])
+
   return (
     <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md dark:bg-zinc-900">
       <h1 className="text-2xl font-bold mb-6 text-center">Sign In</h1>
-      <form onSubmit={handleSubmit((data: FormValues) => console.log(data))}>
+      <form onSubmit={handleSubmit((data: FormValues) => {
+        post(
+          '/api/auth/signin',
+          data,
+          (data) => {
+            login(data.user)
+            toast.success('Logged in successfully!')
+            console.log('User logged in:', {data})
+            router.push('/profile')
+          }
+        )
+      })}>
         <Fieldset className="space-y-6">
           <Field>
-            <label className="block text-sm font-medium mb-1" htmlFor="email">
-              Email *
+            <label className="block text-sm font-medium mb-1" htmlFor="identifier">
+              Email or Username *
             </label>
             <Input
-              id="email"
-              type="email"
-              placeholder="john@example.com"
-              {...register('email')}
+              id="identifier"
+              type="text"
+              placeholder="Email or username"
+              {...register('identifier')}
             />
-            {errors.email?.message && (
-              <ErrorMessage>{errors.email.message}</ErrorMessage>
+            {errors.identifier?.message && (
+              <ErrorMessage>{errors.identifier.message}</ErrorMessage>
             )}
           </Field>
 
@@ -105,8 +130,9 @@ export default function LoginPage() {
           <Button 
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700"
+            disabled={isLoading}
           >
-            Sign In
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
         </div>
       </form>

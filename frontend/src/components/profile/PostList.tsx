@@ -1,25 +1,19 @@
-import { User } from '@/types/User';
+import { Post } from '@/types/Post';
 import PostCard from './PostCard';
-
-interface Post {
-  id: number;
-  content: string;
-  likes: number;
-  comments: number;
-  timestamp: string;
-}
 
 interface PostListProps {
   posts: Post[];
-  user: User;
 }
 
-export default function PostList({ posts, user }: PostListProps) {
+export default function PostList({ posts }: PostListProps) {
   return (
-    <div>
-      {posts.map(post => (
-        <PostCard key={post.id} post={post} user={user} />
+    <div className="space-y-6">
+      {posts.map((post) => (
+        <PostCard key={post.id} post={post} />
       ))}
+      {posts.length === 0 && (
+        <p className="text-center text-gray-500">No posts yet</p>
+      )}
     </div>
   );
 }

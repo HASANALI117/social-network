@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Avatar } from "@/components/ui/avatar"
 import {
   Dropdown,
@@ -13,8 +14,30 @@ import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "@/components/ui
 import { BellIcon, ChatBubbleLeftIcon, UserGroupIcon } from '@heroicons/react/16/solid'
 import { AccountDropdownMenu } from './account-dropdown-menu'
 import { NotificationsDropdown } from './notifications-dropdown'
+import { useUserStore } from '@/store/useUserStore'
+import Link from 'next/link'
 
 export function AppNavbar() {
+  const { user, isAuthenticated } = useUserStore()
+
+  useEffect(() => {
+    useUserStore.persist.rehydrate()
+  }, [])
+
+  const avatarUrl = user?.avatar_url || `https://ui-avatars.com/api/?name=${user?.first_name}+${user?.last_name}&background=3b82f6&color=fff&bold=true`
+
+  if (!isAuthenticated) {
+    return (
+      <Navbar>
+        <NavbarSpacer />
+        <NavbarSection>
+          <NavbarItem href="/login">Sign In</NavbarItem>
+          <NavbarItem href="/register">Register</NavbarItem>
+        </NavbarSection>
+      </Navbar>
+    )
+  }
+
   return (
     <Navbar>
       <NavbarSection className="lg:hidden">
@@ -41,7 +64,7 @@ export function AppNavbar() {
       <NavbarSection>
         <Dropdown>
           <DropdownButton as={NavbarItem}>
-            <Avatar src="https://ui-avatars.com/api/?name=Erica+Jones&background=3b82f6&color=fff&bold=true" square alt="Erica Jones" />
+            <Avatar src={avatarUrl} square alt={`${user?.first_name} ${user?.last_name}`} />
           </DropdownButton>
           <AccountDropdownMenu anchor="bottom end" />
         </Dropdown>

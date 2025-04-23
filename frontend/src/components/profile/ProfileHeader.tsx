@@ -1,20 +1,32 @@
 import { FiEdit, FiUsers, FiLock, FiUnlock } from 'react-icons/fi';
-import { User } from '@/types/User';
+import { UserType } from '@/types/User';
 
 interface ProfileHeaderProps {
-  user: User;
+  user: UserType;
   isPublic: boolean;
-  onTogglePublic: () => void;
+  onTogglePublic?: () => void;
   onFollow: () => void;
+  onEdit?: () => void;
+  isPreview?: boolean;
 }
 
-export default function ProfileHeader({ user, isPublic, onTogglePublic, onFollow }: ProfileHeaderProps) {
+export default function ProfileHeader({
+  user,
+  isPublic,
+  onTogglePublic,
+  onFollow,
+  onEdit,
+  isPreview = false,
+}: ProfileHeaderProps) {
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
       <div className="flex items-start gap-6">
-        <img 
-          src={user.avatar_url || "https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff&bold=true"} 
-          alt="Avatar" 
+        <img
+          src={
+            user.avatar_url ||
+            `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`
+          }
+          alt="Avatar"
           className="w-32 h-32 rounded-full border-4 border-purple-100"
         />
         <div className="flex-1">
@@ -26,21 +38,26 @@ export default function ProfileHeader({ user, isPublic, onTogglePublic, onFollow
               <p className="text-gray-400">@{user.username}</p>
             </div>
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={onFollow}
                 className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
               >
                 <FiUsers className="text-lg" />
                 Follow
               </button>
-              <button className="text-purple-400 hover:text-purple-300">
-                <FiEdit className="text-2xl" />
-              </button>
+              {!isPreview && (
+                <button
+                  onClick={onEdit}
+                  className="text-purple-400 hover:text-purple-300"
+                >
+                  <FiEdit className="text-2xl" />
+                </button>
+              )}
             </div>
           </div>
-          
+
           <p className="text-gray-300 mb-4">{user.about_me}</p>
-          
+
           <div className="flex items-center gap-6 text-gray-400">
             <div className="flex items-center gap-2">
               <FiUsers />
@@ -50,13 +67,15 @@ export default function ProfileHeader({ user, isPublic, onTogglePublic, onFollow
               <FiUsers />
               <span>856 following</span>
             </div>
-            <button 
-              onClick={onTogglePublic}
-              className="flex items-center gap-2 ml-auto text-sm px-4 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-200"
-            >
-              {isPublic ? <FiUnlock /> : <FiLock />}
-              {isPublic ? 'Public Profile' : 'Private Profile'}
-            </button>
+            {!isPreview && onTogglePublic && (
+              <button
+                onClick={onTogglePublic}
+                className="flex items-center gap-2 ml-auto text-sm px-4 py-2 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-200"
+              >
+                {isPublic ? <FiUnlock /> : <FiLock />}
+                {isPublic ? 'Public Profile' : 'Private Profile'}
+              </button>
+            )}
           </div>
         </div>
       </div>
