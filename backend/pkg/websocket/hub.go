@@ -109,7 +109,7 @@ func (h *Hub) Run() {
 				}
 
 				// Get all group members
-				members, err := helpers.ListGroupMembers(message.ReceiverID)
+				members, err := helpers.ListGroupMembers(message.ReceiverID) // TODO: use the new services
 				if err != nil {
 					fmt.Printf("❌ Error getting group members: %v\n", err)
 					continue

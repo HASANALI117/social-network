@@ -82,8 +82,8 @@ groupID := r.URL.Query().Get("id")
 	}
 
 	// Add member to group
-	if err := helpers.AddGroupMember(groupID, req.UserID, req.Role); err != nil {
-		if errors.Is(err, helpers.ErrAlreadyGroupMember) {
+	if err := helpers.AddGroupMember(groupID, req.UserID, req.Role); err != nil { //TODO: Use GroupService/GroupMemberService
+		if errors.Is(err, helpers.ErrAlreadyGroupMember) { // TODO: Use GroupService/GroupMemberService
 			return httperr.NewHTTPError(http.StatusConflict, "User is already a member of this group", err)
 		}
 		return httperr.NewInternalServerError(err, "Failed to add member")
@@ -144,7 +144,7 @@ groupID := r.URL.Query().Get("id")
 	}
 
 	// Check if current user is an admin or removing self
-	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID)
+	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID) //TODO: Use GroupService/GroupMemberService
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to check admin status")
 	}
@@ -153,8 +153,8 @@ groupID := r.URL.Query().Get("id")
 	}
 
 	// Remove member from group
-	if err := helpers.RemoveGroupMember(groupID, req.UserID); err != nil {
-		if errors.Is(err, helpers.ErrNotGroupMember) {
+	if err := helpers.RemoveGroupMember(groupID, req.UserID); err != nil { //TODO: Use GroupService/GroupMemberService
+		if errors.Is(err, helpers.ErrNotGroupMember) { //TODO: Use GroupService/GroupMemberService
 			return httperr.NewNotFound(err, "User is not a member of this group")
 		}
 		return httperr.NewInternalServerError(err, "Failed to remove member")
@@ -200,7 +200,7 @@ groupID := r.URL.Query().Get("id")
 	}
 
 	// Check if current user is a member
-	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID)
+	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID) //TODO: Use GroupService/GroupMemberService
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to check member status")
 	}
@@ -208,7 +208,7 @@ groupID := r.URL.Query().Get("id")
 		return httperr.NewUnauthorized(nil, "Only members can view the member list")
 	}
 
-	members, err := helpers.ListGroupMembers(groupID)
+	members, err := helpers.ListGroupMembers(groupID) //TODO: Use GroupService/GroupMemberService
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to list group members")
 	}

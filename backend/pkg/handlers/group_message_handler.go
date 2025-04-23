@@ -59,7 +59,7 @@ groupID := r.URL.Query().Get("id")
 	}
 
 	// Check if user is a member of the group
-	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID)
+	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID) //TODO: Use GroupService/GroupMemberService
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to check member status")
 	}
@@ -85,7 +85,7 @@ groupID := r.URL.Query().Get("id")
 		}
 	}
 
-	messages, err := helpers.GetGroupMessages(groupID, limit, offset)
+	messages, err := helpers.GetGroupMessages(groupID, limit, offset) //TODO: Use GroupService/GroupMemberService
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to get group messages")
 	}
