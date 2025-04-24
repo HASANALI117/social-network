@@ -1,14 +1,14 @@
 package handlers
 
 import (
-"encoding/json"
-"errors"
-"log" // Import log package
-"net/http"
-"strconv"
-"strings"
+  "encoding/json"
+  "errors"
+  "log"
+  "net/http"
+  "strconv"
+  "strings"
 
-"github.com/HASANALI117/social-network/pkg/helpers" // Keep for GetUserFromSession if needed for auth/online users
+  "github.com/HASANALI117/social-network/pkg/helpers" // Keep for GetUserFromSession if needed for auth/online users
 	"github.com/HASANALI117/social-network/pkg/httperr"
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories" // For ErrUserNotFound comparison
