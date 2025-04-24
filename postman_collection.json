@@ -248,6 +248,102 @@
 ]
 },
 {
+"name": "Followers",
+"item": [
+{
+"name": "Follow User [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{targetUserId}}/follow",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{targetUserId}}", "follow"]
+},
+"description": "Sends a follow request to another user."
+},
+"response": []
+},
+{
+"name": "Unfollow User [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{targetUserId}}/unfollow",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{targetUserId}}", "unfollow"]
+},
+"description": "Stops following another user."
+},
+"response": []
+},
+{
+"name": "Accept Follow Request [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{requesterId}}/accept",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{requesterId}}", "accept"]
+},
+"description": "Accepts a follow request from another user."
+},
+"response": []
+},
+{
+"name": "Reject Follow Request [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{requesterId}}/reject",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{requesterId}}", "reject"]
+},
+"description": "Rejects a follow request from another user."
+},
+"response": []
+},
+{
+"name": "List Followers [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}/followers",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}", "followers"]
+},
+"description": "Lists all users who follow the specified user."
+},
+"response": []
+},
+{
+"name": "List Following [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}/following",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}", "following"]
+},
+"description": "Lists all users that the specified user follows."
+},
+"response": []
+},
+{
+"name": "List Pending Follow Requests [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/me/follow-requests",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "me", "follow-requests"]
+},
+"description": "Lists all pending follow requests for the authenticated user."
+},
+"response": []
+}
+]
+},
+{
 "name": "Groups",
 "item": [
 {
@@ -444,6 +540,11 @@
 {
 "key": "targetUserId",
 "value": "REPLACE_WITH_TARGET_USER_ID",
+"type": "string"
+},
+{
+"key": "requesterId",
+"value": "REPLACE_WITH_REQUESTER_ID",
 "type": "string"
 }
 ]
