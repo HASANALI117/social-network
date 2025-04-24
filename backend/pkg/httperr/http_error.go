@@ -134,6 +134,14 @@ func NewMethodNotAllowed(err error, userMessage string) *HTTPError {
 	return NewHTTPError(http.StatusMethodNotAllowed, userMessage, err)
 }
 
+// NewConflict creates a 409 Conflict error
+func NewConflict(err error, userMessage string) *HTTPError {
+	if userMessage == "" {
+		userMessage = "A conflict occurred with the current state of the resource"
+	}
+	return NewHTTPError(http.StatusConflict, userMessage, err)
+}
+
 // NewInternalServerError creates a 500 Internal Server Error
 func NewInternalServerError(err error, userMessage string) *HTTPError {
 	if userMessage == "" {

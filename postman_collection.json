@@ -1,0 +1,450 @@
+{
+"info": {
+"_postman_id": "YOUR_COLLECTION_ID",
+"name": "Social Network API (Refactored)",
+"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+"description": "API endpoints for the refactored social network backend."
+},
+"item": [
+{
+"name": "Auth",
+"item": [
+{
+"name": "Sign Up (Create User)",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"username\": \"testuser\",\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\",\n    \"first_name\": \"Test\",\n    \"last_name\": \"User\",\n    \"dob\": \"1990-01-01\",\n    \"avatar_url\": \"\",\n    \"about_me\": \"Just a test user\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/users/",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", ""]
+},
+"description": "Creates a new user account. Equivalent to Sign Up."
+},
+"response": []
+},
+{
+"name": "Sign In",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"emailOrUsername\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/auth/signin",
+"host": ["{{baseUrl}}"],
+"path": ["api", "auth", "signin"]
+},
+"description": "Logs in a user and sets the session_token cookie."
+},
+"response": []
+},
+{
+"name": "Sign Out",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/auth/signout",
+"host": ["{{baseUrl}}"],
+"path": ["api", "auth", "signout"]
+},
+"description": "Logs out the current user by deleting the session."
+},
+"response": []
+}
+]
+},
+{
+"name": "Users",
+"item": [
+{
+"name": "List Users",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/?limit=10&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", ""],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Retrieves a list of users."
+},
+"response": []
+},
+{
+"name": "Get User By ID",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}"]
+},
+"description": "Retrieves details for a specific user."
+},
+"response": []
+},
+{
+"name": "Update User [Auth Required]",
+"request": {
+"method": "PUT",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"first_name\": \"UpdatedTest\",\n    \"last_name\": \"UpdatedUser\",\n    \"dob\": \"1991-02-02\",\n    \"avatar_url\": \"http://example.com/new_avatar.jpg\",\n    \"about_me\": \"Updated bio.\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}"]
+},
+"description": "Updates the profile of the currently logged-in user."
+},
+"response": []
+},
+{
+"name": "Delete User [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}"]
+},
+"description": "Deletes the currently logged-in user."
+},
+"response": []
+}
+]
+},
+{
+"name": "Posts",
+"item": [
+{
+"name": "Create Post [Auth Required]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"My First Post\",\n    \"content\": \"This is the content of my first post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/",
+"host": ["{{baseUrl}}"],
+"path": ["api", "posts", ""]
+},
+"description": "Creates a new post. Requires authentication."
+},
+"response": []
+},
+{
+"name": "List Posts",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/posts/?limit=10&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "posts", ""],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Retrieves a list of posts (public, friends if logged in)."
+},
+"response": []
+},
+{
+"name": "Get Post By ID",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/posts/{{postId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "posts", "{{postId}}"]
+},
+"description": "Retrieves details for a specific post."
+},
+"response": []
+},
+{
+"name": "List Posts By User",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/posts/user/{{userId}}?limit=10&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "posts", "user", "{{userId}}"],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Retrieves posts created by a specific user."
+},
+"response": []
+},
+{
+"name": "Delete Post [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/posts/{{postId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "posts", "{{postId}}"]
+},
+"description": "Deletes a specific post. Requires authentication and ownership."
+},
+"response": []
+}
+]
+},
+{
+"name": "Groups",
+"item": [
+{
+"name": "Create Group [Auth Required]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"name\": \"Test Group Alpha\",\n    \"description\": \"A group for testing purposes.\",\n    \"avatar_url\": \"\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", ""]
+},
+"description": "Creates a new group. Requires authentication."
+},
+"response": []
+},
+{
+"name": "List Groups [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/?limit=10&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", ""],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Retrieves a list of groups (requires auth)."
+},
+"response": []
+},
+{
+"name": "Get Group By ID [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}"]
+},
+"description": "Retrieves details for a specific group."
+},
+"response": []
+},
+{
+"name": "Update Group [Auth Required, Admin]",
+"request": {
+"method": "PUT",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"name\": \"Test Group Alpha (Updated)\",\n    \"description\": \"Updated description.\",\n    \"avatar_url\": \"http://example.com/group.jpg\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}"]
+},
+"description": "Updates details for a specific group. Requires admin role."
+},
+"response": []
+},
+{
+"name": "Delete Group [Auth Required, Creator]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}"]
+},
+"description": "Deletes a specific group. Requires creator role."
+},
+"response": []
+},
+{
+"name": "Add Group Member [Auth Required, Admin]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"user_id\": \"{{targetUserId}}\",\n    \"role\": \"member\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/members",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}", "members"]
+},
+"description": "Adds a user to a group. Requires admin role."
+},
+"response": []
+},
+{
+"name": "List Group Members [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/members",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}", "members"]
+},
+"description": "Lists members of a specific group. Requires membership."
+},
+"response": []
+},
+{
+"name": "Remove Group Member [Auth Required, Admin or Self]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/members/{{targetUserId}}",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}", "members", "{{targetUserId}}"]
+},
+"description": "Removes a user from a group. Requires admin role or self-removal."
+},
+"response": []
+},
+{
+"name": "List Group Messages [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/messages?limit=20&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "groups", "{{groupId}}", "messages"],
+"query": [
+{
+"key": "limit",
+"value": "20"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists messages in a specific group. Requires membership. Currently stubbed."
+},
+"response": []
+}
+]
+}
+],
+"variable": [
+{
+"key": "baseUrl",
+"value": "http://localhost:8080",
+"type": "string"
+},
+{
+"key": "userId",
+"value": "REPLACE_WITH_USER_ID",
+"type": "string"
+},
+{
+"key": "postId",
+"value": "REPLACE_WITH_POST_ID",
+"type": "string"
+},
+{
+"key": "groupId",
+"value": "REPLACE_WITH_GROUP_ID",
+"type": "string"
+},
+{
+"key": "targetUserId",
+"value": "REPLACE_WITH_TARGET_USER_ID",
+"type": "string"
+}
+]
+}

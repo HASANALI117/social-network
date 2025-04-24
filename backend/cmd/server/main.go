@@ -25,7 +25,7 @@ func main() {
 	defer database.Close()
 
 	// Setup HTTP routes
-	handler := routes.Setup()
+	handler := routes.Setup(database)
 
 	// Start HTTP server
 	addr := ":8080"

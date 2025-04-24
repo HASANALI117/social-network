@@ -1,67 +1,61 @@
 package routes
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
+	"github.com/HASANALI117/social-network/pkg/repositories" // Import repositories for Init
+	"github.com/HASANALI117/social-network/pkg/services"     // Import services for Init
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // Setup sets up all API routes
-func Setup() http.Handler {
+func Setup(dbConn *sql.DB) http.Handler {
 	// Initialize Websocket Hub
 	handlers.InitWebsocket()
 
 	// This will ensure the swagger docs are registered
 	docs.SwaggerInfo.BasePath = "/api"
 
+	// --- Dependency Injection ---
+	repos := repositories.InitRepositories(dbConn) // Initialize all repositories
+	services := services.InitServices(repos)       // Initialize all services using the repositories
+	controllers := handlers.InitHandlers(services) // Initialize all handlers
+	// --- End Dependency Injection ---
+
 	mux := http.NewServeMux()
 
 	// Swagger Documentation
 	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
-	// Websocket routes
-	mux.HandleFunc("/ws", handlers.HandleWebSocket)
+// Websocket routes - Pass the AuthService instance
+mux.HandleFunc("/ws", handlers.HandleWebSocket(services.Auth))
 
-	// Authentication routes
-	mux.HandleFunc("/api/auth/signin", httperr.ErrorHandler(handlers.SignIn))
-	mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(handlers.SignOut))
+// Authentication routes - Use methods from the initialized AuthHandler
+mux.HandleFunc("/api/auth/signin", httperr.ErrorHandler(controllers.Auth.SignIn))
+mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(controllers.Auth.SignOut))
 
-	// User routes
-	mux.HandleFunc("/api/users/register", httperr.ErrorHandler(handlers.RegisterUser))
-	mux.HandleFunc("/api/users/get", httperr.ErrorHandler(handlers.GetUser))
-	mux.HandleFunc("/api/users/list", httperr.ErrorHandler(handlers.ListUsers))
-	mux.HandleFunc("/api/users/update", httperr.ErrorHandler(handlers.UpdateUser))
-	mux.HandleFunc("/api/users/delete", httperr.ErrorHandler(handlers.DeleteUser))
-	mux.HandleFunc("/api/users/online", httperr.ErrorHandler(handlers.OnlineUsers))
+mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Note the trailing slash for prefix matching
+	// Keep OnlineUsers separate for now
+mux.HandleFunc("/api/users/online", httperr.ErrorHandler(handlers.OnlineUsers))
 
-	// Post routes
-	mux.HandleFunc("/api/posts/create", httperr.ErrorHandler(handlers.CreatePost))
-	mux.HandleFunc("/api/posts/get", httperr.ErrorHandler(handlers.GetPost))
-	mux.HandleFunc("/api/posts/list", httperr.ErrorHandler(handlers.ListPosts))
-	mux.HandleFunc("/api/posts/user", httperr.ErrorHandler(handlers.ListUserPosts))
-	// mux.HandleFunc("/api/posts/update", handlers.u)
-	mux.HandleFunc("/api/posts/delete", httperr.ErrorHandler(handlers.DeletePost))
+// Post routes - Use the PostHandler with prefix matching
+mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP)) // Note the trailing slash
 
-	// Message routes
-	mux.HandleFunc("/api/messages", httperr.ErrorHandler(handlers.GetMessages))
+// Message routes
+mux.HandleFunc("/api/messages", httperr.ErrorHandler(handlers.GetMessages))
 
-	// Group routes
-	mux.HandleFunc("/api/groups/create", httperr.ErrorHandler(handlers.CreateGroup))
-	mux.HandleFunc("/api/groups/get", httperr.ErrorHandler(handlers.GetGroup))
-	mux.HandleFunc("/api/groups/list", httperr.ErrorHandler(handlers.ListGroups))
-	mux.HandleFunc("/api/groups/update", httperr.ErrorHandler(handlers.UpdateGroup))
-	mux.HandleFunc("/api/groups/delete", httperr.ErrorHandler(handlers.DeleteGroup))
+// Group routes - Use the consolidated GroupHandler with prefix matching
+mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
 
-	// Group membership routes
-	mux.HandleFunc("/api/groups/members/add", httperr.ErrorHandler(handlers.AddGroupMember))
-	mux.HandleFunc("/api/groups/members/remove", httperr.ErrorHandler(handlers.RemoveGroupMember))
-	mux.HandleFunc("/api/groups/members", httperr.ErrorHandler(handlers.ListGroupMembers))
+// Remove old separate group member/message routes as they are handled by GroupHandler now
+// mux.HandleFunc("/api/groups/members/add", httperr.ErrorHandler(controllers.GroupMember.AddGroupMember))
+// mux.HandleFunc("/api/groups/members/remove", httperr.ErrorHandler(controllers.GroupMember.RemoveGroupMember))
+// mux.HandleFunc("/api/groups/members", httperr.ErrorHandler(controllers.GroupMember.ListGroupMembers))
+// mux.HandleFunc("/api/groups/messages", httperr.ErrorHandler(controllers.GroupMessage.GetGroupMessages))
 
-	// Group messages routes
-	mux.HandleFunc("/api/groups/messages", httperr.ErrorHandler(handlers.GetGroupMessages))
-
-	return mux
+return mux
 }
