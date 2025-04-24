@@ -3,9 +3,12 @@ package helpers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/db"
+	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/google/uuid"
 )
 
@@ -48,6 +51,27 @@ func GetSession(token string) (string, error) {
 	}
 
 	return userID, nil
+}
+
+// GetSession retrieves user by session
+func GetUserFromSession(r *http.Request) (*models.User, error) {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		return nil, fmt.Errorf("no session cookie found")
+	}
+
+	userID, err := GetSession(cookie.Value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session: %v", err)
+	}
+
+	// Verify user exists in database
+	user, err := GetUserByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %v", err)
+	}
+
+	return user, nil
 }
 
 // DeleteSession removes a session by token

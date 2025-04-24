@@ -3,23 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
 	"github.com/HASANALI117/social-network/pkg/models"
 )
-
-// PostHandler handles HTTP requests for posts
-// type PostHandler struct {
-// 	postDB *helpers.PostDB
-// }
-
-// NewPostHandler creates a new PostHandler
-// func NewPostHandler() *PostHandler {
-// 	return &PostHandler{}
-// }
 
 // CreatePost godoc
 // @Summary Create a new post
@@ -29,25 +19,22 @@ import (
 // @Produce json
 // @Param post body models.Post true "Post creation details"
 // @Success 201 {object} map[string]interface{} "Post created successfully"
-// @Failure 400 {string} string "Invalid request body"
-// @Failure 500 {string} string "Failed to create post"
+// @Failure 400 {object} httperr.ErrorResponse "Invalid request body"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to create post"
 // @Router /posts/create [post]
-func CreatePost(w http.ResponseWriter, r *http.Request) {
+func CreatePost(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	var post models.Post
 	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
 	if err := helpers.CreatePost(&post); err != nil {
-		log.Printf("Failed to create post: %v", err) // Log the error
-		http.Error(w, "Failed to create post", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to create post")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -61,6 +48,7 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 		"privacy":    post.Privacy,
 		"created_at": post.CreatedAt,
 	})
+	return nil
 }
 
 // GetPost godoc
@@ -71,30 +59,27 @@ func CreatePost(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id query string true "Post ID"
 // @Success 200 {object} map[string]interface{} "Post details"
-// @Failure 400 {string} string "Post ID is required"
-// @Failure 404 {string} string "Post not found"
-// @Failure 500 {string} string "Failed to get post"
+// @Failure 400 {object} httperr.ErrorResponse "Post ID is required"
+// @Failure 404 {object} httperr.ErrorResponse "Post not found"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to get post"
 // @Router /posts/get [get]
-func GetPost(w http.ResponseWriter, r *http.Request) {
+func GetPost(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	postID := r.URL.Query().Get("id")
 	if postID == "" {
-		http.Error(w, "Post ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Post ID is required")
 	}
 
 	post, err := helpers.GetPostByID(postID)
 	if err != nil {
 		if errors.Is(err, helpers.ErrPostNotFound) {
-			http.Error(w, "Post not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to get post", http.StatusInternalServerError)
+			return httperr.NewNotFound(err, "Post not found")
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to get post")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -107,6 +92,7 @@ func GetPost(w http.ResponseWriter, r *http.Request) {
 		"privacy":    post.Privacy,
 		"created_at": post.CreatedAt,
 	})
+	return nil
 }
 
 // ListPosts godoc
@@ -118,12 +104,12 @@ func GetPost(w http.ResponseWriter, r *http.Request) {
 // @Param limit query int false "Number of posts to return (default 10)"
 // @Param offset query int false "Number of posts to skip (default 0)"
 // @Success 200 {object} map[string]interface{} "List of posts"
-// @Failure 500 {string} string "Failed to list posts"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to list posts"
 // @Router /posts/list [get]
-func ListPosts(w http.ResponseWriter, r *http.Request) {
+func ListPosts(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	limitStr := r.URL.Query().Get("limit")
@@ -145,8 +131,7 @@ func ListPosts(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := helpers.ListPosts(limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to list posts", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to list posts")
 	}
 
 	result := make([]map[string]interface{}, len(posts))
@@ -169,6 +154,7 @@ func ListPosts(w http.ResponseWriter, r *http.Request) {
 		"offset": offset,
 		"count":  len(posts),
 	})
+	return nil
 }
 
 // ListUserPosts godoc
@@ -181,19 +167,18 @@ func ListPosts(w http.ResponseWriter, r *http.Request) {
 // @Param limit query int false "Number of posts to return (default 10)"
 // @Param offset query int false "Number of posts to skip (default 0)"
 // @Success 200 {object} map[string]interface{} "List of user's posts"
-// @Failure 400 {string} string "User ID is required"
-// @Failure 500 {string} string "Failed to list posts"
+// @Failure 400 {object} httperr.ErrorResponse "User ID is required"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to list posts"
 // @Router /posts/user [get]
-func ListUserPosts(w http.ResponseWriter, r *http.Request) {
+func ListUserPosts(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	userID := r.URL.Query().Get("id")
 	if userID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
 	limitStr := r.URL.Query().Get("limit")
@@ -215,9 +200,7 @@ func ListUserPosts(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := helpers.ListPostsByUser(userID, limit, offset)
 	if err != nil {
-		log.Printf("Failed to list user posts: %v", err)
-		http.Error(w, "Failed to list posts", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to list posts")
 	}
 
 	result := make([]map[string]interface{}, len(posts))
@@ -240,76 +223,8 @@ func ListUserPosts(w http.ResponseWriter, r *http.Request) {
 		"offset": offset,
 		"count":  len(posts),
 	})
+	return nil
 }
-
-// UpdatePost godoc
-// @Summary Update post
-// @Description Update post details
-// @Tags posts
-// @Accept json
-// @Produce json
-// @Param id query string true "Post ID"
-// @Param post body object true "Post update details"
-// @Success 200 {object} map[string]interface{} "Updated post details"
-// @Failure 400 {string} string "Invalid request"
-// @Failure 404 {string} string "Post not found"
-// @Failure 500 {string} string "Failed to update post"
-// @Router /posts/update [put]
-// func UpdatePost(w http.ResponseWriter, r *http.Request) {
-// 	if r.Method != http.MethodPut {
-// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-// 		return
-// 	}
-
-// 	postID := r.URL.Query().Get("id")
-// 	if postID == "" {
-// 		http.Error(w, "Post ID is required", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	post, err := helpers.GetByID(postID)
-// 	if err != nil {
-// 		if errors.Is(err, helpers.ErrPostNotFound) {
-// 			http.Error(w, "Post not found", http.StatusNotFound)
-// 		} else {
-// 			http.Error(w, "Failed to get post", http.StatusInternalServerError)
-// 		}
-// 		return
-// 	}
-
-// 	var req struct {
-// 		Title    string `json:"title"`
-// 		Content  string `json:"content"`
-// 		ImageURL string `json:"image_url"`
-// 		Privacy  string `json:"privacy"`
-// 	}
-
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		http.Error(w, "Invalid request body", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	post.Title = req.Title
-// 	post.Content = req.Content
-// 	post.ImageURL = req.ImageURL
-// 	post.Privacy = req.Privacy
-
-// 	if err := helpers.Update(post); err != nil {
-// 		http.Error(w, "Failed to update post", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(map[string]interface{}{
-// 		"id":         post.ID,
-// 		"user_id":    post.UserID,
-// 		"title":      post.Title,
-// 		"content":    post.Content,
-// 		"image_url":  post.ImageURL,
-// 		"privacy":    post.Privacy,
-// 		"created_at": post.CreatedAt,
-// 	})
-// }
 
 // DeletePost godoc
 // @Summary Delete post
@@ -319,33 +234,31 @@ func ListUserPosts(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param id query string true "Post ID"
 // @Success 200 {object} map[string]string "Post deleted successfully"
-// @Failure 400 {string} string "Post ID is required"
-// @Failure 404 {string} string "Post not found"
-// @Failure 500 {string} string "Failed to delete post"
+// @Failure 400 {object} httperr.ErrorResponse "Post ID is required"
+// @Failure 404 {object} httperr.ErrorResponse "Post not found"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to delete post"
 // @Router /posts/delete [delete]
-func DeletePost(w http.ResponseWriter, r *http.Request) {
+func DeletePost(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	postID := r.URL.Query().Get("id")
 	if postID == "" {
-		http.Error(w, "Post ID is required", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(nil, "Post ID is required")
 	}
 
 	if err := helpers.DeletePost(postID); err != nil {
 		if errors.Is(err, helpers.ErrPostNotFound) {
-			http.Error(w, "Post not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Failed to delete post", http.StatusInternalServerError)
+			return httperr.NewNotFound(err, "Post not found")
 		}
-		return
+		return httperr.NewInternalServerError(err, "Failed to delete post")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Post deleted successfully",
 	})
+	return nil
 }

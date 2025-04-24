@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
 )
 
 // SignIn godoc
@@ -16,13 +18,13 @@ import (
 // @Produce json
 // @Param credentials body object true "Login credentials"
 // @Success 200 {object} map[string]interface{} "Login successful"
-// @Failure 400 {string} string "Invalid credentials"
+// @Failure 400 {object} httperr.ErrorResponse "Invalid credentials"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to create session"
 // @Router /auth/signin [post]
-func SignIn(w http.ResponseWriter, r *http.Request) {
-	// Only allow POST requests
+func SignIn(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	var credentials struct {
@@ -31,21 +33,21 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
 	// Authenticate user
 	user, err := helpers.AuthenticateUser(credentials.Identifier, credentials.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		if errors.Is(err, helpers.ErrUserNotFound) {
+			return httperr.NewBadRequest(nil, "Email Not Found")
+		}
+		return httperr.NewBadRequest(err, "Invalid credentials")
 	}
 
 	sessionToken, err := helpers.CreateSession(user.ID, 24*time.Hour)
 	if err != nil {
-		http.Error(w, "Failed to create session", http.StatusInternalServerError)
-		return
+		return httperr.NewInternalServerError(err, "Failed to create session")
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -72,6 +74,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 			"birth_date": user.BirthDate,
 		},
 	})
+	return nil
 }
 
 // SignOut godoc
@@ -81,17 +84,17 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]string "Logged out successfully"
+// @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
 // @Router /auth/signout [post]
-func SignOut(w http.ResponseWriter, r *http.Request) {
-	// Only allow POST requests
+func SignOut(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return httperr.NewMethodNotAllowed(nil, "")
 	}
 
 	// Delete session from database
 	cookie, err := r.Cookie("session_token")
 	if err == nil {
+		// Ignore errors from DeleteSession as we want to proceed with cookie deletion anyway
 		helpers.DeleteSession(cookie.Value)
 	}
 
@@ -103,10 +106,11 @@ func SignOut(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1, // Delete cookie
 	})
 
-	// Return created user (excluding password)
+	// Return success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Logged out successfully",
 	})
+	return nil
 }
