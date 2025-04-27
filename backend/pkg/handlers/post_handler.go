@@ -16,18 +16,20 @@ import (
 	"github.com/HASANALI117/social-network/pkg/services"
 )
 
-// PostHandler handles HTTP requests for posts
+// PostHandler handles HTTP requests for posts and delegates comment routes
 type PostHandler struct {
-	postService services.PostService
-	authService services.AuthService
+postService    services.PostService
+authService    services.AuthService
+commentHandler *CommentHandler // Added CommentHandler
 }
 
 // NewPostHandler creates a new PostHandler
-func NewPostHandler(postService services.PostService, authService services.AuthService) *PostHandler {
-	return &PostHandler{
-		postService: postService,
-		authService: authService,
-	}
+func NewPostHandler(postService services.PostService, authService services.AuthService, commentHandler *CommentHandler) *PostHandler {
+return &PostHandler{
+postService:    postService,
+authService:    authService,
+commentHandler: commentHandler, // Store CommentHandler
+}
 }
 
 // ServeHTTP routes the request to the appropriate handler method
@@ -54,11 +56,23 @@ func (h *PostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 		}
 		return httperr.NewInternalServerError(err, "Failed to get current user")
 	}
-	// If currentUser is nil here, it means it's an anonymous GET request
+// If currentUser is nil here, it means it's an anonymous GET request
 
-	// Routing logic
-	switch r.Method {
-	case http.MethodPost:
+// Check if this is a comment-related route nested under posts
+// e.g., /api/posts/{postId}/comments -> parts = ["{postId}", "comments"]
+if len(parts) >= 2 && parts[1] == "comments" {
+// Delegate to CommentHandler. ServeHTTP needs to handle this specific path structure.
+// We might need to adjust CommentHandler's ServeHTTP if it relies on a different path format.
+log.Printf("PostHandler delegating to CommentHandler for path: %s", r.URL.Path)
+// Re-route by calling the CommentHandler's ServeHTTP directly
+// Note: The CommentHandler's ServeHTTP will re-parse the path, which might be inefficient
+// or require adjustments in CommentHandler.
+return h.commentHandler.ServeHTTP(w, r)
+}
+
+// --- Original Post Routing Logic ---
+switch r.Method {
+case http.MethodPost:
 		// POST /api/posts/ -> Create Post
 		if len(parts) == 1 && parts[0] == "" {
 			if currentUser == nil { // Must be logged in to create
