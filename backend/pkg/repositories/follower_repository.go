@@ -81,7 +81,7 @@ func (r *followerRepository) GetFollowers(userID string, limit, offset int) ([]m
 	}
 	defer rows.Close()
 
-	var followers []models.User
+	followers := make([]models.User, 0) // Initialize as empty slice
 	for rows.Next() {
 		var user models.User
 		// Note: Ensure Scan order matches SELECT columns exactly, including is_private
@@ -116,7 +116,7 @@ func (r *followerRepository) GetFollowing(userID string, limit, offset int) ([]m
 	}
 	defer rows.Close()
 
-	var following []models.User
+	following := make([]models.User, 0) // Initialize as empty slice
 	for rows.Next() {
 		var user models.User
 		// Note: Ensure Scan order matches SELECT columns exactly, including is_private

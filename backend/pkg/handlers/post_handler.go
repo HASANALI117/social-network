@@ -216,7 +216,7 @@ func (h *PostHandler) listPosts(w http.ResponseWriter, r *http.Request, requesti
 	}
 
 	// Call service to list posts (service handles filtering logic)
-	postsResponse, err := h.postService.List(limit, offset, requestingUserID)
+	postsResponse, err := h.postService.List(requestingUserID, limit, offset) // Pass requestingUserID first
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to list posts")
 	}
@@ -264,7 +264,7 @@ func (h *PostHandler) listUserPosts(w http.ResponseWriter, r *http.Request, targ
 	}
 
 	// Call service to list posts by user (service handles filtering logic)
-	postsResponse, err := h.postService.ListPostsByUser(targetUserID, limit, offset, requestingUserID) // Renamed method call
+	postsResponse, err := h.postService.ListPostsByUser(targetUserID, requestingUserID, limit, offset) // Pass requestingUserID before limit/offset
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to list user posts")
 	}

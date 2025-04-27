@@ -348,7 +348,7 @@ func (s *userService) GetUserProfile(viewerID, profileUserID string) (*UserProfi
 
 	// Fetch latest posts
 	// Pass viewerID as requestingUserID for privacy checks
-	postsResponse, fetchErr = s.postService.ListPostsByUser(profileUserID, profileDataLimit, 0, viewerID) // Pass viewerID
+	postsResponse, fetchErr = s.postService.ListPostsByUser(profileUserID, viewerID, profileDataLimit, 0) // Pass viewerID before limit/offset
 	if fetchErr != nil {
 		log.Printf("Error fetching posts for user %s (viewer %s): %v", profileUserID, viewerID, fetchErr)
 		// Decide if partial data is okay or return error
