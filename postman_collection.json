@@ -44,7 +44,7 @@
 ],
 "body": {
 "mode": "raw",
-"raw": "{\n    \"emailOrUsername\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
+"raw": "{\n    \"identifier\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
 },
 "url": {
 "raw": "{{baseUrl}}/api/auth/signin",
@@ -65,6 +65,29 @@
 "path": ["api", "auth", "signout"]
 },
 "description": "Logs out the current user by deleting the session."
+},
+"response": []
+},
+{
+"name": "Update User Privacy [Auth Required]",
+"request": {
+"method": "PUT",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"is_private\": true \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}/privacy",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}", "privacy"]
+},
+"description": "Updates the privacy setting (public/private) for the specified user. Requires authentication (TODO: implement auth check)."
 },
 "response": []
 }
@@ -242,6 +265,122 @@
 "path": ["api", "posts", "{{postId}}"]
 },
 "description": "Deletes a specific post. Requires authentication and ownership."
+},
+"response": []
+}
+]
+},
+{
+"name": "Followers",
+"item": [
+{
+"name": "Follow User [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{targetUserId}}/follow",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{targetUserId}}", "follow"]
+},
+"description": "Sends a follow request to another user."
+},
+"response": []
+},
+{
+"name": "Unfollow User [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{targetUserId}}/unfollow",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{targetUserId}}", "unfollow"]
+},
+"description": "Stops following another user."
+},
+"response": []
+},
+{
+"name": "Accept Follow Request [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{requesterId}}/accept",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{requesterId}}", "accept"]
+},
+"description": "Accepts a follow request from another user."
+},
+"response": []
+},
+{
+"name": "Reject Follow Request [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{requesterId}}/reject",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{requesterId}}", "reject"]
+},
+"description": "Rejects a follow request from another user."
+},
+"response": []
+},
+{
+"name": "List Followers [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}/followers?limit=10&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}", "followers"],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists all users who follow the specified user (paginated)."
+},
+"response": []
+},
+{
+"name": "List Following [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}/following?limit=10&offset=0",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}", "following"],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists all users that the specified user follows (paginated)."
+},
+"response": []
+},
+{
+"name": "List Pending Follow Requests [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/users/me/follow-requests",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "me", "follow-requests"]
+},
+"description": "Lists all pending follow requests for the authenticated user. Returns a JSON object with 'received' and 'sent' arrays."
 },
 "response": []
 }
@@ -444,6 +583,11 @@
 {
 "key": "targetUserId",
 "value": "REPLACE_WITH_TARGET_USER_ID",
+"type": "string"
+},
+{
+"key": "requesterId",
+"value": "REPLACE_WITH_REQUESTER_ID",
 "type": "string"
 }
 ]

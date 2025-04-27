@@ -31,31 +31,32 @@ func Setup(dbConn *sql.DB) http.Handler {
 	// Swagger Documentation
 	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
-// Websocket routes - Pass the AuthService instance
-mux.HandleFunc("/ws", handlers.HandleWebSocket(services.Auth))
+	// Websocket routes - Pass the AuthService instance
+	mux.HandleFunc("/ws", handlers.HandleWebSocket(services.Auth))
 
-// Authentication routes - Use methods from the initialized AuthHandler
-mux.HandleFunc("/api/auth/signin", httperr.ErrorHandler(controllers.Auth.SignIn))
-mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(controllers.Auth.SignOut))
+	// Authentication routes - Use methods from the initialized AuthHandler
+	mux.HandleFunc("/api/auth/signin", httperr.ErrorHandler(controllers.Auth.SignIn))
+	mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(controllers.Auth.SignOut))
 
-mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Note the trailing slash for prefix matching
-	// Keep OnlineUsers separate for now
-mux.HandleFunc("/api/users/online", httperr.ErrorHandler(handlers.OnlineUsers))
+	// User and Follower routes
+	mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Handles /api/users/, /api/users/{id}, and /api/users/{id}/{action}
+	// Specific route for the current user's pending follow requests
+	mux.HandleFunc("/api/users/me/follow-requests", controllers.Follower.HandleListPending) // No ErrorHandler wrapper needed
 
-// Post routes - Use the PostHandler with prefix matching
-mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP)) // Note the trailing slash
+	// Post routes - Use the PostHandler with prefix matching
+	mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP)) // Note the trailing slash
 
-// Message routes
-mux.HandleFunc("/api/messages", httperr.ErrorHandler(handlers.GetMessages))
+	// Message routes
+	mux.HandleFunc("/api/messages", httperr.ErrorHandler(handlers.GetMessages))
 
-// Group routes - Use the consolidated GroupHandler with prefix matching
-mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
+	// Group routes - Use the consolidated GroupHandler with prefix matching
+	mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
 
-// Remove old separate group member/message routes as they are handled by GroupHandler now
-// mux.HandleFunc("/api/groups/members/add", httperr.ErrorHandler(controllers.GroupMember.AddGroupMember))
-// mux.HandleFunc("/api/groups/members/remove", httperr.ErrorHandler(controllers.GroupMember.RemoveGroupMember))
-// mux.HandleFunc("/api/groups/members", httperr.ErrorHandler(controllers.GroupMember.ListGroupMembers))
-// mux.HandleFunc("/api/groups/messages", httperr.ErrorHandler(controllers.GroupMessage.GetGroupMessages))
+	// Remove old separate group member/message routes as they are handled by GroupHandler now
+	// mux.HandleFunc("/api/groups/members/add", httperr.ErrorHandler(controllers.GroupMember.AddGroupMember))
+	// mux.HandleFunc("/api/groups/members/remove", httperr.ErrorHandler(controllers.GroupMember.RemoveGroupMember))
+	// mux.HandleFunc("/api/groups/members", httperr.ErrorHandler(controllers.GroupMember.ListGroupMembers))
+	// mux.HandleFunc("/api/groups/messages", httperr.ErrorHandler(controllers.GroupMessage.GetGroupMessages))
 
-return mux
+	return mux
 }

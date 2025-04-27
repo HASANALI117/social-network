@@ -15,6 +15,7 @@ type User struct {
 	AvatarURL string    `json:"avatar_url,omitempty"`
 	AboutMe   string    `json:"about_me,omitempty"`
 	BirthDate string    `json:"birth_date"`
+	IsPrivate bool      `json:"is_private" db:"is_private"` // Added for profile privacy
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
