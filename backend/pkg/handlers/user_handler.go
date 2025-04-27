@@ -66,11 +66,11 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 				return httperr.NewMethodNotAllowed(nil, "")
 			}
 		}
-	} else if len(parts) == 2 { // Path is /api/users/{id}/{action} - Likely follower actions
-		// userID := parts[0] // ID is extracted within follower handlers
+	} else if len(parts) == 2 { // Path is /api/users/{id}/{action}
+		userID := parts[0] // Extract userID here
 		action := parts[1]
 
-		if h.followerHandler == nil {
+		if h.followerHandler == nil && action != "privacy" { // Only check followerHandler if needed
 			log.Println("Error: FollowerHandler not initialized in UserHandler")
 			return httperr.NewInternalServerError(nil, "Server configuration error")
 		}
@@ -112,11 +112,16 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 				return nil
 			}
 			return httperr.NewMethodNotAllowed(nil, "Method GET required for following")
+		case "privacy":
+			if r.Method == http.MethodPut {
+				return h.updatePrivacy(w, r, userID)
+			}
+			return httperr.NewMethodNotAllowed(nil, "Method PUT required for privacy")
 		default:
-			// Action didn't match any known follower action
+			// Action didn't match any known follower or privacy action
 			return httperr.NewNotFound(nil, "Unknown user action: "+action)
 		}
-		// Code should not reach here because all cases in the inner switch return
+		// Code should not reach here because all cases in the switch return
 	} else {
 		// Any other path structure is not found
 		return httperr.NewNotFound(nil, "Invalid user path")
@@ -281,6 +286,52 @@ func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request, id stri
 
 // sanitizeUser function removed as sanitization is now handled by the service layer returning UserResponse DTOs
 
+// updatePrivacy handles PUT /api/users/{id}/privacy
+func (h *UserHandler) updatePrivacy(w http.ResponseWriter, r *http.Request, userID string) error {
+	// TODO: Add authorization check - ensure the logged-in user can update this profile
+	/*
+	   currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	   if err != nil {
+	       if errors.Is(err, helpers.ErrInvalidSession) {
+	           return httperr.NewUnauthorized(err, "Invalid session")
+	       }
+	       return httperr.NewInternalServerError(err, "Failed to get current user")
+	   }
+	   if currentUser.ID != userID {
+	       return httperr.NewForbidden(nil, "Not authorized to update this user's privacy")
+	   }
+	*/
+
+	var payload struct {
+		IsPrivate *bool `json:"is_private"` // Use pointer to distinguish between false and not provided
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		return httperr.NewBadRequest(err, "Invalid request body")
+	}
+
+	if payload.IsPrivate == nil {
+		return httperr.NewBadRequest(nil, "Missing 'is_private' field")
+	}
+
+	err := h.userService.UpdatePrivacy(userID, *payload.IsPrivate)
+	if err != nil {
+		if errors.Is(err, repositories.ErrUserNotFound) {
+			return httperr.NewNotFound(err, "User not found")
+		}
+		return httperr.NewInternalServerError(err, "Failed to update user privacy")
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":    "Privacy setting updated successfully",
+		"user_id":    userID,
+		"is_private": *payload.IsPrivate,
+	})
+	return nil
+}
+
 //
 // // OnlineUsers might need separate handling or integration with the new structure
 // // if it relies on different mechanisms (like WebSockets) than the standard CRUD operations.
@@ -337,4 +388,3 @@ func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request, id stri
 // })
 // return nil
 // }
-//

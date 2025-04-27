@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql" // Added for sql.ErrNoRows
 	"errors"
 	"fmt"
 	"log"
@@ -40,15 +41,15 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 		return errors.New("cannot follow yourself")
 	}
 
-	// Check if target user exists (optional, depends on requirements)
-	// _, err := s.userRepo.FindByID(targetID)
-	// if err != nil {
-	//     if err == sql.ErrNoRows {
-	//         return errors.New("target user not found")
-	//     }
-	//     log.Printf("Error checking target user: %v", err)
-	//     return fmt.Errorf("internal server error")
-	// }
+	// Check if target user exists and get their privacy status
+	targetUser, err := s.userRepo.GetByID(targetID) // Corrected method name
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, repositories.ErrUserNotFound) { // Check for specific not found errors
+			return errors.New("target user not found")
+		}
+		log.Printf("Error checking target user: %v", err)
+		return fmt.Errorf("internal server error checking target user")
+	}
 
 	// Check if already following or request pending
 	existing, err := s.followerRepo.FindFollow(requesterID, targetID)
@@ -67,11 +68,31 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 		return fmt.Errorf("unexpected follow status: %s", existing.Status)
 	}
 
-	// Create the follow request
-	err = s.followerRepo.CreateFollowRequest(requesterID, targetID)
-	if err != nil {
-		log.Printf("Error creating follow request in service: %v", err)
-		return fmt.Errorf("failed to send follow request")
+	// Create the follow request/relationship based on privacy
+	if targetUser.IsPrivate {
+		// Private profile: Create a pending request
+		err = s.followerRepo.CreateFollowRequest(requesterID, targetID)
+		if err != nil {
+			log.Printf("Error creating follow request for private profile: %v", err)
+			return fmt.Errorf("failed to send follow request")
+		}
+		log.Printf("Follow request sent from %s to private user %s", requesterID, targetID)
+	} else {
+		// Public profile: Create request and immediately accept it
+		err = s.followerRepo.CreateFollowRequest(requesterID, targetID)
+		if err != nil {
+			// Handle potential duplicate error if CreateFollowRequest fails uniquely
+			log.Printf("Error creating initial follow record for public profile: %v", err)
+			return fmt.Errorf("failed to initiate follow for public profile")
+		}
+		err = s.followerRepo.UpdateFollowStatus(requesterID, targetID, "accepted")
+		if err != nil {
+			log.Printf("Error auto-accepting follow for public profile: %v", err)
+			// Consider cleanup: Delete the pending request if acceptance fails?
+			// s.followerRepo.DeleteFollow(requesterID, targetID) // Optional cleanup
+			return fmt.Errorf("failed to finalize follow for public profile")
+		}
+		log.Printf("User %s automatically followed public user %s", requesterID, targetID)
 	}
 
 	return nil

@@ -44,7 +44,7 @@
 ],
 "body": {
 "mode": "raw",
-"raw": "{\n    \"emailOrUsername\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
+"raw": "{\n    \"identifier\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
 },
 "url": {
 "raw": "{{baseUrl}}/api/auth/signin",
@@ -65,6 +65,29 @@
 "path": ["api", "auth", "signout"]
 },
 "description": "Logs out the current user by deleting the session."
+},
+"response": []
+},
+{
+"name": "Update User Privacy [Auth Required]",
+"request": {
+"method": "PUT",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"is_private\": true \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/users/{{userId}}/privacy",
+"host": ["{{baseUrl}}"],
+"path": ["api", "users", "{{userId}}", "privacy"]
+},
+"description": "Updates the privacy setting (public/private) for the specified user. Requires authentication (TODO: implement auth check)."
 },
 "response": []
 }
