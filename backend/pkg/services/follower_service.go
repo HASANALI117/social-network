@@ -19,6 +19,9 @@ type FollowerService interface {
 	ListFollowers(userID string, limit, offset int) ([]models.User, error) // Added pagination
 	ListFollowing(userID string, limit, offset int) ([]models.User, error) // Added pagination
 	ListPendingRequests(userID string) (map[string][]models.User, error)   // Changed return type
+	FindFollow(followerID, followingID string) (*models.Follower, error)   // Added method
+	CountFollowers(userID string) (int, error)                             // Added follower count
+	CountFollowing(userID string) (int, error)                             // Added following count
 }
 
 // followerService implements FollowerService
@@ -214,4 +217,37 @@ func (s *followerService) ListPendingRequests(userID string) (map[string][]model
 	}
 
 	return response, nil
+}
+
+// FindFollow checks if a follow relationship exists between two users.
+func (s *followerService) FindFollow(followerID, followingID string) (*models.Follower, error) {
+	// Directly call the repository method
+	follow, err := s.followerRepo.FindFollow(followerID, followingID)
+	if err != nil {
+		// Log the error but return it directly, including sql.ErrNoRows if the repo doesn't handle it
+		log.Printf("Error finding follow in service from %s to %s: %v", followerID, followingID, err)
+		return nil, err
+	}
+	// If repo returns nil, nil for not found, this service method will also return nil, nil
+	return follow, nil
+}
+
+// CountFollowers retrieves the total count of accepted followers for a user.
+func (s *followerService) CountFollowers(userID string) (int, error) {
+	count, err := s.followerRepo.CountFollowers(userID)
+	if err != nil {
+		log.Printf("Error counting followers in service for user %s: %v", userID, err)
+		return 0, fmt.Errorf("failed to count followers")
+	}
+	return count, nil
+}
+
+// CountFollowing retrieves the total count of users the given user is following (accepted).
+func (s *followerService) CountFollowing(userID string) (int, error) {
+	count, err := s.followerRepo.CountFollowing(userID)
+	if err != nil {
+		log.Printf("Error counting following in service for user %s: %v", userID, err)
+		return 0, fmt.Errorf("failed to count following")
+	}
+	return count, nil
 }

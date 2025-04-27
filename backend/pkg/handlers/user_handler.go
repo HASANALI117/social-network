@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/HASANALI117/social-network/pkg/helpers" // Added for GetUserFromSession
 	"github.com/HASANALI117/social-network/pkg/httperr"
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories" // For ErrUserNotFound comparison
@@ -159,18 +160,36 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// getUserByID handles GET /api/users/{id}
-func (h *UserHandler) getUserByID(w http.ResponseWriter, r *http.Request, id string) error {
-	userResponse, err := h.userService.GetByID(id)
+// getUserByID handles GET /api/users/{id} - Now fetches full profile
+func (h *UserHandler) getUserByID(w http.ResponseWriter, r *http.Request, profileUserID string) error {
+	// Get the ID of the user making the request (viewer), if logged in
+	viewerID := ""
+	currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil && !errors.Is(err, helpers.ErrInvalidSession) {
+		// Log unexpected errors, but proceed as anonymous viewer for session errors
+		log.Printf("Error getting user from session: %v", err)
+		// Allow anonymous viewing attempt
+	}
+	if currentUser != nil {
+		viewerID = currentUser.ID
+	}
+
+	// Call the service to get the profile, passing viewer and profile IDs
+	userProfileResponse, err := h.userService.GetUserProfile(viewerID, profileUserID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrUserNotFound) {
-			return httperr.NewNotFound(err, "User not found")
+			return httperr.NewNotFound(err, "User profile not found")
 		}
-		return httperr.NewInternalServerError(err, "Failed to get user")
+		if errors.Is(err, services.ErrForbidden) {
+			// Return 403 Forbidden if the viewer is not allowed to see the profile
+			return httperr.NewForbidden(err, "Access to this profile is restricted")
+		}
+		// Handle other potential errors
+		return httperr.NewInternalServerError(err, "Failed to get user profile")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(userResponse) // Encode the response DTO directly
+	json.NewEncoder(w).Encode(userProfileResponse) // Encode the full profile response
 	return nil
 }
 

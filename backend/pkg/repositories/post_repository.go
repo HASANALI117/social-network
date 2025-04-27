@@ -1,214 +1,376 @@
 package repositories
 
 import (
-"database/sql"
-"errors"
-"fmt"
-"time"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
 
-"github.com/HASANALI117/social-network/pkg/models"
-"github.com/google/uuid"
+	"github.com/HASANALI117/social-network/pkg/models"
+	"github.com/google/uuid"
 )
 
 var (
-// ErrPostNotFound indicates that a post with the given ID was not found.
-ErrPostNotFound = errors.New("post not found")
+	// ErrPostNotFound indicates that a post with the given ID was not found.
+	ErrPostNotFound = errors.New("post not found")
 )
 
 // PostRepository defines the interface for post data access
 type PostRepository interface {
-Create(post *models.Post) error
-GetByID(id string) (*models.Post, error)
-List(limit, offset int) ([]*models.Post, error)
-ListByUser(userID string, limit, offset int) ([]*models.Post, error)
-// Update(post *models.Post) error // TODO: Implement Update
-Delete(id string) error
+	Create(post *models.Post) error
+	GetByID(id string) (*models.Post, error)
+	List(requestingUserID string, limit, offset int) ([]*models.Post, error)                     // Added requestingUserID for filtering
+	ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) // Added requestingUserID for filtering
+	// Update(post *models.Post) error // TODO: Implement Update
+	Delete(id string) error
+
+	// Methods for managing allowed users for private posts
+	AddAllowedUsers(postID string, userIDs []string) error
+	RemoveAllowedUsers(postID string, userIDs []string) error // Optional: For editing allowed list
+	IsUserAllowed(postID, userID string) (bool, error)
+	GetAllowedUsers(postID string) ([]string, error) // Optional: For editing/display
 }
 
 // postRepository implements PostRepository interface
 type postRepository struct {
-db *sql.DB
+	db *sql.DB
 }
 
 // NewPostRepository creates a new PostRepository
 func NewPostRepository(db *sql.DB) PostRepository {
-return &postRepository{
-db: db,
-}
+	return &postRepository{
+		db: db,
+	}
 }
 
 // Create inserts a new post record into the database
 func (r *postRepository) Create(post *models.Post) error {
-query := `
+	query := `
         INSERT INTO posts (id, user_id, title, content, image_url, privacy, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     `
-post.ID = uuid.New().String()
-post.CreatedAt = time.Now()
+	post.ID = uuid.New().String()
+	post.CreatedAt = time.Now()
 
-_, err := r.db.Exec(
-query,
-post.ID,
-post.UserID,
-post.Title,
-post.Content,
-post.ImageURL,
-post.Privacy,
-post.CreatedAt,
-)
-if err != nil {
-return fmt.Errorf("failed to create post: %w", err)
-}
-return nil
+	_, err := r.db.Exec(
+		query,
+		post.ID,
+		post.UserID,
+		post.Title,
+		post.Content,
+		post.ImageURL,
+		post.Privacy,
+		post.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create post: %w", err)
+	}
+	return nil
 }
 
 // GetByID retrieves a post by its ID
 func (r *postRepository) GetByID(id string) (*models.Post, error) {
-query := `
+	query := `
         SELECT id, user_id, title, content, image_url, privacy, created_at
         FROM posts
         WHERE id = ?
     `
-var post models.Post
-var createdAt string // Scan as string first
+	var post models.Post
+	var createdAt string // Scan as string first
 
-err := r.db.QueryRow(query, id).Scan(
-&post.ID,
-&post.UserID,
-&post.Title,
-&post.Content,
-&post.ImageURL,
-&post.Privacy,
-&createdAt, // Scan into string
-)
-if err != nil {
-if errors.Is(err, sql.ErrNoRows) {
-return nil, ErrPostNotFound
-}
-return nil, fmt.Errorf("failed to get post by ID: %w", err)
-}
+	err := r.db.QueryRow(query, id).Scan(
+		&post.ID,
+		&post.UserID,
+		&post.Title,
+		&post.Content,
+		&post.ImageURL,
+		&post.Privacy,
+		&createdAt, // Scan into string
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrPostNotFound
+		}
+		return nil, fmt.Errorf("failed to get post by ID: %w", err)
+	}
 
-// Parse timestamp
-post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-if err != nil {
-// Log parsing error but return the post anyway? Or return error?
-fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
-// Decide on error handling strategy. For now, return post with zero time.
-post.CreatedAt = time.Time{}
-}
+	// Parse timestamp
+	post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		// Log parsing error but return the post anyway? Or return error?
+		fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
+		// Decide on error handling strategy. For now, return post with zero time.
+		post.CreatedAt = time.Time{}
+	}
 
-return &post, nil
-}
-
-// List retrieves a paginated list of all posts (consider privacy later)
-func (r *postRepository) List(limit, offset int) ([]*models.Post, error) {
-query := `
-        SELECT id, user_id, title, content, image_url, privacy, created_at
-        FROM posts
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-    `
-rows, err := r.db.Query(query, limit, offset)
-if err != nil {
-return nil, fmt.Errorf("failed to list posts: %w", err)
-}
-defer rows.Close()
-
-posts := make([]*models.Post, 0)
-for rows.Next() {
-var post models.Post
-var createdAt string
-err := rows.Scan(
-&post.ID,
-&post.UserID,
-&post.Title,
-&post.Content,
-&post.ImageURL,
-&post.Privacy,
-&createdAt,
-)
-if err != nil {
-return nil, fmt.Errorf("failed to scan post during list: %w", err)
-}
-// Parse timestamp
-post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-if err != nil {
-fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
-post.CreatedAt = time.Time{}
-}
-posts = append(posts, &post)
+	return &post, nil
 }
 
-if err := rows.Err(); err != nil {
-return nil, fmt.Errorf("error iterating post list rows: %w", err)
+// List retrieves a paginated list of posts, filtered by privacy rules based on the requesting user.
+func (r *postRepository) List(requestingUserID string, limit, offset int) ([]*models.Post, error) {
+	// Base query selects posts based on privacy rules
+	// 1. Public posts
+	// 2. User's own posts
+	// 3. Posts from users the requesting user follows (almost_private)
+	// 4. Private posts where the requesting user is specifically allowed
+	query := `
+		SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.created_at
+		FROM posts p
+		LEFT JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted' -- requestingUserID for almost_private check
+		LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- requestingUserID for private check
+		WHERE
+			p.privacy = ? -- models.PrivacyPublic
+			OR p.user_id = ? -- requestingUserID (own posts)
+			OR (p.privacy = ? AND f.follower_id IS NOT NULL) -- models.PrivacyAlmostPrivate and follower relationship exists
+			OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- models.PrivacyPrivate and user is allowed
+		ORDER BY p.created_at DESC
+		LIMIT ? OFFSET ?;
+	`
+
+	rows, err := r.db.Query(query,
+		requestingUserID, // For follower check
+		requestingUserID, // For allowed user check
+		models.PrivacyPublic,
+		requestingUserID, // For own post check
+		models.PrivacyAlmostPrivate,
+		models.PrivacyPrivate,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list posts with privacy filter: %w", err)
+	}
+	defer rows.Close()
+
+	posts := make([]*models.Post, 0)
+	for rows.Next() {
+		var post models.Post
+		var createdAt string
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL,
+			&post.Privacy,
+			&createdAt,
+		)
+		if err != nil {
+			// Log or return error? Return for now.
+			return nil, fmt.Errorf("failed to scan post during filtered list: %w", err)
+		}
+		// Parse timestamp
+		post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		if err != nil {
+			fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
+			post.CreatedAt = time.Time{}
+		}
+		posts = append(posts, &post)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating filtered post list rows: %w", err)
+	}
+
+	return posts, nil
 }
 
-return posts, nil
-}
+// ListByUser retrieves a paginated list of posts for a specific user, filtered by privacy rules based on the requesting user.
+func (r *postRepository) ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) {
+	// Similar logic to List, but initially filtered by targetUserID
+	// Privacy checks are still based on the requestingUserID's relationship to the targetUserID's posts
+	query := `
+		SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.created_at
+		FROM posts p
+		LEFT JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted' -- requestingUserID for almost_private check
+		LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- requestingUserID for private check
+		WHERE
+			p.user_id = ? -- targetUserID
+			AND ( -- Privacy conditions based on requestingUserID
+				p.privacy = ? -- models.PrivacyPublic
+				OR p.user_id = ? -- requestingUserID (viewing own profile, though filtered by targetUserID already)
+				OR (p.privacy = ? AND f.follower_id IS NOT NULL) -- models.PrivacyAlmostPrivate and follower relationship exists
+				OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- models.PrivacyPrivate and user is allowed
+			)
+		ORDER BY p.created_at DESC
+		LIMIT ? OFFSET ?;
+	`
 
-// ListByUser retrieves a paginated list of posts for a specific user
-func (r *postRepository) ListByUser(userID string, limit, offset int) ([]*models.Post, error) {
-query := `
-        SELECT id, user_id, title, content, image_url, privacy, created_at
-        FROM posts
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-    `
-rows, err := r.db.Query(query, userID, limit, offset)
-if err != nil {
-return nil, fmt.Errorf("failed to list posts by user: %w", err)
-}
-defer rows.Close()
+	rows, err := r.db.Query(query,
+		requestingUserID, // For follower check
+		requestingUserID, // For allowed user check
+		targetUserID,     // Filter by post owner
+		models.PrivacyPublic,
+		requestingUserID, // For own post check (redundant here but harmless)
+		models.PrivacyAlmostPrivate,
+		models.PrivacyPrivate,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list posts by user with privacy filter: %w", err)
+	}
+	defer rows.Close()
 
-posts := make([]*models.Post, 0)
-for rows.Next() {
-var post models.Post
-var createdAt string
-err := rows.Scan(
-&post.ID,
-&post.UserID,
-&post.Title,
-&post.Content,
-&post.ImageURL,
-&post.Privacy,
-&createdAt,
-)
-if err != nil {
-return nil, fmt.Errorf("failed to scan post during list by user: %w", err)
-}
-// Parse timestamp
-post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-if err != nil {
-fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
-post.CreatedAt = time.Time{}
-}
-posts = append(posts, &post)
-}
+	posts := make([]*models.Post, 0)
+	for rows.Next() {
+		var post models.Post
+		var createdAt string
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL,
+			&post.Privacy,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan post during filtered list by user: %w", err)
+		}
+		// Parse timestamp
+		post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		if err != nil {
+			fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
+			post.CreatedAt = time.Time{}
+		}
+		posts = append(posts, &post)
+	}
 
-if err := rows.Err(); err != nil {
-return nil, fmt.Errorf("error iterating post list by user rows: %w", err)
-}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating filtered post list by user rows: %w", err)
+	}
 
-return posts, nil
+	return posts, nil
 }
 
 // Delete removes a post record by its ID
 func (r *postRepository) Delete(id string) error {
-query := "DELETE FROM posts WHERE id = ?"
-result, err := r.db.Exec(query, id)
-if err != nil {
-return fmt.Errorf("failed to delete post: %w", err)
+	query := "DELETE FROM posts WHERE id = ?"
+	result, err := r.db.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete post: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected after deleting post: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrPostNotFound // Return error if no rows were deleted
+	}
+
+	return nil
 }
 
-rowsAffected, err := result.RowsAffected()
-if err != nil {
-return fmt.Errorf("failed to get rows affected after deleting post: %w", err)
+// --- Methods for post_allowed_users ---
+
+// AddAllowedUsers inserts multiple user IDs allowed to view a specific private post.
+// It assumes the post's privacy is already set to 'private'.
+func (r *postRepository) AddAllowedUsers(postID string, userIDs []string) error {
+	if len(userIDs) == 0 {
+		return nil // Nothing to add
+	}
+
+	// Use transaction for multiple inserts
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for adding allowed users: %w", err)
+	}
+	defer tx.Rollback() // Rollback if anything fails
+
+	stmt, err := tx.Prepare("INSERT OR IGNORE INTO post_allowed_users (post_id, user_id) VALUES (?, ?)")
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement for adding allowed users: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, userID := range userIDs {
+		_, err := stmt.Exec(postID, userID)
+		if err != nil {
+			// Consider logging the specific user ID that failed
+			return fmt.Errorf("failed to insert allowed user %s for post %s: %w", userID, postID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction for adding allowed users: %w", err)
+	}
+
+	return nil
 }
 
-if rowsAffected == 0 {
-return ErrPostNotFound // Return error if no rows were deleted
+// RemoveAllowedUsers removes specified user IDs from the allowed list for a post.
+func (r *postRepository) RemoveAllowedUsers(postID string, userIDs []string) error {
+	if len(userIDs) == 0 {
+		return nil // Nothing to remove
+	}
+
+	// Use transaction for multiple deletes
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for removing allowed users: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("DELETE FROM post_allowed_users WHERE post_id = ? AND user_id = ?")
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement for removing allowed users: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, userID := range userIDs {
+		_, err := stmt.Exec(postID, userID)
+		if err != nil {
+			// Log or handle error - e.g., user wasn't in the list anyway
+			fmt.Printf("Warning: Failed to remove allowed user %s for post %s (may not have existed): %v\n", userID, postID, err)
+			// Continue trying to remove others
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction for removing allowed users: %w", err)
+	}
+
+	return nil
 }
 
-return nil
+// IsUserAllowed checks if a specific user is in the allowed list for a private post.
+func (r *postRepository) IsUserAllowed(postID, userID string) (bool, error) {
+	query := "SELECT 1 FROM post_allowed_users WHERE post_id = ? AND user_id = ? LIMIT 1"
+	var exists int
+	err := r.db.QueryRow(query, postID, userID).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil // User is not in the list
+		}
+		return false, fmt.Errorf("failed to check if user %s is allowed for post %s: %w", userID, postID, err)
+	}
+	return true, nil // User is in the list
+}
+
+// GetAllowedUsers retrieves all user IDs allowed to view a specific private post.
+func (r *postRepository) GetAllowedUsers(postID string) ([]string, error) {
+	query := "SELECT user_id FROM post_allowed_users WHERE post_id = ?"
+	rows, err := r.db.Query(query, postID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query allowed users for post %s: %w", postID, err)
+	}
+	defer rows.Close()
+
+	allowedUserIDs := make([]string, 0)
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, fmt.Errorf("failed to scan allowed user ID for post %s: %w", postID, err)
+		}
+		allowedUserIDs = append(allowedUserIDs, userID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating allowed users rows for post %s: %w", postID, err)
+	}
+
+	return allowedUserIDs, nil
 }

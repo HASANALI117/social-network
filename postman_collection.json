@@ -175,6 +175,92 @@
 "item": [
 {
 "name": "Create Post [Auth Required]",
+"examples": [
+{
+"name": "Create Public Post",
+"originalRequest": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"My Public Post\",\n    \"content\": \"This post is visible to everyone!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+""
+]
+}
+},
+"response": []
+},
+{
+"name": "Create Almost Private Post (Followers Only)",
+"originalRequest": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"My Almost Private Post\",\n    \"content\": \"This post is visible only to my followers.\",\n    \"image_url\": \"\",\n    \"privacy\": \"almost_private\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+""
+]
+}
+},
+"response": []
+},
+{
+"name": "Create Private Post (Specific Users)",
+"originalRequest": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"My Private Post\",\n    \"content\": \"This post is visible only to specific users.\",\n    \"image_url\": \"\",\n    \"privacy\": \"private\",\n    \"allowed_user_ids\": [\n        \"REPLACE_WITH_ALLOWED_USER_ID_1\",\n        \"REPLACE_WITH_ALLOWED_USER_ID_2\"\n    ]\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+""
+]
+}
+},
+"response": []
+}
+],
 "request": {
 "method": "POST",
 "header": [
@@ -185,19 +271,19 @@
 ],
 "body": {
 "mode": "raw",
-"raw": "{\n    \"title\": \"My First Post\",\n    \"content\": \"This is the content of my first post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\" \n}"
+"raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": []\n}"
 },
 "url": {
 "raw": "{{baseUrl}}/api/posts/",
 "host": ["{{baseUrl}}"],
 "path": ["api", "posts", ""]
 },
-"description": "Creates a new post. Requires authentication."
+"description": "Creates a new post. Requires authentication. \n\n**Privacy Options:**\n*   `public`: Visible to everyone.\n*   `almost_private`: Visible only to users who follow the creator.\n*   `private`: Visible only to users specified in `allowed_user_ids`.\n\nSee examples for different privacy settings."
 },
 "response": []
 },
 {
-"name": "List Posts",
+"name": "List Posts (Feed)",
 "request": {
 "method": "GET",
 "url": {
@@ -215,12 +301,12 @@
 }
 ]
 },
-"description": "Retrieves a list of posts (public, friends if logged in)."
+"description": "Retrieves a list of posts visible to the requesting user (based on authentication and relationships).\n\n- **Anonymous:** Sees only `public` posts.\n- **Authenticated:** Sees `public` posts, their own posts, `almost_private` posts from users they follow, and `private` posts they are specifically allowed to see."
 },
 "response": []
 },
 {
-"name": "Get Post By ID",
+"name": "Get Post By ID [Check Auth]",
 "request": {
 "method": "GET",
 "url": {
@@ -228,12 +314,12 @@
 "host": ["{{baseUrl}}"],
 "path": ["api", "posts", "{{postId}}"]
 },
-"description": "Retrieves details for a specific post."
+"description": "Retrieves details for a specific post. \n\nAccess depends on the post's privacy and the requesting user's relationship:\n- Owner can always view.\n- Anyone can view `public` posts.\n- Followers can view `almost_private` posts.\n- Specifically allowed users can view `private` posts.\n- Unauthorized users will receive a 404 Not Found."
 },
 "response": []
 },
 {
-"name": "List Posts By User",
+"name": "List Posts By User [Check Auth]",
 "request": {
 "method": "GET",
 "url": {
@@ -251,7 +337,7 @@
 }
 ]
 },
-"description": "Retrieves posts created by a specific user."
+"description": "Retrieves posts created by a specific user (`{{userId}}`), filtered based on the requesting user's permissions.\n\n- **Viewing Own Profile:** Sees all their own posts.\n- **Viewing Other Profile:** Sees posts based on the same rules as the main feed (public, almost_private if following, private if allowed)."
 },
 "response": []
 },

@@ -1,12 +1,18 @@
 # Database migrations
+MIGRATE_CMD = /home/ahmed/go/bin/migrate
+
 migrate-create:
-	@migrate create -ext sql -dir pkg/db/migrations/sqlite -seq $(name)
+	@$(MIGRATE_CMD) create -ext sql -dir pkg/db/migrations/sqlite -seq $(name)
 
 migrate-up:
-	@migrate -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite up
+	@$(MIGRATE_CMD) -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite up
 
 migrate-down:
-	@migrate -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite down
+@$(MIGRATE_CMD) -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite down
+
+migrate-force:
+	@echo "Forcing migration version to $(version)..."
+	@$(MIGRATE_CMD) -database "sqlite3://pkg/db/social_network.db" -path pkg/db/migrations/sqlite force $(version)
 
 mc: migrate-create
 mu: migrate-up
