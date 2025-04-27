@@ -473,6 +473,90 @@
 ]
 },
 {
+"name": "Comments",
+"item": [
+{
+"name": "Create Comment [Auth Required]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"content\": \"This is a great post!\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/{{postId}}/comments",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+"{{postId}}",
+"comments"
+]
+},
+"description": "Adds a comment to a specific post. Requires authentication and permission to view the post."
+},
+"response": []
+},
+{
+"name": "List Comments for Post [Check Auth]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/posts/{{postId}}/comments?limit=10&offset=0",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+"{{postId}}",
+"comments"
+],
+"query": [
+{
+"key": "limit",
+"value": "10"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Retrieves comments for a specific post. Requires permission to view the post."
+},
+"response": []
+},
+{
+"name": "Delete Comment [Auth Required]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/comments/{{commentId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"comments",
+"{{commentId}}"
+]
+},
+"description": "Deletes a specific comment. Requires authentication and ownership of the comment."
+},
+"response": []
+}
+]
+},
+{
 "name": "Groups",
 "item": [
 {
@@ -674,6 +758,11 @@
 {
 "key": "requesterId",
 "value": "REPLACE_WITH_REQUESTER_ID",
+"type": "string"
+},
+{
+"key": "commentId",
+"value": "REPLACE_WITH_COMMENT_ID",
 "type": "string"
 }
 ]
