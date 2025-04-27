@@ -17,6 +17,8 @@ type FollowerRepository interface {
 	GetPendingReceivedRequests(userID string) ([]models.User, error)      // Renamed and specific
 	GetPendingSentRequests(userID string) ([]models.User, error)          // Added for sent requests
 	FindFollow(followerID, followingID string) (*models.Follower, error)
+	CountFollowers(userID string) (int, error) // Added follower count
+	CountFollowing(userID string) (int, error) // Added following count
 }
 
 // followerRepository implements FollowerRepository
@@ -215,4 +217,28 @@ func (r *followerRepository) FindFollow(followerID, followingID string) (*models
 		return nil, err
 	}
 	return &follow, nil
+}
+
+// CountFollowers counts the number of accepted followers for a user
+func (r *followerRepository) CountFollowers(userID string) (int, error) {
+	query := `SELECT COUNT(*) FROM followers WHERE following_id = ? AND status = 'accepted'`
+	var count int
+	err := r.db.QueryRow(query, userID).Scan(&count)
+	if err != nil {
+		log.Printf("Error counting followers for user %s: %v", userID, err)
+		return 0, err
+	}
+	return count, nil
+}
+
+// CountFollowing counts the number of users the given user is following (accepted)
+func (r *followerRepository) CountFollowing(userID string) (int, error) {
+	query := `SELECT COUNT(*) FROM followers WHERE follower_id = ? AND status = 'accepted'`
+	var count int
+	err := r.db.QueryRow(query, userID).Scan(&count)
+	if err != nil {
+		log.Printf("Error counting following for user %s: %v", userID, err)
+		return 0, err
+	}
+	return count, nil
 }

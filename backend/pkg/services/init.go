@@ -14,11 +14,14 @@ type Services struct {
 
 // InitServices initializes all services.
 func InitServices(repos *repositories.Repositories) *Services {
-	userService := NewUserService(repos.User)
+	// Initialize services that don't depend on other services first
 	authService := NewAuthService(repos.User, repos.Session)          // Initialize AuthService, passing User and Session repos
 	postService := NewPostService(repos.Post /*, repos.User */)       // Initialize PostService, passing PostRepo (and UserRepo when needed)
 	groupService := NewGroupService(repos.Group, repos.User)          // Initialize GroupService
 	followerService := NewFollowerService(repos.Follower, repos.User) // Initialize FollowerService
+
+	// Now initialize services that depend on other services
+	userService := NewUserService(repos.User, postService, followerService) // Pass dependencies
 	// Initialize other services, passing required repositories...
 
 	return &Services{
