@@ -16,9 +16,9 @@ type FollowerService interface {
 	AcceptFollow(accepterID, requesterID string) error
 	RejectFollow(rejecterID, requesterID string) error
 	Unfollow(unfollowerID, targetID string) error
-	ListFollowers(userID string) ([]models.User, error)
-	ListFollowing(userID string) ([]models.User, error)
-	ListPendingRequests(userID string) ([]models.User, error)
+	ListFollowers(userID string, limit, offset int) ([]models.User, error) // Added pagination
+	ListFollowing(userID string, limit, offset int) ([]models.User, error) // Added pagination
+	ListPendingRequests(userID string) (map[string][]models.User, error)   // Changed return type
 }
 
 // followerService implements FollowerService
@@ -169,9 +169,10 @@ func (s *followerService) Unfollow(unfollowerID, targetID string) error {
 	return nil
 }
 
-// ListFollowers retrieves the list of users following the given userID
-func (s *followerService) ListFollowers(userID string) ([]models.User, error) {
-	followers, err := s.followerRepo.GetFollowers(userID)
+// ListFollowers retrieves a paginated list of users following the given userID
+func (s *followerService) ListFollowers(userID string, limit, offset int) ([]models.User, error) {
+	// TODO: Update repo call signature
+	followers, err := s.followerRepo.GetFollowers(userID, limit, offset)
 	if err != nil {
 		log.Printf("Error listing followers in service: %v", err)
 		return nil, fmt.Errorf("failed to retrieve followers")
@@ -180,9 +181,10 @@ func (s *followerService) ListFollowers(userID string) ([]models.User, error) {
 	return followers, nil
 }
 
-// ListFollowing retrieves the list of users the given userID is following
-func (s *followerService) ListFollowing(userID string) ([]models.User, error) {
-	following, err := s.followerRepo.GetFollowing(userID)
+// ListFollowing retrieves a paginated list of users the given userID is following
+func (s *followerService) ListFollowing(userID string, limit, offset int) ([]models.User, error) {
+	// TODO: Update repo call signature
+	following, err := s.followerRepo.GetFollowing(userID, limit, offset)
 	if err != nil {
 		log.Printf("Error listing following in service: %v", err)
 		return nil, fmt.Errorf("failed to retrieve following list")
@@ -191,13 +193,25 @@ func (s *followerService) ListFollowing(userID string) ([]models.User, error) {
 	return following, nil
 }
 
-// ListPendingRequests retrieves the list of pending follow requests for the given userID
-func (s *followerService) ListPendingRequests(userID string) ([]models.User, error) {
-	requests, err := s.followerRepo.GetPendingRequests(userID)
+// ListPendingRequests retrieves lists of pending received and sent follow requests for the given userID
+func (s *followerService) ListPendingRequests(userID string) (map[string][]models.User, error) {
+	// TODO: Update repo call signature/logic to get both received and sent
+	received, err := s.followerRepo.GetPendingReceivedRequests(userID)
 	if err != nil {
-		log.Printf("Error listing pending requests in service: %v", err)
-		return nil, fmt.Errorf("failed to retrieve pending requests")
+		log.Printf("Error listing pending received requests in service: %v", err)
+		return nil, fmt.Errorf("failed to retrieve pending received requests")
 	}
-	// Optionally filter/map user data
-	return requests, nil
+
+	sent, err := s.followerRepo.GetPendingSentRequests(userID)
+	if err != nil {
+		log.Printf("Error listing pending sent requests in service: %v", err)
+		return nil, fmt.Errorf("failed to retrieve pending sent requests")
+	}
+
+	response := map[string][]models.User{
+		"received": received,
+		"sent":     sent,
+	}
+
+	return response, nil
 }

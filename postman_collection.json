@@ -330,11 +330,21 @@
 "request": {
 "method": "GET",
 "url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}/followers",
+"raw": "{{baseUrl}}/api/users/{{userId}}/followers?limit=10&offset=0",
 "host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}", "followers"]
+"path": ["api", "users", "{{userId}}", "followers"],
+"query": [
+{
+"key": "limit",
+"value": "10"
 },
-"description": "Lists all users who follow the specified user."
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists all users who follow the specified user (paginated)."
 },
 "response": []
 },
@@ -343,11 +353,21 @@
 "request": {
 "method": "GET",
 "url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}/following",
+"raw": "{{baseUrl}}/api/users/{{userId}}/following?limit=10&offset=0",
 "host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}", "following"]
+"path": ["api", "users", "{{userId}}", "following"],
+"query": [
+{
+"key": "limit",
+"value": "10"
 },
-"description": "Lists all users that the specified user follows."
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists all users that the specified user follows (paginated)."
 },
 "response": []
 },
@@ -360,7 +380,7 @@
 "host": ["{{baseUrl}}"],
 "path": ["api", "users", "me", "follow-requests"]
 },
-"description": "Lists all pending follow requests for the authenticated user."
+"description": "Lists all pending follow requests for the authenticated user. Returns a JSON object with 'received' and 'sent' arrays."
 },
 "response": []
 }

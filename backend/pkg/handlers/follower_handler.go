@@ -8,6 +8,7 @@ import (
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
+	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/services"
 )
 
@@ -188,7 +189,7 @@ func (h *FollowerHandler) HandleUnfollow(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleListFollowers lists users following a given user
-// GET /users/{user_id}/followers
+// GET /users/{user_id}/followers?limit=10&offset=0
 func (h *FollowerHandler) HandleListFollowers(w http.ResponseWriter, r *http.Request) {
 	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(pathParts) != 4 || pathParts[0] != "api" || pathParts[1] != "users" || pathParts[3] != "followers" {
@@ -201,18 +202,29 @@ func (h *FollowerHandler) HandleListFollowers(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	followers, err := h.service.ListFollowers(userID)
+	// Parse pagination parameters
+	limit, offset := helpers.GetPaginationParams(r)
+
+	// TODO: Update service call signature to accept limit, offset
+	followers, err := h.service.ListFollowers(userID, limit, offset)
 	if err != nil {
 		log.Printf("Error in HandleListFollowers service call: %v", err)
 		writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve followers")
 		return
 	}
 
-	writeJSONResponse(w, http.StatusOK, followers)
+	// Return paginated response
+	response := map[string]interface{}{
+		"followers": followers,
+		"limit":     limit,
+		"offset":    offset,
+		"count":     len(followers), // Note: This is count of returned items, not total
+	}
+	writeJSONResponse(w, http.StatusOK, response)
 }
 
 // HandleListFollowing lists users a given user is following
-// GET /users/{user_id}/following
+// GET /users/{user_id}/following?limit=10&offset=0
 func (h *FollowerHandler) HandleListFollowing(w http.ResponseWriter, r *http.Request) {
 	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(pathParts) != 4 || pathParts[0] != "api" || pathParts[1] != "users" || pathParts[3] != "following" {
@@ -225,14 +237,25 @@ func (h *FollowerHandler) HandleListFollowing(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	following, err := h.service.ListFollowing(userID)
+	// Parse pagination parameters
+	limit, offset := helpers.GetPaginationParams(r)
+
+	// TODO: Update service call signature to accept limit, offset
+	following, err := h.service.ListFollowing(userID, limit, offset)
 	if err != nil {
 		log.Printf("Error in HandleListFollowing service call: %v", err)
 		writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve following list")
 		return
 	}
 
-	writeJSONResponse(w, http.StatusOK, following)
+	// Return paginated response
+	response := map[string]interface{}{
+		"following": following,
+		"limit":     limit,
+		"offset":    offset,
+		"count":     len(following), // Note: This is count of returned items, not total
+	}
+	writeJSONResponse(w, http.StatusOK, response)
 }
 
 // HandleListPending lists pending follow requests for the authenticated user
@@ -244,12 +267,21 @@ func (h *FollowerHandler) HandleListPending(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	requests, err := h.service.ListPendingRequests(userID)
+	// Service now returns a map {"received": [...], "sent": [...]}
+	pendingRequestsMap, err := h.service.ListPendingRequests(userID)
 	if err != nil {
 		log.Printf("Error in HandleListPending service call: %v", err)
 		writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve pending requests")
 		return
 	}
 
-	writeJSONResponse(w, http.StatusOK, requests)
+	// Ensure the map keys exist even if the lists are empty
+	if _, ok := pendingRequestsMap["received"]; !ok {
+		pendingRequestsMap["received"] = []models.User{}
+	}
+	if _, ok := pendingRequestsMap["sent"]; !ok {
+		pendingRequestsMap["sent"] = []models.User{}
+	}
+
+	writeJSONResponse(w, http.StatusOK, pendingRequestsMap)
 }

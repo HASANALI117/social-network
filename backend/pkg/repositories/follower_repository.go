@@ -12,9 +12,10 @@ type FollowerRepository interface {
 	CreateFollowRequest(followerID, followingID string) error
 	UpdateFollowStatus(followerID, followingID, status string) error
 	DeleteFollow(followerID, followingID string) error
-	GetFollowers(userID string) ([]models.User, error)
-	GetFollowing(userID string) ([]models.User, error)
-	GetPendingRequests(userID string) ([]models.User, error)
+	GetFollowers(userID string, limit, offset int) ([]models.User, error) // Added pagination
+	GetFollowing(userID string, limit, offset int) ([]models.User, error) // Added pagination
+	GetPendingReceivedRequests(userID string) ([]models.User, error)      // Renamed and specific
+	GetPendingSentRequests(userID string) ([]models.User, error)          // Added for sent requests
 	FindFollow(followerID, followingID string) (*models.Follower, error)
 }
 
@@ -61,15 +62,17 @@ func (r *followerRepository) DeleteFollow(followerID, followingID string) error 
 	return nil
 }
 
-// GetFollowers retrieves users who follow the given userID
-func (r *followerRepository) GetFollowers(userID string) ([]models.User, error) {
+// GetFollowers retrieves a paginated list of users who follow the given userID
+func (r *followerRepository) GetFollowers(userID string, limit, offset int) ([]models.User, error) {
 	query := `
-        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.created_at, u.updated_at
+        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.is_private, u.created_at, u.updated_at
         FROM users u
         JOIN followers f ON u.id = f.follower_id
         WHERE f.following_id = ? AND f.status = 'accepted'
+        ORDER BY f.created_at DESC -- Or u.username, etc.
+        LIMIT ? OFFSET ?
     `
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting followers: %v", err)
 		return nil, err
@@ -79,8 +82,8 @@ func (r *followerRepository) GetFollowers(userID string) ([]models.User, error) 
 	var followers []models.User
 	for rows.Next() {
 		var user models.User
-		// Note: Ensure Scan order matches SELECT columns exactly
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		// Note: Ensure Scan order matches SELECT columns exactly, including is_private
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.IsPrivate, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			log.Printf("Error scanning follower row: %v", err)
 			return nil, err
 		}
@@ -94,15 +97,17 @@ func (r *followerRepository) GetFollowers(userID string) ([]models.User, error) 
 	return followers, nil
 }
 
-// GetFollowing retrieves users whom the given userID follows
-func (r *followerRepository) GetFollowing(userID string) ([]models.User, error) {
+// GetFollowing retrieves a paginated list of users whom the given userID follows
+func (r *followerRepository) GetFollowing(userID string, limit, offset int) ([]models.User, error) {
 	query := `
-        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.created_at, u.updated_at
+        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.is_private, u.created_at, u.updated_at
         FROM users u
         JOIN followers f ON u.id = f.following_id
         WHERE f.follower_id = ? AND f.status = 'accepted'
+        ORDER BY f.created_at DESC -- Or u.username, etc.
+        LIMIT ? OFFSET ?
     `
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, limit, offset)
 	if err != nil {
 		log.Printf("Error getting following: %v", err)
 		return nil, err
@@ -112,7 +117,8 @@ func (r *followerRepository) GetFollowing(userID string) ([]models.User, error) 
 	var following []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		// Note: Ensure Scan order matches SELECT columns exactly, including is_private
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.IsPrivate, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			log.Printf("Error scanning following row: %v", err)
 			return nil, err
 		}
@@ -126,17 +132,18 @@ func (r *followerRepository) GetFollowing(userID string) ([]models.User, error) 
 	return following, nil
 }
 
-// GetPendingRequests retrieves users who have sent a follow request to the given userID
-func (r *followerRepository) GetPendingRequests(userID string) ([]models.User, error) {
+// GetPendingReceivedRequests retrieves users who have sent a follow request to the given userID
+func (r *followerRepository) GetPendingReceivedRequests(userID string) ([]models.User, error) {
 	query := `
-        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.created_at, u.updated_at
+        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.is_private, u.created_at, u.updated_at
         FROM users u
         JOIN followers f ON u.id = f.follower_id
         WHERE f.following_id = ? AND f.status = 'pending'
+        ORDER BY f.created_at DESC
     `
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
-		log.Printf("Error getting pending requests: %v", err)
+		log.Printf("Error getting pending received requests: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -144,14 +151,49 @@ func (r *followerRepository) GetPendingRequests(userID string) ([]models.User, e
 	var requests []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.CreatedAt, &user.UpdatedAt); err != nil {
-			log.Printf("Error scanning pending request row: %v", err)
+		// Note: Ensure Scan order matches SELECT columns exactly, including is_private
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.IsPrivate, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			log.Printf("Error scanning pending received request row: %v", err)
 			return nil, err
 		}
 		requests = append(requests, user)
 	}
 	if err = rows.Err(); err != nil {
-		log.Printf("Error iterating pending request rows: %v", err)
+		log.Printf("Error iterating pending received request rows: %v", err)
+		return nil, err
+	}
+
+	return requests, nil
+}
+
+// GetPendingSentRequests retrieves users to whom the given userID has sent a follow request
+func (r *followerRepository) GetPendingSentRequests(userID string) ([]models.User, error) {
+	query := `
+        SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.avatar_url, u.about_me, u.birth_date, u.is_private, u.created_at, u.updated_at
+        FROM users u
+        JOIN followers f ON u.id = f.following_id
+        WHERE f.follower_id = ? AND f.status = 'pending'
+        ORDER BY f.created_at DESC
+    `
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		log.Printf("Error getting pending sent requests: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var requests []models.User
+	for rows.Next() {
+		var user models.User
+		// Note: Ensure Scan order matches SELECT columns exactly, including is_private
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.FirstName, &user.LastName, &user.AvatarURL, &user.AboutMe, &user.BirthDate, &user.IsPrivate, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			log.Printf("Error scanning pending sent request row: %v", err)
+			return nil, err
+		}
+		requests = append(requests, user)
+	}
+	if err = rows.Err(); err != nil {
+		log.Printf("Error iterating pending sent request rows: %v", err)
 		return nil, err
 	}
 
