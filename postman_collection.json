@@ -655,29 +655,6 @@
 "response": []
 },
 {
-"name": "Add Group Member [Auth Required, Admin]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"user_id\": \"{{targetUserId}}\",\n    \"role\": \"member\" \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/members",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}", "members"]
-},
-"description": "Adds a user to a group. Requires admin role."
-},
-"response": []
-},
-{
 "name": "List Group Members [Auth Required, Member]",
 "request": {
 "method": "GET",
@@ -727,6 +704,191 @@
 "response": []
 }
 ]
+},
+{
+"name": "Group Invitations",
+"item": [
+{
+"name": "Invite User to Group [Auth Required, Member/Admin]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"invitee_id\": \"{{targetUserId}}\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/invitations",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"invitations"
+]
+},
+"description": "Invites a user (targetUserId) to join a specific group (groupId). Requires the sender to be a member or admin."
+},
+"response": []
+},
+{
+"name": "List Pending Invitations (For Me) [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/invitations/pending",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"invitations",
+"pending"
+]
+},
+"description": "Lists all pending group invitations for the currently authenticated user."
+},
+"response": []
+},
+{
+"name": "Accept Group Invitation [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/accept",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"invitations",
+"{{invitationId}}",
+"accept"
+]
+},
+"description": "Accepts a specific group invitation. Requires the authenticated user to be the invitee."
+},
+"response": []
+},
+{
+"name": "Reject Group Invitation [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/reject",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"invitations",
+"{{invitationId}}",
+"reject"
+]
+},
+"description": "Rejects a specific group invitation. Requires the authenticated user to be the invitee."
+},
+"response": []
+}
+]
+},
+{
+"name": "Group Join Requests",
+"item": [
+{
+"name": "Request to Join Group [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/requests",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"requests"
+]
+},
+"description": "Sends a request to join a specific group (groupId). Cannot request to join if already a member or creator."
+},
+"response": []
+},
+{
+"name": "List Pending Join Requests (For Group) [Auth Required, Admin]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/requests/pending",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"requests",
+"pending"
+]
+},
+"description": "Lists all pending requests to join a specific group (groupId). Requires the authenticated user to be an admin of the group."
+},
+"response": []
+},
+{
+"name": "Accept Group Join Request [Auth Required, Admin]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/accept",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"requests",
+"{{requestId}}",
+"accept"
+]
+},
+"description": "Accepts a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
+},
+"response": []
+},
+{
+"name": "Reject Group Join Request [Auth Required, Admin]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/reject",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"requests",
+"{{requestId}}",
+"reject"
+]
+},
+"description": "Rejects a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
+},
+"response": []
+}
+]
 }
 ],
 "variable": [
@@ -763,6 +925,16 @@
 {
 "key": "commentId",
 "value": "REPLACE_WITH_COMMENT_ID",
+"type": "string"
+},
+{
+"key": "invitationId",
+"value": "REPLACE_WITH_INVITATION_ID",
+"type": "string"
+},
+{
+"key": "requestId",
+"value": "REPLACE_WITH_REQUEST_ID",
 "type": "string"
 }
 ]
