@@ -33,7 +33,7 @@ type GroupRepository interface {
 	// Group CRUD
 	Create(group *models.Group) error
 	GetByID(id string) (*models.Group, error)
-	List(limit, offset int) ([]*models.Group, error)
+	List(limit, offset int, searchQuery string) ([]*models.Group, error) // Added searchQuery
 	Update(group *models.Group) error
 	Delete(id string) error
 
@@ -173,17 +173,34 @@ func (r *groupRepository) GetByID(id string) (*models.Group, error) {
 	return &group, nil
 }
 
-// List retrieves a paginated list of all groups
-func (r *groupRepository) List(limit, offset int) ([]*models.Group, error) {
-	query := `
+// List retrieves a paginated list of all groups, optionally filtered by search query
+func (r *groupRepository) List(limit, offset int, searchQuery string) ([]*models.Group, error) {
+	baseQuery := `
         SELECT id, creator_id, name, description, avatar_url, created_at, updated_at
         FROM groups
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
     `
-	rows, err := r.db.Query(query, limit, offset)
+	args := []interface{}{}
+	whereClauses := []string{}
+
+	if searchQuery != "" {
+		// Add WHERE clause for search (case-insensitive partial match)
+		// Use LOWER() for case-insensitivity, works in SQLite and PostgreSQL
+		whereClauses = append(whereClauses, "(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)")
+		searchTerm := "%" + strings.ToLower(searchQuery) + "%"
+		args = append(args, searchTerm, searchTerm)
+	}
+
+	// Construct the final query
+	query := baseQuery
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ") // Use AND if more clauses are added later
+	}
+	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list groups: %w", err)
+		return nil, fmt.Errorf("failed to list groups with query '%s': %w", query, err)
 	}
 	defer rows.Close()
 

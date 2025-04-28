@@ -110,9 +110,9 @@ var (
 // GroupService defines the interface for group business logic
 type GroupService interface {
 	Create(request *GroupCreateRequest) (*GroupResponse, error)
-	GetByID(groupID string, requestingUserID string) (*GroupResponse, error)                // Basic group info
-	GetGroupProfile(groupID string, requestingUserID string) (*GroupProfileResponse, error) // Detailed profile view
-	List(limit, offset int, requestingUserID string) ([]*GroupResponse, error)              // List groups user can see/join?
+	GetByID(groupID string, requestingUserID string) (*GroupResponse, error)                       // Basic group info
+	GetGroupProfile(groupID string, requestingUserID string) (*GroupProfileResponse, error)        // Detailed profile view
+	List(limit, offset int, searchQuery string, requestingUserID string) ([]*GroupResponse, error) // List groups user can see/join, with search
 	Update(groupID string, request *GroupUpdateRequest, requestingUserID string) (*GroupResponse, error)
 	Delete(groupID string, requestingUserID string) error
 
@@ -347,9 +347,10 @@ func (s *groupService) GetByID(groupID string, requestingUserID string) (*GroupR
 	return mapGroupToResponse(group), nil
 }
 
-func (s *groupService) List(limit, offset int, requestingUserID string) ([]*GroupResponse, error) {
+func (s *groupService) List(limit, offset int, searchQuery string, requestingUserID string) ([]*GroupResponse, error) {
 	// TODO: Implement filtering based on user's memberships or public groups
-	groups, err := s.groupRepo.List(limit, offset)
+	// Pass the search query down to the repository layer
+	groups, err := s.groupRepo.List(limit, offset, searchQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list groups from repository: %w", err)
 	}

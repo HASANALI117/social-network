@@ -276,8 +276,9 @@ func (h *GroupHandler) getGroupByID(w http.ResponseWriter, r *http.Request, grou
 // @Tags groups
 // @Accept json
 // @Produce json
-// @Param limit query int false "Number of groups to return (default 10)"
+// @Param limit query int false "Number of groups to return (default 20)"
 // @Param offset query int false "Number of groups to skip (default 0)"
+// @Param search query string false "Search term for group name or description (partial match)"
 // @Success 200 {object} map[string]interface{} "List of groups"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
 // @Failure 500 {object} httperr.ErrorResponse "Failed to list groups"
@@ -285,6 +286,7 @@ func (h *GroupHandler) getGroupByID(w http.ResponseWriter, r *http.Request, grou
 func (h *GroupHandler) listGroups(w http.ResponseWriter, r *http.Request, currentUser *services.UserResponse) error {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
+	searchQuery := r.URL.Query().Get("search") // Read the search query parameter
 
 	limit := 20 // Default limit
 	if limitStr != "" {
@@ -300,7 +302,8 @@ func (h *GroupHandler) listGroups(w http.ResponseWriter, r *http.Request, curren
 		}
 	}
 
-	groupsResponse, err := h.groupService.List(limit, offset, currentUser.ID)
+	// Pass the search query to the service layer
+	groupsResponse, err := h.groupService.List(limit, offset, searchQuery, currentUser.ID)
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to list groups")
 	}
