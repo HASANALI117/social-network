@@ -259,6 +259,34 @@
 }
 },
 "response": []
+},
+{
+"name": "Create Group Post",
+"originalRequest": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"My Group Post\",\n    \"content\": \"This post is only visible within the group.\",\n    \"image_url\": \"\",\n    \"group_id\": \"{{groupId}}\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+""
+]
+}
+},
+"response": []
 }
 ],
 "request": {
@@ -271,14 +299,14 @@
 ],
 "body": {
 "mode": "raw",
-"raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": []\n}"
+"raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": [],\n    \"group_id\": null \n}"
 },
 "url": {
 "raw": "{{baseUrl}}/api/posts/",
 "host": ["{{baseUrl}}"],
 "path": ["api", "posts", ""]
 },
-"description": "Creates a new post. Requires authentication. \n\n**Privacy Options:**\n*   `public`: Visible to everyone.\n*   `almost_private`: Visible only to users who follow the creator.\n*   `private`: Visible only to users specified in `allowed_user_ids`.\n\nSee examples for different privacy settings."
+"description": "Creates a new post. Requires authentication.\n\n**Post Types:**\n*   **Regular Post:** Set `privacy` (`public`, `almost_private`, `private`) and optionally `allowed_user_ids` (for `private`). Leave `group_id` as `null` or omit it.\n*   **Group Post:** Set `group_id` to the target group's ID. `privacy` and `allowed_user_ids` are ignored. Requires membership in the group.\n\nSee examples for different types."
 },
 "response": []
 },
@@ -350,7 +378,7 @@
 "host": ["{{baseUrl}}"],
 "path": ["api", "posts", "{{postId}}"]
 },
-"description": "Deletes a specific post. Requires authentication and ownership."
+"description": "Deletes a specific post. Requires authentication and ownership.\n\n**Group Posts:** Deleting a post within a group requires the user to be the post owner OR an admin of the group."
 },
 "response": []
 }
@@ -550,7 +578,7 @@
 "{{commentId}}"
 ]
 },
-"description": "Deletes a specific comment. Requires authentication and ownership of the comment."
+"description": "Deletes a specific comment. Requires authentication and ownership of the comment.\n\n**Group Post Comments:** Deleting a comment on a group post requires the user to be the comment owner OR an admin of the group."
 },
 "response": []
 }
@@ -700,6 +728,36 @@
 ]
 },
 "description": "Lists messages in a specific group. Requires membership. Currently stubbed."
+},
+"response": []
+},
+{
+"name": "List Group Posts [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/posts?limit=20&offset=0",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"posts"
+],
+"query": [
+{
+"key": "limit",
+"value": "20"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists posts within a specific group. Requires membership in the group."
 },
 "response": []
 }
