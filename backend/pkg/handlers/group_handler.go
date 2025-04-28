@@ -236,36 +236,37 @@ func (h *GroupHandler) createGroup(w http.ResponseWriter, r *http.Request, curre
 	return nil
 }
 
-// getGroupByID handles GET /api/groups/{id}
-// @Summary Get group by ID
-// @Description Get group details by group ID
+// getGroupByID handles GET /api/groups/{id} - Now fetches full profile
+// @Summary Get group profile by ID
+// @Description Get detailed group profile information including members
 // @Tags groups
 // @Accept json
 // @Produce json
-// @Param id query string true "Group ID"
-// @Success 200 {object} map[string]interface{} "Group details"
-// @Failure 400 {object} httperr.ErrorResponse "Group ID is required"
+// @Param id path string true "Group ID"
+// @Success 200 {object} services.GroupProfileResponse "Detailed group profile"
+// @Failure 400 {object} httperr.ErrorResponse "Group ID is required" // Implicit via routing
 // @Failure 404 {object} httperr.ErrorResponse "Group not found"
+// @Failure 403 {object} httperr.ErrorResponse "Forbidden (not a member)"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
-// @Failure 403 {object} httperr.ErrorResponse "Forbidden"
-// @Failure 500 {object} httperr.ErrorResponse "Failed to get group"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to get group profile"
 // @Router /groups/{id} [get]
 func (h *GroupHandler) getGroupByID(w http.ResponseWriter, r *http.Request, groupID string, currentUser *services.UserResponse) error {
-	groupResponse, err := h.groupService.GetByID(groupID, currentUser.ID)
+	// Call the new service method to get the full profile
+	groupProfileResponse, err := h.groupService.GetGroupProfile(groupID, currentUser.ID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrGroupNotFound) {
 			return httperr.NewNotFound(err, "Group not found")
 		}
-		if errors.Is(err, services.ErrGroupMemberRequired) || errors.Is(err, services.ErrGroupForbidden) {
-			// Hide existence if not a member/allowed
-			return httperr.NewNotFound(err, "Group not found")
-			// Or return 403: return httperr.NewForbidden(err, "Access denied to this group")
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			// Return 403 Forbidden if the user is not a member (as required by GetGroupProfile)
+			return httperr.NewForbidden(err, "Access denied: You must be a member to view this group profile")
 		}
-		return httperr.NewInternalServerError(err, "Failed to get group details")
+		// Handle other potential errors from GetGroupProfile or its dependencies
+		return httperr.NewInternalServerError(err, "Failed to get group profile")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(groupResponse)
+	json.NewEncoder(w).Encode(groupProfileResponse) // Encode the full profile response
 	return nil
 }
 

@@ -75,6 +75,22 @@ type GroupJoinRequestResponse struct {
 	Group       *GroupResponse `json:"group,omitempty"` // Optional: Include full group details
 }
 
+// GroupProfileResponse is the comprehensive DTO for a group's profile page
+type GroupProfileResponse struct {
+	ID             string          `json:"id"`
+	Creator        *UserResponse   `json:"creator"` // Include creator details
+	Name           string          `json:"name"`
+	Description    string          `json:"description,omitempty"`
+	AvatarURL      string          `json:"avatar_url,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at,omitempty"`
+	Members        []*UserResponse `json:"members"`          // List of members with basic details
+	MemberCount    int             `json:"member_count"`     // Total number of members
+	ViewerIsMember bool            `json:"viewer_is_member"` // Is the requesting user a member?
+	ViewerIsAdmin  bool            `json:"viewer_is_admin"`  // Is the requesting user an admin?
+	// TODO: Add pending request/invitation counts if needed
+}
+
 // TODO: GroupMessageResponse DTO
 
 var (
@@ -94,8 +110,9 @@ var (
 // GroupService defines the interface for group business logic
 type GroupService interface {
 	Create(request *GroupCreateRequest) (*GroupResponse, error)
-	GetByID(groupID string, requestingUserID string) (*GroupResponse, error)   // Check if user can view
-	List(limit, offset int, requestingUserID string) ([]*GroupResponse, error) // List groups user can see/join?
+	GetByID(groupID string, requestingUserID string) (*GroupResponse, error)                // Basic group info
+	GetGroupProfile(groupID string, requestingUserID string) (*GroupProfileResponse, error) // Detailed profile view
+	List(limit, offset int, requestingUserID string) ([]*GroupResponse, error)              // List groups user can see/join?
 	Update(groupID string, request *GroupUpdateRequest, requestingUserID string) (*GroupResponse, error)
 	Delete(groupID string, requestingUserID string) error
 
@@ -400,6 +417,66 @@ func (s *groupService) Delete(groupID string, requestingUserID string) error {
 	}
 
 	return nil
+}
+
+func (s *groupService) GetGroupProfile(groupID string, requestingUserID string) (*GroupProfileResponse, error) {
+	// 1. Get basic group info
+	group, err := s.groupRepo.GetByID(groupID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrGroupNotFound) {
+			return nil, err // Propagate not found error
+		}
+		return nil, fmt.Errorf("failed to get group for profile: %w", err)
+	}
+
+	// 2. Authorization: Check if the requesting user is a member (required to view profile)
+	//    Alternatively, allow public viewing if group is public (not implemented yet)
+	isMember, err := s.groupRepo.IsMember(groupID, requestingUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check membership for profile view: %w", err)
+	}
+	if !isMember {
+		// If group was public, we might allow viewing here. For now, require membership.
+		return nil, ErrGroupMemberRequired
+	}
+
+	// 3. Get Creator Details
+	creator, err := s.userRepo.GetByID(group.CreatorID)
+	if err != nil {
+		// Log error but don't fail the whole request if creator not found (might be deleted user)
+		fmt.Printf("Warning: Failed to get creator details for group profile %s: %v\n", groupID, err)
+		// Optionally return a placeholder or nil creator
+	}
+
+	// 4. Get Members List
+	members, err := s.groupRepo.ListMembers(groupID) // This returns []*models.User
+	if err != nil {
+		return nil, fmt.Errorf("failed to list members for profile: %w", err)
+	}
+	memberResponses := mapUsersToUserResponse(members) // Convert to []*UserResponse
+
+	// 5. Check if viewer is admin
+	isAdmin, err := s.groupRepo.IsAdmin(groupID, requestingUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check admin status for profile view: %w", err)
+	}
+
+	// 6. Construct the response DTO
+	profileResponse := &GroupProfileResponse{
+		ID:             group.ID,
+		Creator:        mapUserToResponse(creator), // Map creator model to response DTO
+		Name:           group.Name,
+		Description:    group.Description,
+		AvatarURL:      group.AvatarURL,
+		CreatedAt:      group.CreatedAt,
+		UpdatedAt:      group.UpdatedAt,
+		Members:        memberResponses,
+		MemberCount:    len(memberResponses),
+		ViewerIsMember: isMember, // We already checked this
+		ViewerIsAdmin:  isAdmin,
+	}
+
+	return profileResponse, nil
 }
 
 // --- Member Management ---
