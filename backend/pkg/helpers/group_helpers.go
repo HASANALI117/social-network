@@ -308,7 +308,7 @@ func SaveGroupMessage(message *models.GroupMessage) error {
     `
 
 	message.ID = uuid.NewString()
-	message.CreatedAt = time.Now().Format(time.RFC3339)
+	message.CreatedAt = time.Now() // Use time.Time directly
 
 	_, err := db.GlobalDB.Exec(
 		query,

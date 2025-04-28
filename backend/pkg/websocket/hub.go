@@ -90,11 +90,24 @@ func (h *Hub) Run() {
 				fmt.Printf("   Time: %s\n", message.CreatedAt)
 
 				// Save the message to the database
+				// Parse the timestamp string into time.Time
+				var createdAt time.Time
+				var parseErr error
+				if message.CreatedAt != "" {
+					createdAt, parseErr = time.Parse(time.RFC3339, message.CreatedAt)
+					if parseErr != nil {
+						fmt.Printf("Error parsing CreatedAt timestamp '%s': %v\n", message.CreatedAt, parseErr)
+						createdAt = time.Now() // Default to now if parsing fails
+					}
+				} else {
+					createdAt = time.Now() // Default to now if empty
+				}
+
 				groupMsg := &models.GroupMessage{
 					GroupID:   message.ReceiverID, // GroupID is in the ReceiverID field
 					SenderID:  message.SenderID,
 					Content:   message.Content,
-					CreatedAt: message.CreatedAt,
+					CreatedAt: createdAt, // Use the parsed time.Time value
 				}
 
 				if err := helpers.SaveGroupMessage(groupMsg); err != nil {
