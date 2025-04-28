@@ -19,12 +19,13 @@ var (
 type PostRepository interface {
 	Create(post *models.Post) error
 	GetByID(id string) (*models.Post, error)
-	List(requestingUserID string, limit, offset int) ([]*models.Post, error)                     // Added requestingUserID for filtering
-	ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) // Added requestingUserID for filtering
+	List(requestingUserID string, limit, offset int) ([]*models.Post, error)                     // General feed (non-group posts)
+	ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) // User profile posts (non-group)
+	ListByGroupID(groupID string, limit, offset int) ([]*models.Post, error)                     // Group-specific posts
 	// Update(post *models.Post) error // TODO: Implement Update
 	Delete(id string) error
 
-	// Methods for managing allowed users for private posts
+	// Methods for managing allowed users for private posts (Only applicable if post.GroupID is NULL)
 	AddAllowedUsers(postID string, userIDs []string) error
 	RemoveAllowedUsers(postID string, userIDs []string) error // Optional: For editing allowed list
 	IsUserAllowed(postID, userID string) (bool, error)
@@ -46,11 +47,18 @@ func NewPostRepository(db *sql.DB) PostRepository {
 // Create inserts a new post record into the database
 func (r *postRepository) Create(post *models.Post) error {
 	query := `
-        INSERT INTO posts (id, user_id, title, content, image_url, privacy, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO posts (id, user_id, title, content, image_url, privacy, group_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `
 	post.ID = uuid.New().String()
 	post.CreatedAt = time.Now()
+
+	// If it's a group post, privacy is implicitly handled by group membership, set to public for simplicity within the group context.
+	// If it's not a group post, use the specified privacy.
+	privacy := post.Privacy
+	if post.GroupID.Valid {
+		privacy = models.PrivacyPublic // Group posts are 'public' within the group
+	}
 
 	_, err := r.db.Exec(
 		query,
@@ -59,7 +67,8 @@ func (r *postRepository) Create(post *models.Post) error {
 		post.Title,
 		post.Content,
 		post.ImageURL,
-		post.Privacy,
+		privacy,      // Use determined privacy
+		post.GroupID, // Can be NULL
 		post.CreatedAt,
 	)
 	if err != nil {
@@ -71,7 +80,7 @@ func (r *postRepository) Create(post *models.Post) error {
 // GetByID retrieves a post by its ID
 func (r *postRepository) GetByID(id string) (*models.Post, error) {
 	query := `
-        SELECT id, user_id, title, content, image_url, privacy, created_at
+        SELECT id, user_id, title, content, image_url, privacy, group_id, created_at
         FROM posts
         WHERE id = ?
     `
@@ -85,7 +94,8 @@ func (r *postRepository) GetByID(id string) (*models.Post, error) {
 		&post.Content,
 		&post.ImageURL,
 		&post.Privacy,
-		&createdAt, // Scan into string
+		&post.GroupID, // Scan GroupID
+		&createdAt,    // Scan into string
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -106,26 +116,30 @@ func (r *postRepository) GetByID(id string) (*models.Post, error) {
 	return &post, nil
 }
 
-// List retrieves a paginated list of posts, filtered by privacy rules based on the requesting user.
+// List retrieves a paginated list of non-group posts for the general feed,
+// filtered by privacy rules based on the requesting user.
 func (r *postRepository) List(requestingUserID string, limit, offset int) ([]*models.Post, error) {
-	// Base query selects posts based on privacy rules
-	// 1. Public posts
-	// 2. User's own posts
-	// 3. Posts from users the requesting user follows (almost_private)
-	// 4. Private posts where the requesting user is specifically allowed
+	// Base query selects posts based on privacy rules, EXCLUDING group posts
+	// 1. Public posts (non-group)
+	// 2. User's own posts (non-group)
+	// 3. Posts from users the requesting user follows (almost_private, non-group)
+	// 4. Private posts where the requesting user is specifically allowed (non-group)
 	query := `
-		SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.created_at
-		FROM posts p
-		LEFT JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted' -- requestingUserID for almost_private check
-		LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- requestingUserID for private check
-		WHERE
-			p.privacy = ? -- models.PrivacyPublic
-			OR p.user_id = ? -- requestingUserID (own posts)
-			OR (p.privacy = ? AND f.follower_id IS NOT NULL) -- models.PrivacyAlmostPrivate and follower relationship exists
-			OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- models.PrivacyPrivate and user is allowed
-		ORDER BY p.created_at DESC
-		LIMIT ? OFFSET ?;
-	`
+SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.group_id, p.created_at
+FROM posts p
+LEFT JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted' -- requestingUserID for almost_private check
+LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- requestingUserID for private check
+WHERE
+    p.group_id IS NULL -- Exclude group posts
+AND (
+    p.privacy = ? -- models.PrivacyPublic
+    OR p.user_id = ? -- requestingUserID (own posts)
+    OR (p.privacy = ? AND f.follower_id IS NOT NULL) -- models.PrivacyAlmostPrivate and follower relationship exists
+    OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- models.PrivacyPrivate and user is allowed
+)
+ORDER BY p.created_at DESC
+LIMIT ? OFFSET ?;
+`
 
 	rows, err := r.db.Query(query,
 		requestingUserID, // For follower check
@@ -138,7 +152,7 @@ func (r *postRepository) List(requestingUserID string, limit, offset int) ([]*mo
 		offset,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list posts with privacy filter: %w", err)
+		return nil, fmt.Errorf("failed to list non-group posts with privacy filter: %w", err)
 	}
 	defer rows.Close()
 
@@ -153,6 +167,7 @@ func (r *postRepository) List(requestingUserID string, limit, offset int) ([]*mo
 			&post.Content,
 			&post.ImageURL,
 			&post.Privacy,
+			&post.GroupID, // Scan GroupID
 			&createdAt,
 		)
 		if err != nil {
@@ -175,26 +190,27 @@ func (r *postRepository) List(requestingUserID string, limit, offset int) ([]*mo
 	return posts, nil
 }
 
-// ListByUser retrieves a paginated list of posts for a specific user, filtered by privacy rules based on the requesting user.
+// ListByUser retrieves a paginated list of non-group posts for a specific user's profile,
+// filtered by privacy rules based on the requesting user.
 func (r *postRepository) ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) {
-	// Similar logic to List, but initially filtered by targetUserID
-	// Privacy checks are still based on the requestingUserID's relationship to the targetUserID's posts
+	// Similar logic to List, but initially filtered by targetUserID and excludes group posts
 	query := `
-		SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.created_at
-		FROM posts p
-		LEFT JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted' -- requestingUserID for almost_private check
-		LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- requestingUserID for private check
-		WHERE
-			p.user_id = ? -- targetUserID
-			AND ( -- Privacy conditions based on requestingUserID
-				p.privacy = ? -- models.PrivacyPublic
-				OR p.user_id = ? -- requestingUserID (viewing own profile, though filtered by targetUserID already)
-				OR (p.privacy = ? AND f.follower_id IS NOT NULL) -- models.PrivacyAlmostPrivate and follower relationship exists
-				OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- models.PrivacyPrivate and user is allowed
-			)
-		ORDER BY p.created_at DESC
-		LIMIT ? OFFSET ?;
-	`
+SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.group_id, p.created_at
+FROM posts p
+LEFT JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted' -- requestingUserID for almost_private check
+LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- requestingUserID for private check
+WHERE
+    p.user_id = ? -- targetUserID
+AND p.group_id IS NULL -- Exclude group posts
+AND ( -- Privacy conditions based on requestingUserID
+    p.privacy = ? -- models.PrivacyPublic
+    OR p.user_id = ? -- requestingUserID (viewing own profile, though filtered by targetUserID already)
+    OR (p.privacy = ? AND f.follower_id IS NOT NULL) -- models.PrivacyAlmostPrivate and follower relationship exists
+    OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- models.PrivacyPrivate and user is allowed
+)
+ORDER BY p.created_at DESC
+LIMIT ? OFFSET ?;
+`
 
 	rows, err := r.db.Query(query,
 		requestingUserID, // For follower check
@@ -208,7 +224,7 @@ func (r *postRepository) ListByUser(targetUserID, requestingUserID string, limit
 		offset,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list posts by user with privacy filter: %w", err)
+		return nil, fmt.Errorf("failed to list non-group posts by user with privacy filter: %w", err)
 	}
 	defer rows.Close()
 
@@ -223,6 +239,7 @@ func (r *postRepository) ListByUser(targetUserID, requestingUserID string, limit
 			&post.Content,
 			&post.ImageURL,
 			&post.Privacy,
+			&post.GroupID, // Scan GroupID
 			&createdAt,
 		)
 		if err != nil {
@@ -239,6 +256,55 @@ func (r *postRepository) ListByUser(targetUserID, requestingUserID string, limit
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating filtered post list by user rows: %w", err)
+	}
+
+	return posts, nil
+}
+
+// ListByGroupID retrieves a paginated list of posts belonging to a specific group.
+// Assumes authorization (checking if requesting user is a member) is done in the service layer.
+func (r *postRepository) ListByGroupID(groupID string, limit, offset int) ([]*models.Post, error) {
+	query := `
+        SELECT id, user_id, title, content, image_url, privacy, group_id, created_at
+        FROM posts
+        WHERE group_id = ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    `
+	rows, err := r.db.Query(query, groupID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list posts by group ID %s: %w", groupID, err)
+	}
+	defer rows.Close()
+
+	posts := make([]*models.Post, 0)
+	for rows.Next() {
+		var post models.Post
+		var createdAt string
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL,
+			&post.Privacy,
+			&post.GroupID, // Scan GroupID
+			&createdAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan post during list by group ID %s: %w", groupID, err)
+		}
+		// Parse timestamp
+		post.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		if err != nil {
+			fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAt, err)
+			post.CreatedAt = time.Time{}
+		}
+		posts = append(posts, &post)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating post list by group ID %s rows: %w", groupID, err)
 	}
 
 	return posts, nil

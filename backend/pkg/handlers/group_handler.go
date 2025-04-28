@@ -34,16 +34,18 @@ type RespondToJoinRequest struct {
 	// No body needed, action determined by endpoint, requestID in path
 }
 
-// GroupHandler handles group and group membership/message related HTTP requests
+// GroupHandler handles group and group membership/message/post related HTTP requests
 type GroupHandler struct {
 	groupService services.GroupService
+	postService  services.PostService // Added PostService
 	authService  services.AuthService
 }
 
 // NewGroupHandler creates a new GroupHandler
-func NewGroupHandler(groupService services.GroupService, authService services.AuthService) *GroupHandler {
+func NewGroupHandler(groupService services.GroupService, postService services.PostService, authService services.AuthService) *GroupHandler {
 	return &GroupHandler{
 		groupService: groupService,
+		postService:  postService, // Store PostService
 		authService:  authService,
 	}
 }
@@ -190,6 +192,20 @@ func (h *GroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/messages", groupID))
 					}
 				}
+				return httperr.NewNotFound(nil, fmt.Sprintf("Invalid path for /api/groups/%s/messages", groupID))
+
+			case "posts":
+				// /api/groups/{groupID}/posts
+				if len(parts) == 2 {
+					switch r.Method {
+					case http.MethodGet: // GET /api/groups/{groupID}/posts -> List Group Posts
+						return h.listGroupPosts(w, r, groupID, currentUser)
+					// POST /api/groups/{groupID}/posts is handled by PostHandler via POST /api/posts with group_id in body
+					default:
+						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/posts", groupID))
+					}
+				}
+				return httperr.NewNotFound(nil, fmt.Sprintf("Invalid path for /api/groups/%s/posts", groupID))
 
 			default:
 				return httperr.NewNotFound(nil, "Invalid group sub-resource")
@@ -835,5 +851,73 @@ func (h *GroupHandler) rejectGroupJoinRequest(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Join request rejected successfully"})
+	return nil
+}
+
+// listGroupPosts handles GET /api/groups/{groupID}/posts
+// @Summary List posts within a group
+// @Description Get a paginated list of posts belonging to a specific group (requires membership)
+// @Tags groups-posts
+// @Accept json
+// @Produce json
+// @Param groupID path string true "Group ID"
+// @Param limit query int false "Number of posts to return (default 20)"
+// @Param offset query int false "Number of posts to skip (default 0)"
+// @Success 200 {object} map[string]interface{} "List of group posts"
+// @Failure 401 {object} httperr.ErrorResponse "Unauthorized"
+// @Failure 403 {object} httperr.ErrorResponse "Forbidden (not a member)" // Although service returns empty list currently
+// @Failure 404 {object} httperr.ErrorResponse "Group not found"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to list group posts"
+// @Router /groups/{groupID}/posts [get]
+func (h *GroupHandler) listGroupPosts(w http.ResponseWriter, r *http.Request, groupID string, currentUser *services.UserResponse) error {
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // Default limit
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0 // Default offset
+	if offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	// Call post service to list group posts (service handles auth check - is member?)
+	postsResponse, err := h.postService.ListGroupPosts(groupID, currentUser.ID, limit, offset)
+	if err != nil {
+		// The service method ListGroupPosts checks membership and returns empty list if not member,
+		// or error if group doesn't exist or other DB issue.
+		// Let's check for specific errors if the service provides them, otherwise assume internal error.
+		// Currently, ListGroupPosts returns empty list for non-members, so no 403 needed here based on that impl.
+		// If groupRepo.IsMember fails inside ListGroupPosts, it returns an error.
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Check if the underlying error was group not found
+			return httperr.NewNotFound(err, "Group not found")
+		}
+		// If IsMember failed for other reasons
+		if strings.Contains(err.Error(), "failed to verify group membership") {
+			// This indicates an issue checking membership, potentially DB error, treat as internal
+			log.Printf("Error verifying group membership for listing posts in group %s: %v", groupID, err)
+			return httperr.NewInternalServerError(err, "Failed to verify group access")
+		}
+		// Other errors from postRepo.ListByGroupID
+		log.Printf("Error listing group posts via handler for group %s: %v", groupID, err)
+		return httperr.NewInternalServerError(err, "Failed to list group posts")
+	}
+
+	// Note: If the user is not a member, the service returns an empty list, resulting in a 200 OK response.
+	// This avoids revealing the existence of the group or its posts if the user isn't a member.
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts":  postsResponse,
+		"limit":  limit,
+		"offset": offset,
+		"count":  len(postsResponse), // Count of returned posts
+	})
 	return nil
 }
