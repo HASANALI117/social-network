@@ -63,10 +63,17 @@ type GroupEventResponseCounts struct {
 	NotGoing int `json:"not_going"`
 }
 
+// GroupEventDetailsResponse is the DTO for returning full event details including responses and counts
+type GroupEventDetailsResponse struct {
+	*GroupEventResponse                              // Embed basic event details
+	Responses           []*GroupEventResponseDetails `json:"responses"`       // List of user responses
+	ResponseCounts      *GroupEventResponseCounts    `json:"response_counts"` // Counts of responses
+}
+
 // GroupEventService defines the interface for group event business logic
 type GroupEventService interface {
 	Create(request *GroupEventCreateRequest) (*GroupEventResponse, error)
-	GetByID(eventID string, requestingUserID string) (*GroupEventResponse, error)
+	GetByID(eventID string, requestingUserID string) (*GroupEventDetailsResponse, error) // Changed return type
 	ListByGroupID(groupID string, limit, offset int, requestingUserID string) ([]*GroupEventResponse, error)
 	Update(eventID string, request *GroupEventUpdateRequest, requestingUserID string) (*GroupEventResponse, error)
 	Delete(eventID string, requestingUserID string) error
@@ -170,9 +177,9 @@ func (s *groupEventService) Create(request *GroupEventCreateRequest) (*GroupEven
 	return mapGroupEventToResponse(event), nil
 }
 
-// GetByID retrieves a group event by its ID
-func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*GroupEventResponse, error) {
-	// Get event from repository
+// GetByID retrieves detailed group event information including responses and counts
+func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*GroupEventDetailsResponse, error) { // Corrected return type here
+	// 1. Get basic event from repository
 	event, err := s.groupEventRepo.GetByID(eventID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrEventNotFound) {
@@ -190,22 +197,51 @@ func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*G
 		return nil, ErrGroupMemberRequired
 	}
 
-	// Create response with additional details
-	response := mapGroupEventToResponse(event)
+	// 3. Create base response DTO
+	baseResponse := mapGroupEventToResponse(event)
 
 	// Add creator name if possible
 	creator, err := s.userRepo.GetByID(event.CreatorID)
 	if err == nil {
-		response.CreatorName = creator.FirstName + " " + creator.LastName
+		baseResponse.CreatorName = creator.FirstName + " " + creator.LastName
+	} else {
+		fmt.Printf("Warning: Failed to get creator details for event %s: %v\n", eventID, err)
 	}
 
 	// Add group name if possible
 	group, err := s.groupRepo.GetByID(event.GroupID)
 	if err == nil {
-		response.GroupName = group.Name
+		baseResponse.GroupName = group.Name
+	} else {
+		fmt.Printf("Warning: Failed to get group details for event %s: %v\n", eventID, err)
 	}
 
-	return response, nil
+	// 4. Fetch responses
+	// Use ListEventResponses, handle errors locally
+	responses, err := s.ListEventResponses(eventID, requestingUserID)
+	if err != nil {
+		// Log the error but don't fail the whole request, return empty responses
+		fmt.Printf("Warning: Failed to get event responses for event %s: %v\n", eventID, err)
+		responses = []*GroupEventResponseDetails{} // Ensure it's not nil
+	}
+
+	// 5. Fetch response counts
+	// Use GetEventResponseCounts, handle errors locally
+	counts, err := s.GetEventResponseCounts(eventID, requestingUserID)
+	if err != nil {
+		// Log the error but don't fail the whole request, return nil counts
+		fmt.Printf("Warning: Failed to get event response counts for event %s: %v\n", eventID, err)
+		counts = nil // Return nil counts if fetching failed
+	}
+
+	// 6. Assemble the detailed response
+	detailedResponse := &GroupEventDetailsResponse{
+		GroupEventResponse: baseResponse,
+		Responses:          responses,
+		ResponseCounts:     counts,
+	}
+
+	return detailedResponse, nil // Correctly return the detailed response
 }
 
 // ListByGroupID lists all events for a group

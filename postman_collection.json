@@ -831,7 +831,7 @@
 "{{eventId}}"
 ]
 },
-"description": "Retrieves details for a specific event within a group. Requires the user to be a member of the group."
+"description": "Retrieves detailed information for a specific event within a group, including the list of user responses and the counts of 'going'/'not_going'. Requires the user to be a member of the group."
 },
 "response": []
 },
