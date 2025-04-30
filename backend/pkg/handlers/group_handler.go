@@ -269,16 +269,28 @@ func (h *GroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events/%s", groupID, eventID))
 					}
 				}
-				// /api/groups/{groupID}/events/{eventID}/responses
-				if len(parts) == 4 && parts[2] != "" && parts[3] == "responses" {
+				// /api/groups/{groupID}/events/{eventID}/responses/...
+				if len(parts) >= 4 && parts[2] != "" && parts[3] == "responses" {
 					eventID := parts[2]
-					switch r.Method {
-					case http.MethodGet: // GET /api/groups/{groupID}/events/{eventID}/responses -> List Event Responses
-						return h.listEventResponses(w, r, groupID, eventID, currentUser)
-					case http.MethodPost: // POST /api/groups/{groupID}/events/{eventID}/responses -> Respond to Event
-						return h.respondToEvent(w, r, groupID, eventID, currentUser)
-					default:
-						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events/%s/responses", groupID, eventID))
+					// /api/groups/{groupID}/events/{eventID}/responses/counts
+					if len(parts) == 5 && parts[4] == "counts" {
+						switch r.Method {
+						case http.MethodGet: // GET /api/groups/{groupID}/events/{eventID}/responses/counts -> Get Response Counts
+							return h.getEventResponseCounts(w, r, groupID, eventID, currentUser)
+						default:
+							return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events/%s/responses/counts", groupID, eventID))
+						}
+					}
+					// /api/groups/{groupID}/events/{eventID}/responses (base)
+					if len(parts) == 4 {
+						switch r.Method {
+						case http.MethodGet: // GET /api/groups/{groupID}/events/{eventID}/responses -> List Event Responses
+							return h.listEventResponses(w, r, groupID, eventID, currentUser)
+						case http.MethodPost: // POST /api/groups/{groupID}/events/{eventID}/responses -> Respond to Event
+							return h.respondToEvent(w, r, groupID, eventID, currentUser)
+						default:
+							return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events/%s/responses", groupID, eventID))
+						}
 					}
 				}
 				return httperr.NewNotFound(nil, fmt.Sprintf("Invalid path for /api/groups/%s/events", groupID))
@@ -1149,26 +1161,79 @@ func (h *GroupHandler) deleteGroupEvent(w http.ResponseWriter, r *http.Request, 
 // respondToEvent handles POST /api/groups/{groupID}/events/{eventID}/responses
 func (h *GroupHandler) respondToEvent(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
 	// Parse JSON body
-	var req EventResponseRequest
+	var req services.GroupEventResponseRequest // Use the service DTO
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return httperr.NewBadRequest(err, "Invalid request body")
 	}
 
-	// For now, return a placeholder (we'll implement event responses in a future update)
+	// Validation is handled by DB constraint ('going', 'not_going')
+
+	// Call the service method
+	err := h.groupEventService.RespondToEvent(eventID, currentUser.ID, &req)
+	if err != nil {
+		if errors.Is(err, repositories.ErrEventNotFound) {
+			return httperr.NewNotFound(err, "Event not found")
+		}
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can respond to events")
+		}
+		// Handle potential constraint errors from the repo/service (e.g., invalid response value)
+		if strings.Contains(err.Error(), "invalid response value") {
+			return httperr.NewBadRequest(err, "Invalid response value provided")
+		}
+		// Handle foreign key errors (event/user not found) - repo might return specific error
+		if strings.Contains(err.Error(), "event or user not found") {
+			return httperr.NewNotFound(err, "Event or user not found") // Or BadRequest depending on context
+		}
+		return httperr.NewInternalServerError(err, "Failed to save event response")
+	}
+
+	// Return success (200 OK or 201 Created if we knew it was new, but UPSERT makes it tricky)
+	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	return json.NewEncoder(w).Encode(map[string]string{
-		"message":  "Event response functionality will be implemented in a future update",
-		"status":   "pending",
-		"response": req.Response,
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Event response saved successfully",
 	})
+	return nil
 }
 
 // listEventResponses handles GET /api/groups/{groupID}/events/{eventID}/responses
 func (h *GroupHandler) listEventResponses(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
-	// For now, return a placeholder (we'll implement event responses in a future update)
+	// Call the service method
+	responses, err := h.groupEventService.ListEventResponses(eventID, currentUser.ID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrEventNotFound) {
+			return httperr.NewNotFound(err, "Event not found")
+		}
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can view event responses")
+		}
+		return httperr.NewInternalServerError(err, "Failed to list event responses")
+	}
+
+	// Return the list of responses
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":   "Event response listing will be implemented in a future update",
-		"responses": []string{},
+		"responses": responses,
+		"count":     len(responses),
 	})
+}
+
+// getEventResponseCounts handles GET /api/groups/{groupID}/events/{eventID}/responses/counts
+func (h *GroupHandler) getEventResponseCounts(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
+	// Call the service method
+	counts, err := h.groupEventService.GetEventResponseCounts(eventID, currentUser.ID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrEventNotFound) {
+			return httperr.NewNotFound(err, "Event not found")
+		}
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can view event response counts")
+		}
+		return httperr.NewInternalServerError(err, "Failed to get event response counts")
+	}
+
+	// Return the counts
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(counts) // Directly encode the map
 }

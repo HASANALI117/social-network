@@ -20,7 +20,8 @@ func InitServices(repos *repositories.Repositories) *Services {
 	groupService := NewGroupService(repos.Group, repos.User)
 	followerService := NewFollowerService(repos.Follower, repos.User)
 	commentService := NewCommentService(repos.Comment, postService, repos.Group)
-	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User) // Initialize GroupEventService
+	// Update NewGroupEventService to include GroupEventResponseRepository
+	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User, repos.GroupEventResponse)
 	userService := NewUserService(repos.User, postService, followerService)
 
 	return &Services{
