@@ -4,37 +4,32 @@ import "github.com/HASANALI117/social-network/pkg/repositories"
 
 // Services holds all service instances.
 type Services struct {
-	User     UserService
-	Auth     AuthService     // Add AuthService field
-	Post     PostService     // Add PostService field
-	Group    GroupService    // Add GroupService field
-	Follower FollowerService // Added FollowerService
-	Comment  CommentService  // Added CommentService
-	// Add other services here
+	Auth       AuthService
+	User       UserService
+	Post       PostService
+	Group      GroupService
+	Follower   FollowerService
+	Comment    CommentService
+	GroupEvent GroupEventService // Added GroupEvent service
 }
 
 // InitServices initializes all services.
 func InitServices(repos *repositories.Repositories) *Services {
-	// Initialize services that don't depend on other services first
-	authService := NewAuthService(repos.User, repos.Session) // Initialize AuthService, passing User and Session repos
-	// Pass GroupRepo to PostService constructor
+	authService := NewAuthService(repos.User, repos.Session)
 	postService := NewPostService(repos.Post, repos.Follower, repos.Group)
-	groupService := NewGroupService(repos.Group, repos.User)          // Initialize GroupService
-	followerService := NewFollowerService(repos.Follower, repos.User) // Initialize FollowerService
-	// Pass GroupRepo to CommentService constructor
+	groupService := NewGroupService(repos.Group, repos.User)
+	followerService := NewFollowerService(repos.Follower, repos.User)
 	commentService := NewCommentService(repos.Comment, postService, repos.Group)
-
-	// Now initialize services that depend on other services
-	userService := NewUserService(repos.User, postService, followerService) // Pass dependencies
-	// Initialize other services, passing required repositories...
+	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User) // Initialize GroupEventService
+	userService := NewUserService(repos.User, postService, followerService)
 
 	return &Services{
-		User:     userService,
-		Auth:     authService,     // Assign initialized AuthService
-		Post:     postService,     // Assign initialized PostService
-		Group:    groupService,    // Assign initialized GroupService
-		Follower: followerService, // Assign initialized FollowerService
-		Comment:  commentService,  // Assign initialized CommentService
-		// Assign other initialized services...
+		Auth:       authService,
+		User:       userService,
+		Post:       postService,
+		Group:      groupService,
+		Follower:   followerService,
+		Comment:    commentService,
+		GroupEvent: groupEventService, // Assign initialized GroupEventService
 	}
 }

@@ -17,7 +17,7 @@ type Handlers struct {
 func InitHandlers(svc *services.Services) *Handlers {
 	authHandler := NewAuthHandler(svc.Auth) // Initialize AuthHandler using AuthService from services struct
 	// Pass PostService to GroupHandler constructor
-	groupHandler := NewGroupHandler(svc.Group, svc.Post, svc.Auth)
+	groupHandler := NewGroupHandler(svc.Group, svc.Post, svc.Auth, svc.GroupEvent)
 	followerHandler := NewFollowerHandler(svc.Follower, svc.Auth)      // Initialize FollowerHandler with AuthService
 	commentHandler := NewCommentHandler(svc.Comment, svc.Auth)         // Initialize CommentHandler
 	postHandler := NewPostHandler(svc.Post, svc.Auth, commentHandler)  // Initialize PostHandler, passing CommentHandler

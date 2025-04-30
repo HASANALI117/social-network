@@ -1,35 +1,37 @@
 package repositories
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 // Repositories holds all repository instances.
 type Repositories struct {
-	User     UserRepository
-	Session  SessionRepository  // Add SessionRepository field
-	Post     PostRepository     // Add PostRepository field
-Group    GroupRepository    // Add GroupRepository field
-Follower FollowerRepository // Added FollowerRepository
-Comment  CommentRepository  // Added CommentRepository
-// Add other repository fields here
+	User       UserRepository
+	Post       PostRepository
+	Group      GroupRepository
+	Session    SessionRepository
+	Follower   FollowerRepository
+	Comment    CommentRepository
+	GroupEvent GroupEventRepository // Added GroupEvent repository
 }
 
 // InitRepositories initializes all repositories.
 func InitRepositories(db *sql.DB) *Repositories {
 	userRepo := NewUserRepository(db)
-	postRepo := NewPostRepository(db)         // Initialize PostRepository
-	groupRepo := NewGroupRepository(db)       // Initialize GroupRepository
-sessionRepo := NewSessionRepository(db)   // Initialize SessionRepository
-followerRepo := NewFollowerRepository(db) // Initialize FollowerRepository
-commentRepo := NewCommentRepository(db)   // Initialize CommentRepository
-// Initialize other repositories...
+	postRepo := NewPostRepository(db)             // Initialize PostRepository
+	groupRepo := NewGroupRepository(db)           // Initialize GroupRepository
+	sessionRepo := NewSessionRepository(db)       // Initialize SessionRepository
+	followerRepo := NewFollowerRepository(db)     // Initialize FollowerRepository
+	commentRepo := NewCommentRepository(db)       // Initialize CommentRepository
+	groupEventRepo := NewGroupEventRepository(db) // Initialize GroupEventRepository
 
-return &Repositories{
-		User:     userRepo,
-		Post:     postRepo,     // Assign initialized PostRepository
-		Group:    groupRepo,    // Assign initialized GroupRepository
-Session:  sessionRepo,  // Assign initialized SessionRepository
-Follower: followerRepo, // Assign initialized FollowerRepository
-Comment:  commentRepo,  // Assign initialized CommentRepository
-// Assign other initialized repositories...
+	return &Repositories{
+		User:       userRepo,
+		Post:       postRepo,       // Assign initialized PostRepository
+		Group:      groupRepo,      // Assign initialized GroupRepository
+		Session:    sessionRepo,    // Assign initialized SessionRepository
+		Follower:   followerRepo,   // Assign initialized FollowerRepository
+		Comment:    commentRepo,    // Assign initialized CommentRepository
+		GroupEvent: groupEventRepo, // Assign initialized GroupEventRepository
+	}
 }
-} // Added missing closing brace

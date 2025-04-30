@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings" // Import strings
+	"time"    // Add time import
 
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
@@ -16,6 +17,38 @@ import (
 	"github.com/HASANALI117/social-network/pkg/repositories" // For error checking
 	"github.com/HASANALI117/social-network/pkg/services"
 )
+
+// EventResponse defines the structure for responding to event endpoints
+type EventResponse struct {
+	ID          string    `json:"id"`       // Changed from int to string
+	GroupID     string    `json:"group_id"` // Changed from int to string
+	CreatorID   string    `json:"creator_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description,omitempty"`
+	EventTime   time.Time `json:"event_time"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	CreatorName string    `json:"creator_name,omitempty"`
+}
+
+// EventCreateRequest defines the structure for creating an event
+type EventCreateRequest struct {
+	Title       string    `json:"title" validate:"required"`
+	Description string    `json:"description"`
+	EventTime   time.Time `json:"event_time" validate:"required"`
+}
+
+// EventUpdateRequest defines the structure for updating an event
+type EventUpdateRequest struct {
+	Title       string    `json:"title" validate:"required"`
+	Description string    `json:"description"`
+	EventTime   time.Time `json:"event_time" validate:"required"`
+}
+
+// EventResponseRequest defines the structure for responding to an event
+type EventResponseRequest struct {
+	Response string `json:"response" validate:"required,oneof=going not_going"` // Valid values: going, not_going
+}
 
 // InviteUserRequest defines the structure for inviting a user
 type InviteUserRequest struct {
@@ -36,17 +69,19 @@ type RespondToJoinRequest struct {
 
 // GroupHandler handles group and group membership/message/post related HTTP requests
 type GroupHandler struct {
-	groupService services.GroupService
-	postService  services.PostService // Added PostService
-	authService  services.AuthService
+	groupService      services.GroupService
+	postService       services.PostService
+	authService       services.AuthService
+	groupEventService services.GroupEventService
 }
 
 // NewGroupHandler creates a new GroupHandler
-func NewGroupHandler(groupService services.GroupService, postService services.PostService, authService services.AuthService) *GroupHandler {
+func NewGroupHandler(groupService services.GroupService, postService services.PostService, authService services.AuthService, groupEventService services.GroupEventService) *GroupHandler {
 	return &GroupHandler{
-		groupService: groupService,
-		postService:  postService, // Store PostService
-		authService:  authService,
+		groupService:      groupService,
+		postService:       postService, // Store PostService
+		authService:       authService,
+		groupEventService: groupEventService, // Store GroupEventService
 	}
 }
 
@@ -206,6 +241,47 @@ func (h *GroupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 					}
 				}
 				return httperr.NewNotFound(nil, fmt.Sprintf("Invalid path for /api/groups/%s/posts", groupID))
+
+			// Add group events handling
+			case "events":
+				// /api/groups/{groupID}/events
+				if len(parts) == 2 {
+					switch r.Method {
+					case http.MethodGet: // GET /api/groups/{groupID}/events -> List Events
+						return h.listGroupEvents(w, r, groupID, currentUser)
+					case http.MethodPost: // POST /api/groups/{groupID}/events -> Create Event
+						return h.createGroupEvent(w, r, groupID, currentUser)
+					default:
+						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events", groupID))
+					}
+				}
+				// /api/groups/{groupID}/events/{eventID}
+				if len(parts) == 3 && parts[2] != "" {
+					eventID := parts[2]
+					switch r.Method {
+					case http.MethodGet: // GET /api/groups/{groupID}/events/{eventID} -> Get Event
+						return h.getGroupEvent(w, r, groupID, eventID, currentUser)
+					case http.MethodPut: // PUT /api/groups/{groupID}/events/{eventID} -> Update Event
+						return h.updateGroupEvent(w, r, groupID, eventID, currentUser)
+					case http.MethodDelete: // DELETE /api/groups/{groupID}/events/{eventID} -> Delete Event
+						return h.deleteGroupEvent(w, r, groupID, eventID, currentUser)
+					default:
+						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events/%s", groupID, eventID))
+					}
+				}
+				// /api/groups/{groupID}/events/{eventID}/responses
+				if len(parts) == 4 && parts[2] != "" && parts[3] == "responses" {
+					eventID := parts[2]
+					switch r.Method {
+					case http.MethodGet: // GET /api/groups/{groupID}/events/{eventID}/responses -> List Event Responses
+						return h.listEventResponses(w, r, groupID, eventID, currentUser)
+					case http.MethodPost: // POST /api/groups/{groupID}/events/{eventID}/responses -> Respond to Event
+						return h.respondToEvent(w, r, groupID, eventID, currentUser)
+					default:
+						return httperr.NewMethodNotAllowed(nil, fmt.Sprintf("Method not allowed for /api/groups/%s/events/%s/responses", groupID, eventID))
+					}
+				}
+				return httperr.NewNotFound(nil, fmt.Sprintf("Invalid path for /api/groups/%s/events", groupID))
 
 			default:
 				return httperr.NewNotFound(nil, "Invalid group sub-resource")
@@ -920,4 +996,179 @@ func (h *GroupHandler) listGroupPosts(w http.ResponseWriter, r *http.Request, gr
 		"count":  len(postsResponse), // Count of returned posts
 	})
 	return nil
+}
+
+// --- Group Events Handlers ---
+
+// createGroupEvent handles POST /api/groups/{groupID}/events
+func (h *GroupHandler) createGroupEvent(w http.ResponseWriter, r *http.Request, groupID string, currentUser *services.UserResponse) error {
+	// Parse JSON body
+	var req EventCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return httperr.NewBadRequest(err, "Invalid request body")
+	}
+
+	// Create a service request
+	eventRequest := &services.GroupEventCreateRequest{
+		GroupID:     groupID, // No need to convert to int, directly use string
+		CreatorID:   currentUser.ID,
+		Title:       req.Title,
+		Description: req.Description,
+		EventTime:   req.EventTime,
+	}
+
+	// Call service to create the event
+	event, err := h.groupEventService.Create(eventRequest)
+	if err != nil {
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can create events")
+		}
+		return httperr.NewInternalServerError(err, "Failed to create event")
+	}
+
+	// Return the created event
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	return json.NewEncoder(w).Encode(event)
+}
+
+// getGroupEvent handles GET /api/groups/{groupID}/events/{eventID}
+func (h *GroupHandler) getGroupEvent(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
+	// Call service to get the event
+	event, err := h.groupEventService.GetByID(eventID, currentUser.ID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrEventNotFound) {
+			return httperr.NewNotFound(err, "Event not found")
+		}
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can view events")
+		}
+		return httperr.NewInternalServerError(err, "Failed to get event")
+	}
+
+	// Return the event
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(event)
+}
+
+// listGroupEvents handles GET /api/groups/{groupID}/events
+func (h *GroupHandler) listGroupEvents(w http.ResponseWriter, r *http.Request, groupID string, currentUser *services.UserResponse) error {
+	// Parse pagination parameters
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // Default limit
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0 // Default offset
+	if offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	// Call service to list events
+	events, err := h.groupEventService.ListByGroupID(groupID, limit, offset, currentUser.ID)
+	if err != nil {
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can view events")
+		}
+		return httperr.NewInternalServerError(err, "Failed to list events")
+	}
+
+	// Return the events
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]interface{}{
+		"events": events,
+		"count":  len(events),
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// updateGroupEvent handles PUT /api/groups/{groupID}/events/{eventID}
+func (h *GroupHandler) updateGroupEvent(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
+	// Parse JSON body
+	var req EventUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return httperr.NewBadRequest(err, "Invalid request body")
+	}
+
+	// Create a service request
+	updateRequest := &services.GroupEventUpdateRequest{
+		Title:       req.Title,
+		Description: req.Description,
+		EventTime:   req.EventTime,
+	}
+
+	// Call service to update the event
+	event, err := h.groupEventService.Update(eventID, updateRequest, currentUser.ID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrEventNotFound) {
+			return httperr.NewNotFound(err, "Event not found")
+		}
+		if errors.Is(err, repositories.ErrEventCreatorRequired) {
+			return httperr.NewForbidden(err, "Only the event creator can update the event")
+		}
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			return httperr.NewForbidden(err, "Only group members can update events")
+		}
+		return httperr.NewInternalServerError(err, "Failed to update event")
+	}
+
+	// Return the updated event
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(event)
+}
+
+// deleteGroupEvent handles DELETE /api/groups/{groupID}/events/{eventID}
+func (h *GroupHandler) deleteGroupEvent(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
+	// Call service to delete the event
+	err := h.groupEventService.Delete(eventID, currentUser.ID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrEventNotFound) {
+			return httperr.NewNotFound(err, "Event not found")
+		}
+		if errors.Is(err, repositories.ErrEventCreatorRequired) {
+			return httperr.NewForbidden(err, "Only the event creator or group admin can delete the event")
+		}
+		return httperr.NewInternalServerError(err, "Failed to delete event")
+	}
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]string{
+		"message": "Event deleted successfully",
+	})
+}
+
+// respondToEvent handles POST /api/groups/{groupID}/events/{eventID}/responses
+func (h *GroupHandler) respondToEvent(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
+	// Parse JSON body
+	var req EventResponseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return httperr.NewBadRequest(err, "Invalid request body")
+	}
+
+	// For now, return a placeholder (we'll implement event responses in a future update)
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]string{
+		"message":  "Event response functionality will be implemented in a future update",
+		"status":   "pending",
+		"response": req.Response,
+	})
+}
+
+// listEventResponses handles GET /api/groups/{groupID}/events/{eventID}/responses
+func (h *GroupHandler) listEventResponses(w http.ResponseWriter, r *http.Request, groupID string, eventID string, currentUser *services.UserResponse) error {
+	// For now, return a placeholder (we'll implement event responses in a future update)
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":   "Event response listing will be implemented in a future update",
+		"responses": []string{},
+	})
 }
