@@ -940,6 +940,29 @@
 "description": "Retrieves a list of all user responses ('going' or 'not_going') for a specific event. Requires the user to be a member of the group."
 },
 "response": []
+},
+{
+"name": "Get Event Response Counts [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses/counts",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}",
+"responses",
+"counts"
+]
+},
+"description": "Retrieves the counts of 'going' and 'not_going' responses for a specific event. Requires the user to be a member of the group."
+},
+"response": []
 }
 ]
 }
