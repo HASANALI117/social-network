@@ -760,6 +760,188 @@
 "description": "Lists posts within a specific group. Requires membership in the group."
 },
 "response": []
+},
+{
+"name": "Group Events",
+"item": [
+{
+"name": "Create Event [Auth Required, Member]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"Team Meeting\",\n    \"description\": \"Discuss project progress.\",\n    \"event_time\": \"2025-05-15T14:00:00Z\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events"
+]
+},
+"description": "Creates a new event within a specific group. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "List Events by Group ID [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events"
+]
+},
+"description": "Retrieves a list of all events for a specific group. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "Get Event by ID [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}"
+]
+},
+"description": "Retrieves details for a specific event within a group. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "Update Event [Auth Required, Creator]",
+"request": {
+"method": "PUT",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"Team Meeting (Updated Location)\",\n    \"description\": \"Discuss project progress in Conference Room B.\",\n    \"event_time\": \"2025-05-15T14:30:00Z\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}"
+]
+},
+"description": "Updates details for a specific event. Requires the user to be the creator of the event."
+},
+"response": []
+},
+{
+"name": "Delete Event [Auth Required, Creator]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}"
+]
+},
+"description": "Deletes a specific event. Requires the user to be the creator of the event."
+},
+"response": []
+},
+{
+"name": "Respond to Event [Auth Required, Member]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"response\": \"going\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}",
+"responses"
+]
+},
+"description": "Sets or updates the authenticated user's response ('going' or 'not_going') to a specific event. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "List Event Responses [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}",
+"responses"
+]
+},
+"description": "Retrieves a list of all user responses ('going' or 'not_going') for a specific event. Requires the user to be a member of the group."
+},
+"response": []
+}
+]
 }
 ]
 },
@@ -993,6 +1175,11 @@
 {
 "key": "requestId",
 "value": "REPLACE_WITH_REQUEST_ID",
+"type": "string"
+},
+{
+"key": "eventId",
+"value": "REPLACE_WITH_EVENT_ID",
 "type": "string"
 }
 ]
