@@ -259,6 +259,34 @@
 }
 },
 "response": []
+},
+{
+"name": "Create Group Post",
+"originalRequest": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"My Group Post\",\n    \"content\": \"This post is only visible within the group.\",\n    \"image_url\": \"\",\n    \"group_id\": \"{{groupId}}\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/posts/",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"posts",
+""
+]
+}
+},
+"response": []
 }
 ],
 "request": {
@@ -271,14 +299,14 @@
 ],
 "body": {
 "mode": "raw",
-"raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": []\n}"
+"raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": [],\n    \"group_id\": null \n}"
 },
 "url": {
 "raw": "{{baseUrl}}/api/posts/",
 "host": ["{{baseUrl}}"],
 "path": ["api", "posts", ""]
 },
-"description": "Creates a new post. Requires authentication. \n\n**Privacy Options:**\n*   `public`: Visible to everyone.\n*   `almost_private`: Visible only to users who follow the creator.\n*   `private`: Visible only to users specified in `allowed_user_ids`.\n\nSee examples for different privacy settings."
+"description": "Creates a new post. Requires authentication.\n\n**Post Types:**\n*   **Regular Post:** Set `privacy` (`public`, `almost_private`, `private`) and optionally `allowed_user_ids` (for `private`). Leave `group_id` as `null` or omit it.\n*   **Group Post:** Set `group_id` to the target group's ID. `privacy` and `allowed_user_ids` are ignored. Requires membership in the group.\n\nSee examples for different types."
 },
 "response": []
 },
@@ -350,7 +378,7 @@
 "host": ["{{baseUrl}}"],
 "path": ["api", "posts", "{{postId}}"]
 },
-"description": "Deletes a specific post. Requires authentication and ownership."
+"description": "Deletes a specific post. Requires authentication and ownership.\n\n**Group Posts:** Deleting a post within a group requires the user to be the post owner OR an admin of the group."
 },
 "response": []
 }
@@ -550,7 +578,7 @@
 "{{commentId}}"
 ]
 },
-"description": "Deletes a specific comment. Requires authentication and ownership of the comment."
+"description": "Deletes a specific comment. Requires authentication and ownership of the comment.\n\n**Group Post Comments:** Deleting a comment on a group post requires the user to be the comment owner OR an admin of the group."
 },
 "response": []
 }
@@ -655,29 +683,6 @@
 "response": []
 },
 {
-"name": "Add Group Member [Auth Required, Admin]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"user_id\": \"{{targetUserId}}\",\n    \"role\": \"member\" \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/members",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}", "members"]
-},
-"description": "Adds a user to a group. Requires admin role."
-},
-"response": []
-},
-{
 "name": "List Group Members [Auth Required, Member]",
 "request": {
 "method": "GET",
@@ -725,6 +730,426 @@
 "description": "Lists messages in a specific group. Requires membership. Currently stubbed."
 },
 "response": []
+},
+{
+"name": "List Group Posts [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/posts?limit=20&offset=0",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"posts"
+],
+"query": [
+{
+"key": "limit",
+"value": "20"
+},
+{
+"key": "offset",
+"value": "0"
+}
+]
+},
+"description": "Lists posts within a specific group. Requires membership in the group."
+},
+"response": []
+},
+{
+"name": "Group Events",
+"item": [
+{
+"name": "Create Event [Auth Required, Member]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"Team Meeting\",\n    \"description\": \"Discuss project progress.\",\n    \"event_time\": \"2025-05-15T14:00:00Z\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events"
+]
+},
+"description": "Creates a new event within a specific group. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "List Events by Group ID [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events"
+]
+},
+"description": "Retrieves a list of all events for a specific group. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "Get Event by ID [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}"
+]
+},
+"description": "Retrieves detailed information for a specific event within a group, including the list of user responses and the counts of 'going'/'not_going'. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "Update Event [Auth Required, Creator]",
+"request": {
+"method": "PUT",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"title\": \"Team Meeting (Updated Location)\",\n    \"description\": \"Discuss project progress in Conference Room B.\",\n    \"event_time\": \"2025-05-15T14:30:00Z\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}"
+]
+},
+"description": "Updates details for a specific event. Requires the user to be the creator of the event."
+},
+"response": []
+},
+{
+"name": "Delete Event [Auth Required, Creator]",
+"request": {
+"method": "DELETE",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}"
+]
+},
+"description": "Deletes a specific event. Requires the user to be the creator of the event."
+},
+"response": []
+},
+{
+"name": "Respond to Event [Auth Required, Member]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"response\": \"going\" \n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}",
+"responses"
+]
+},
+"description": "Sets or updates the authenticated user's response ('going' or 'not_going') to a specific event. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "List Event Responses [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}",
+"responses"
+]
+},
+"description": "Retrieves a list of all user responses ('going' or 'not_going') for a specific event. Requires the user to be a member of the group."
+},
+"response": []
+},
+{
+"name": "Get Event Response Counts [Auth Required, Member]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses/counts",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"events",
+"{{eventId}}",
+"responses",
+"counts"
+]
+},
+"description": "Retrieves the counts of 'going' and 'not_going' responses for a specific event. Requires the user to be a member of the group."
+},
+"response": []
+}
+]
+}
+]
+},
+{
+"name": "Group Invitations",
+"item": [
+{
+"name": "Invite User to Group [Auth Required, Member/Admin]",
+"request": {
+"method": "POST",
+"header": [
+{
+"key": "Content-Type",
+"value": "application/json"
+}
+],
+"body": {
+"mode": "raw",
+"raw": "{\n    \"invitee_id\": \"{{targetUserId}}\"\n}"
+},
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/invitations",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"invitations"
+]
+},
+"description": "Invites a user (targetUserId) to join a specific group (groupId). Requires the sender to be a member or admin."
+},
+"response": []
+},
+{
+"name": "List Pending Invitations (For Me) [Auth Required]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/invitations/pending",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"invitations",
+"pending"
+]
+},
+"description": "Lists all pending group invitations for the currently authenticated user."
+},
+"response": []
+},
+{
+"name": "Accept Group Invitation [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/accept",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"invitations",
+"{{invitationId}}",
+"accept"
+]
+},
+"description": "Accepts a specific group invitation. Requires the authenticated user to be the invitee."
+},
+"response": []
+},
+{
+"name": "Reject Group Invitation [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/reject",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"invitations",
+"{{invitationId}}",
+"reject"
+]
+},
+"description": "Rejects a specific group invitation. Requires the authenticated user to be the invitee."
+},
+"response": []
+}
+]
+},
+{
+"name": "Group Join Requests",
+"item": [
+{
+"name": "Request to Join Group [Auth Required]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/requests",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"requests"
+]
+},
+"description": "Sends a request to join a specific group (groupId). Cannot request to join if already a member or creator."
+},
+"response": []
+},
+{
+"name": "List Pending Join Requests (For Group) [Auth Required, Admin]",
+"request": {
+"method": "GET",
+"url": {
+"raw": "{{baseUrl}}/api/groups/{{groupId}}/requests/pending",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"{{groupId}}",
+"requests",
+"pending"
+]
+},
+"description": "Lists all pending requests to join a specific group (groupId). Requires the authenticated user to be an admin of the group."
+},
+"response": []
+},
+{
+"name": "Accept Group Join Request [Auth Required, Admin]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/accept",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"requests",
+"{{requestId}}",
+"accept"
+]
+},
+"description": "Accepts a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
+},
+"response": []
+},
+{
+"name": "Reject Group Join Request [Auth Required, Admin]",
+"request": {
+"method": "POST",
+"url": {
+"raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/reject",
+"host": [
+"{{baseUrl}}"
+],
+"path": [
+"api",
+"groups",
+"requests",
+"{{requestId}}",
+"reject"
+]
+},
+"description": "Rejects a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
+},
+"response": []
 }
 ]
 }
@@ -763,6 +1188,21 @@
 {
 "key": "commentId",
 "value": "REPLACE_WITH_COMMENT_ID",
+"type": "string"
+},
+{
+"key": "invitationId",
+"value": "REPLACE_WITH_INVITATION_ID",
+"type": "string"
+},
+{
+"key": "requestId",
+"value": "REPLACE_WITH_REQUEST_ID",
+"type": "string"
+},
+{
+"key": "eventId",
+"value": "REPLACE_WITH_EVENT_ID",
 "type": "string"
 }
 ]
