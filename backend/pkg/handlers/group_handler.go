@@ -73,15 +73,17 @@ type GroupHandler struct {
 	postService       services.PostService
 	authService       services.AuthService
 	groupEventService services.GroupEventService
+	messageService    services.MessageService // Added MessageService dependency
 }
 
 // NewGroupHandler creates a new GroupHandler
-func NewGroupHandler(groupService services.GroupService, postService services.PostService, authService services.AuthService, groupEventService services.GroupEventService) *GroupHandler {
+func NewGroupHandler(groupService services.GroupService, postService services.PostService, authService services.AuthService, groupEventService services.GroupEventService, messageService services.MessageService) *GroupHandler { // Added messageService parameter
 	return &GroupHandler{
 		groupService:      groupService,
 		postService:       postService, // Store PostService
 		authService:       authService,
 		groupEventService: groupEventService, // Store GroupEventService
+		messageService:    messageService,    // Store MessageService
 	}
 }
 
@@ -582,48 +584,61 @@ func (h *GroupHandler) listMembers(w http.ResponseWriter, r *http.Request, group
 // @Failure 500 {object} httperr.ErrorResponse "Failed to get messages (or Not Implemented)"
 // @Router /groups/{id}/messages [get]
 func (h *GroupHandler) getGroupMessages(w http.ResponseWriter, r *http.Request, groupID string, currentUser *services.UserResponse) error {
-	// TODO: Implement fully when GroupMessage service/repo methods exist
-	log.Printf("getGroupMessages called for group %s (Not Implemented)", groupID)
-
-	// Basic authorization check (is member?) - can be moved to service later
-	isMember, err := h.groupService.ListMembers(groupID, currentUser.ID) // Re-use ListMembers auth check for now
-	if err != nil {
-		if errors.Is(err, repositories.ErrGroupNotFound) {
-			return httperr.NewNotFound(err, "Group not found")
-		}
-		if errors.Is(err, services.ErrGroupMemberRequired) {
-			return httperr.NewForbidden(err, "Only group members can view messages")
-		}
-		return httperr.NewInternalServerError(err, "Failed to check membership for messages")
-	}
-	_ = isMember // Avoid unused variable error
-
-	// Placeholder response
+	// 1. Extract pagination parameters
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
-	limit := 50
+
+	limit := 20 // Default limit
 	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-			limit = l
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit <= 0 {
+			// Consider allowing 0 limit? For now, require positive.
+			return httperr.NewBadRequest(err, "Invalid 'limit' parameter: must be a positive integer")
 		}
-	}
-	offset := 0
-	if offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
-		}
+		limit = parsedLimit
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":  "Group message endpoint not fully implemented",
-		"messages": []string{},
+	offset := 0 // Default offset
+	if offsetStr != "" {
+		parsedOffset, err := strconv.Atoi(offsetStr)
+		if err != nil || parsedOffset < 0 {
+			return httperr.NewBadRequest(err, "Invalid 'offset' parameter: must be a non-negative integer")
+		}
+		offset = parsedOffset
+	}
+
+	// 2. Call MessageService to fetch messages
+	// Note: The exact method signature might differ. Adjust if needed.
+	// Passing currentUser.ID for potential authorization checks within the service.
+	messages, err := h.messageService.GetGroupMessages(groupID, limit, offset, currentUser.ID) // Use messageService
+	if err != nil {
+		// 3. Handle potential errors
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming service might return this
+			return httperr.NewNotFound(err, "Group not found")
+		}
+		if errors.Is(err, services.ErrGroupMemberRequired) { // Assuming service checks membership
+			return httperr.NewForbidden(err, "Access denied: You must be a member to view group messages")
+		}
+		// Log the unexpected error for debugging
+		log.Printf("ERROR: Failed to get group messages for group %s: %v\n", groupID, err)
+		return httperr.NewInternalServerError(err, "Failed to retrieve group messages")
+	}
+
+	// 4. Return successful response (manual JSON encoding)
+	response := map[string]interface{}{
+		"messages": messages,
 		"limit":    limit,
 		"offset":   offset,
-		"count":    0,
-	})
-	return nil
-	// return httperr.NewInternalServerError(errors.New("not implemented"), "Group message retrieval not implemented")
+		"count":    len(messages), // Assuming messages is a slice
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		// Log error if encoding fails, but can't send HTTP error anymore
+		log.Printf("ERROR: Failed to encode group messages response: %v\n", err)
+		return fmt.Errorf("failed to write response: %w", err) // Return internal error
+	}
+	return nil // Indicate success
 }
 
 // --- Invitation Handlers ---

@@ -20,14 +20,14 @@ type Handlers struct {
 func InitHandlers(svc *services.Services) *Handlers {
 	authHandler := NewAuthHandler(svc.Auth) // Initialize AuthHandler using AuthService from services struct
 	// Pass PostService to GroupHandler constructor
-	groupHandler := NewGroupHandler(svc.Group, svc.Post, svc.Auth, svc.GroupEvent)
-	followerHandler := NewFollowerHandler(svc.Follower, svc.Auth)                   // Initialize FollowerHandler with AuthService
-	commentHandler := NewCommentHandler(svc.Comment, svc.Auth)                      // Initialize CommentHandler
-	postHandler := NewPostHandler(svc.Post, svc.Auth, commentHandler)               // Initialize PostHandler, passing CommentHandler
-	userHandler := NewUserHandler(svc.User, svc.Auth, followerHandler)              // Pass FollowerHandler
-	messageHandler := NewMessageHandler(svc.Message, svc.Auth)                      // Initialize MessageHandler
-	groupMessageHandler := NewGroupMessageHandler(svc.Message, svc.Group, svc.Auth) // Initialize GroupMessageHandler
-	groupMemberHandler := NewGroupMemberHandler(svc.Group, svc.Auth)                // Initialize GroupMemberHandler
+	groupHandler := NewGroupHandler(svc.Group, svc.Post, svc.Auth, svc.GroupEvent, svc.Message) // Pass MessageService
+	followerHandler := NewFollowerHandler(svc.Follower, svc.Auth)                               // Initialize FollowerHandler with AuthService
+	commentHandler := NewCommentHandler(svc.Comment, svc.Auth)                                  // Initialize CommentHandler
+	postHandler := NewPostHandler(svc.Post, svc.Auth, commentHandler)                           // Initialize PostHandler, passing CommentHandler
+	userHandler := NewUserHandler(svc.User, svc.Auth, followerHandler)                          // Pass FollowerHandler
+	messageHandler := NewMessageHandler(svc.Message, svc.Auth)                                  // Initialize MessageHandler
+	groupMessageHandler := NewGroupMessageHandler(svc.Message, svc.Group, svc.Auth)             // Initialize GroupMessageHandler
+	groupMemberHandler := NewGroupMemberHandler(svc.Group, svc.Auth)                            // Initialize GroupMemberHandler
 
 	return &Handlers{
 		User:         userHandler,

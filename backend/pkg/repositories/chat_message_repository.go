@@ -42,10 +42,9 @@ func (r *chatMessageRepository) SaveDirectMessage(message *models.Message) error
 // TODO: Implement the actual SQL query to insert the message.
 func (r *chatMessageRepository) SaveGroupMessage(message *models.GroupMessage) error {
 	// Placeholder implementation - replace with actual DB logic
-	query := `INSERT INTO group_messages (group_id, sender_id, content, created_at) VALUES ($1, $2, $3, $4)`
-	_, err := r.db.Exec(query, message.GroupID, message.SenderID, message.Content, message.CreatedAt)
+	query := `INSERT INTO group_messages (id, group_id, sender_id, content, created_at) VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.db.Exec(query, message.ID, message.GroupID, message.SenderID, message.Content, message.CreatedAt)
 	if err != nil {
-		// Add proper error handling/logging
 		return err
 	}
 	return nil
@@ -106,18 +105,26 @@ func (r *chatMessageRepository) GetGroupMessages(groupID string, limit, offset i
 	messages := make([]*models.GroupMessage, 0)
 	for rows.Next() {
 		msg := &models.GroupMessage{}
-		// Need to handle potential null time for created_at if schema allows
-		// Assuming created_at is NOT NULL for now
+		var nullableID sql.NullString // Use sql.NullString for the ID
+
 		err := rows.Scan(
-			&msg.ID,
+			&nullableID, // Scan into the NullString
 			&msg.GroupID,
 			&msg.SenderID,
 			&msg.Content,
-			&msg.CreatedAt, // Scan directly into time.Time
+			&msg.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, err // Return scan errors immediately
 		}
+
+		// Assign the ID only if it's not NULL in the database
+		if nullableID.Valid {
+			msg.ID = nullableID.String
+		} else {
+			msg.ID = "" // Or handle NULL ID case as appropriate (e.g., log warning)
+		}
+
 		messages = append(messages, msg)
 	}
 
