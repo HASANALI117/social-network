@@ -3,7 +3,7 @@ package services
 import (
 	"fmt"
 
-	"github.com/HASANALI117/social-network/pkg/models"
+	"github.com/HASANALI117/social-network/pkg/models" // Ensure models.Message is imported
 	"github.com/HASANALI117/social-network/pkg/repositories"
 )
 
@@ -11,7 +11,9 @@ import (
 
 // MessageService defines the interface for message-related business logic.
 type MessageService interface {
-	GetUserMessages(senderID, receiverID string, limit, offset int, requestingUserID string) ([]*models.Message, error)
+	// GetDirectMessagesBetweenUsers retrieves paginated messages between two specified users.
+	// It returns the list of messages, the total count of messages between them, and an error if any.
+	GetDirectMessagesBetweenUsers(user1ID, user2ID string, limit, offset int) ([]models.Message, int64, error)
 	GetGroupMessages(groupID string, limit, offset int, requestingUserID string) ([]*models.GroupMessage, error)
 	// TODO: Add methods for sending messages if needed (currently handled by websocket)
 }
@@ -31,22 +33,19 @@ func NewMessageService(messageRepo repositories.ChatMessageRepository, groupRepo
 	}
 }
 
-// GetUserMessages retrieves direct messages between two users.
-// Authorization: Ensure the requesting user is one of the participants.
-func (s *messageService) GetUserMessages(senderID, receiverID string, limit, offset int, requestingUserID string) ([]*models.Message, error) {
-	// Authorization check
-	if requestingUserID != senderID && requestingUserID != receiverID {
-		// Using a standard error type might be better
-		return nil, fmt.Errorf("user %s not authorized to view messages between %s and %s", requestingUserID, senderID, receiverID)
-	}
-
-	messages, err := s.messageRepo.GetUserMessages(senderID, receiverID, limit, offset)
+// GetDirectMessagesBetweenUsers retrieves paginated direct messages between two users.
+// The repository layer handles fetching messages where the pair are sender/receiver in either order.
+// Authorization is implicitly handled by the handler ensuring the requestor is one of the users.
+func (s *messageService) GetDirectMessagesBetweenUsers(user1ID, user2ID string, limit, offset int) ([]models.Message, int64, error) {
+	// Call the repository method that fetches messages and total count
+	messages, totalCount, err := s.messageRepo.GetDirectMessagesBetweenUsers(user1ID, user2ID, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user messages from repository: %w", err)
+		// It's often better to return the specific repository error or wrap it
+		return nil, 0, fmt.Errorf("failed to get direct messages from repository: %w", err)
 	}
 
-	// TODO: Map to response DTOs if needed
-	return messages, nil
+	// TODO: Map to response DTOs if needed. Assuming models.Message is suitable for now.
+	return messages, totalCount, nil
 }
 
 // GetGroupMessages retrieves messages for a specific group.
@@ -59,7 +58,7 @@ func (s *messageService) GetGroupMessages(groupID string, limit, offset int, req
 	}
 	if !isMember {
 		// Using the error from group service for consistency
-		return nil, ErrGroupMemberRequired
+		return nil, ErrGroupMemberRequired // Assuming ErrGroupMemberRequired is defined elsewhere
 	}
 
 	messages, err := s.messageRepo.GetGroupMessages(groupID, limit, offset)
@@ -70,3 +69,5 @@ func (s *messageService) GetGroupMessages(groupID string, limit, offset int, req
 	// TODO: Map to response DTOs if needed
 	return messages, nil
 }
+
+// Note: ErrGroupMemberRequired is likely defined in group_service.go or a shared errors package

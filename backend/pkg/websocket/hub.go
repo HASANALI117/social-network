@@ -7,9 +7,8 @@ import (
 	// "github.com/HASANALI117/social-network/pkg/helpers" // No longer needed
 	"github.com/HASANALI117/social-network/pkg/models" // Keep for message structs
 	"github.com/HASANALI117/social-network/pkg/repositories"
-
-	// "github.com/HASANALI117/social-network/pkg/repositories" // No longer needed directly
 	"github.com/HASANALI117/social-network/pkg/services"
+	"github.com/google/uuid" // Import UUID library
 )
 
 type Hub struct {
@@ -77,7 +76,11 @@ func (h *Hub) Run() {
 				fmt.Printf("   Content: %s\n", message.Content)
 				fmt.Printf("   Time: %s\n", message.CreatedAt)
 
+				// Generate a unique ID for the message
+				newMessageID := uuid.NewString()
+
 				msg := &models.Message{
+					ID:         newMessageID, // Assign the generated UUID
 					SenderID:   message.SenderID,
 					ReceiverID: message.ReceiverID,
 					Content:    message.Content,
