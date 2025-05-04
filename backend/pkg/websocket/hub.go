@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/HASANALI117/social-network/pkg/helpers"
-	"github.com/HASANALI117/social-network/pkg/models"
+	// "github.com/HASANALI117/social-network/pkg/helpers" // No longer needed
+	"github.com/HASANALI117/social-network/pkg/models" // Keep for message structs
+	"github.com/HASANALI117/social-network/pkg/repositories"
+
+	// "github.com/HASANALI117/social-network/pkg/repositories" // No longer needed directly
+	"github.com/HASANALI117/social-network/pkg/services"
 )
 
 type Hub struct {
-	Clients    map[string]*Client
-	Broadcast  chan *Message
-	Register   chan *Client
-	Unregister chan *Client
+	Clients         map[string]*Client
+	Broadcast       chan *Message
+	Register        chan *Client
+	Unregister      chan *Client
+	chatMessageRepo repositories.ChatMessageRepository // Correct field
+	groupService    services.GroupService              // Correct field
 }
 
 type Message struct {
@@ -23,12 +29,15 @@ type Message struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-func NewHub() *Hub {
+// Update NewHub signature to accept ChatMessageRepository and GroupService
+func NewHub(chatMessageRepo repositories.ChatMessageRepository, groupService services.GroupService) *Hub {
 	return &Hub{
-		Clients:    make(map[string]*Client),
-		Broadcast:  make(chan *Message),
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
+		Clients:         make(map[string]*Client),
+		Broadcast:       make(chan *Message),
+		Register:        make(chan *Client),
+		Unregister:      make(chan *Client),
+		chatMessageRepo: chatMessageRepo, // Correct initialization
+		groupService:    groupService,    // Correct initialization
 	}
 }
 
@@ -75,8 +84,9 @@ func (h *Hub) Run() {
 					CreatedAt:  message.CreatedAt,
 				}
 
-				if err := helpers.SaveMessage(msg); err != nil {
-					fmt.Printf("❌ Error storing message: %v\n", err)
+				// Use ChatMessageRepository directly to save the direct message
+				if err := h.chatMessageRepo.SaveDirectMessage(msg); err != nil {
+					fmt.Printf("❌ Error storing direct message: %v\n", err)
 				}
 
 				h.deliverMessage(message.SenderID, message)
@@ -110,21 +120,26 @@ func (h *Hub) Run() {
 					CreatedAt: createdAt, // Use the parsed time.Time value
 				}
 
-				if err := helpers.SaveGroupMessage(groupMsg); err != nil {
+				// Use ChatMessageRepository directly to save the group message
+				if err := h.chatMessageRepo.SaveGroupMessage(groupMsg); err != nil {
 					fmt.Printf("❌ Error storing group message: %v\n", err)
 				}
 
-				// Check if sender is a member of the group
-				isMember, err := helpers.IsGroupMember(message.ReceiverID, message.SenderID)
-				if err != nil || !isMember {
-					fmt.Printf("❌ User %s is not a member of group %s\n", message.SenderID, message.ReceiverID)
-					continue
+				// Use GroupService to check if sender is a member of the group
+				isMember, err := h.groupService.IsMember(message.ReceiverID, message.SenderID)
+				if err != nil {
+					fmt.Printf("❌ Error checking group membership via service for user %s in group %s: %v\n", message.SenderID, message.ReceiverID, err)
+					continue // Skip if error checking membership
+				}
+				if !isMember {
+					fmt.Printf("❌ User %s is not a member of group %s, cannot send message\n", message.SenderID, message.ReceiverID)
+					continue // Skip if not a member
 				}
 
-				// Get all group members
-				members, err := helpers.ListGroupMembers(message.ReceiverID) // TODO: use the new services
+				// Use GroupService to get all group members, passing sender ID as requesting user
+				members, err := h.groupService.ListMembers(message.ReceiverID, message.SenderID)
 				if err != nil {
-					fmt.Printf("❌ Error getting group members: %v\n", err)
+					fmt.Printf("❌ Error getting group members via service for group %s: %v\n", message.ReceiverID, err)
 					continue
 				}
 

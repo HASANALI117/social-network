@@ -1,27 +1,31 @@
 package handlers
 
 import (
-"encoding/json"
-"errors" // Import errors
-"net/http"
-"strconv"
+	"encoding/json"
+	"errors" // Import errors
+	"net/http"
+	"strconv"
 
-"github.com/HASANALI117/social-network/pkg/helpers"
-"github.com/HASANALI117/social-network/pkg/httperr"
-"github.com/HASANALI117/social-network/pkg/services" // Import services
+	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
+	"github.com/HASANALI117/social-network/pkg/repositories" // Added import for repository errors
+	"github.com/HASANALI117/social-network/pkg/services"     // Import services
 )
 
 // GroupMessageHandler handles group message requests
 type GroupMessageHandler struct {
-authService services.AuthService
-// TODO: Inject GroupMessageService when created
+	authService    services.AuthService
+	messageService services.MessageService // Inject MessageService
+	groupService   services.GroupService   // Inject GroupService
 }
 
 // NewGroupMessageHandler creates a new GroupMessageHandler
-func NewGroupMessageHandler(authService services.AuthService) *GroupMessageHandler {
-return &GroupMessageHandler{
-authService: authService,
-}
+func NewGroupMessageHandler(messageService services.MessageService, groupService services.GroupService, authService services.AuthService) *GroupMessageHandler {
+	return &GroupMessageHandler{
+		authService:    authService,
+		messageService: messageService, // Assign MessageService
+		groupService:   groupService,   // Assign GroupService
+	}
 }
 
 // GetGroupMessages godoc
@@ -40,27 +44,30 @@ authService: authService,
 // @Failure 500 {object} httperr.ErrorResponse "Failed to get messages or session error"
 // @Router /groups/messages [get]
 func (h *GroupMessageHandler) GetGroupMessages(w http.ResponseWriter, r *http.Request) error {
-if r.Method != http.MethodGet {
-return httperr.NewMethodNotAllowed(nil, "")
-}
+	if r.Method != http.MethodGet {
+		return httperr.NewMethodNotAllowed(nil, "")
+	}
 
-// Get current user from session using AuthService
-currentUser, err := helpers.GetUserFromSession(r, h.authService)
-if err != nil {
-if errors.Is(err, helpers.ErrInvalidSession) {
-return httperr.NewUnauthorized(err, "Invalid session")
-}
-return httperr.NewInternalServerError(err, "Failed to get current user")
-}
+	// Get current user from session using AuthService
+	currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil {
+		if errors.Is(err, helpers.ErrInvalidSession) {
+			return httperr.NewUnauthorized(err, "Invalid session")
+		}
+		return httperr.NewInternalServerError(err, "Failed to get current user")
+	}
 
-groupID := r.URL.Query().Get("id")
+	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
-	// Check if user is a member of the group
-	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID) //TODO: Use GroupService/GroupMemberService
+	// Check if user is a member of the group using GroupService
+	isMember, err := h.groupService.IsMember(groupID, currentUser.ID)
 	if err != nil {
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
 		return httperr.NewInternalServerError(err, "Failed to check member status")
 	}
 	if !isMember {
@@ -85,25 +92,27 @@ groupID := r.URL.Query().Get("id")
 		}
 	}
 
-	messages, err := helpers.GetGroupMessages(groupID, limit, offset) //TODO: Use GroupService/GroupMemberService
+	// Get messages using MessageService
+	// Pass currentUser.ID as requestingUserID for authorization check within the service
+	messages, err := h.messageService.GetGroupMessages(groupID, limit, offset, currentUser.ID)
 	if err != nil {
+		// Handle specific service errors
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			// This shouldn't happen if the IsMember check above passed, but handle defensively
+			return httperr.NewUnauthorized(err, "Membership required to view messages")
+		}
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming MessageService propagates repo errors via GroupRepo check
+			return httperr.NewNotFound(err, "Group not found")
+		}
+		// Handle other potential errors
 		return httperr.NewInternalServerError(err, "Failed to get group messages")
 	}
 
-	result := make([]map[string]interface{}, len(messages))
-	for i, msg := range messages {
-		result[i] = map[string]interface{}{
-			"id":         msg.ID,
-			"group_id":   msg.GroupID,
-			"sender_id":  msg.SenderID,
-			"content":    msg.Content,
-			"created_at": msg.CreatedAt,
-		}
-	}
-
+	// The service returns []*models.GroupMessage, which should be suitable for JSON encoding
+	// TODO: Consider mapping to a specific response DTO if needed
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"messages": result,
+		"messages": messages, // Use the response directly from the service
 		"limit":    limit,
 		"offset":   offset,
 		"count":    len(messages),

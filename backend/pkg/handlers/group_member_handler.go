@@ -1,26 +1,28 @@
 package handlers
 
 import (
-"encoding/json"
-"errors"
-"net/http"
+	"encoding/json"
+	"errors"
+	"net/http"
 
-"github.com/HASANALI117/social-network/pkg/helpers"
-"github.com/HASANALI117/social-network/pkg/httperr"
-"github.com/HASANALI117/social-network/pkg/services" // Import services
+	"github.com/HASANALI117/social-network/pkg/helpers"
+	"github.com/HASANALI117/social-network/pkg/httperr"
+	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/services" // Import services
 )
 
 // GroupMemberHandler handles group membership requests
 type GroupMemberHandler struct {
-authService services.AuthService
-// TODO: Inject GroupService/GroupMemberService when created
+	authService  services.AuthService
+	groupService services.GroupService // Inject GroupService
 }
 
 // NewGroupMemberHandler creates a new GroupMemberHandler
-func NewGroupMemberHandler(authService services.AuthService) *GroupMemberHandler {
-return &GroupMemberHandler{
-authService: authService,
-}
+func NewGroupMemberHandler(groupService services.GroupService, authService services.AuthService) *GroupMemberHandler {
+	return &GroupMemberHandler{
+		authService:  authService,
+		groupService: groupService, // Assign GroupService
+	}
 }
 
 // AddGroupMember godoc
@@ -40,27 +42,31 @@ authService: authService,
 // @Failure 500 {object} httperr.ErrorResponse "Failed to add member or session error"
 // @Router /groups/members/add [post]
 func (h *GroupMemberHandler) AddGroupMember(w http.ResponseWriter, r *http.Request) error {
-if r.Method != http.MethodPost {
-return httperr.NewMethodNotAllowed(nil, "")
-}
+	if r.Method != http.MethodPost {
+		return httperr.NewMethodNotAllowed(nil, "")
+	}
 
-// Get current user from session using AuthService
-currentUser, err := helpers.GetUserFromSession(r, h.authService)
-if err != nil {
-if errors.Is(err, helpers.ErrInvalidSession) {
-return httperr.NewUnauthorized(err, "Invalid session")
-}
-return httperr.NewInternalServerError(err, "Failed to get current user")
-}
+	// Get current user from session using AuthService
+	currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil {
+		if errors.Is(err, helpers.ErrInvalidSession) {
+			return httperr.NewUnauthorized(err, "Invalid session")
+		}
+		return httperr.NewInternalServerError(err, "Failed to get current user")
+	}
 
-groupID := r.URL.Query().Get("id")
+	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
-	// Check if current user is an admin
-	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID)
+	// Check if current user is an admin using GroupService
+	isAdmin, err := h.groupService.IsAdmin(groupID, currentUser.ID)
 	if err != nil {
+		// Handle potential service-level errors (e.g., group not found)
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
 		return httperr.NewInternalServerError(err, "Failed to check admin status")
 	}
 	if !isAdmin {
@@ -81,11 +87,24 @@ groupID := r.URL.Query().Get("id")
 		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
-	// Add member to group
-	if err := helpers.AddGroupMember(groupID, req.UserID, req.Role); err != nil { //TODO: Use GroupService/GroupMemberService
-		if errors.Is(err, helpers.ErrAlreadyGroupMember) { // TODO: Use GroupService/GroupMemberService
+	// Add member to group using GroupService
+	// Note: The current GroupService.AddMember requires requestingUserID for auth check
+	// We'll pass currentUser.ID as the requesting user.
+	if err := h.groupService.AddMember(groupID, req.UserID, req.Role, currentUser.ID); err != nil {
+		// Handle specific service errors
+		if errors.Is(err, services.ErrGroupAdminRequired) {
+			return httperr.NewUnauthorized(err, "Admin privileges required")
+		}
+		if errors.Is(err, repositories.ErrAlreadyGroupMember) { // Assuming GroupService propagates repo errors
 			return httperr.NewHTTPError(http.StatusConflict, "User is already a member of this group", err)
 		}
+		if errors.Is(err, repositories.ErrUserNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Target user not found")
+		}
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
+		// Handle other potential errors (e.g., DB errors)
 		return httperr.NewInternalServerError(err, "Failed to add member")
 	}
 
@@ -112,20 +131,20 @@ groupID := r.URL.Query().Get("id")
 // @Failure 500 {object} httperr.ErrorResponse "Failed to remove member or session error"
 // @Router /groups/members/remove [post]
 func (h *GroupMemberHandler) RemoveGroupMember(w http.ResponseWriter, r *http.Request) error {
-if r.Method != http.MethodPost {
-return httperr.NewMethodNotAllowed(nil, "")
-}
+	if r.Method != http.MethodPost {
+		return httperr.NewMethodNotAllowed(nil, "")
+	}
 
-// Get current user from session using AuthService
-currentUser, err := helpers.GetUserFromSession(r, h.authService)
-if err != nil {
-if errors.Is(err, helpers.ErrInvalidSession) {
-return httperr.NewUnauthorized(err, "Invalid session")
-}
-return httperr.NewInternalServerError(err, "Failed to get current user")
-}
+	// Get current user from session using AuthService
+	currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil {
+		if errors.Is(err, helpers.ErrInvalidSession) {
+			return httperr.NewUnauthorized(err, "Invalid session")
+		}
+		return httperr.NewInternalServerError(err, "Failed to get current user")
+	}
 
-groupID := r.URL.Query().Get("id")
+	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
@@ -143,20 +162,32 @@ groupID := r.URL.Query().Get("id")
 		return httperr.NewBadRequest(nil, "User ID is required")
 	}
 
-	// Check if current user is an admin or removing self
-	isAdmin, err := helpers.IsGroupAdmin(groupID, currentUser.ID) //TODO: Use GroupService/GroupMemberService
+	// Check if current user is an admin using GroupService
+	isAdmin, err := h.groupService.IsAdmin(groupID, currentUser.ID)
 	if err != nil {
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
 		return httperr.NewInternalServerError(err, "Failed to check admin status")
 	}
 	if !isAdmin && currentUser.ID != req.UserID {
 		return httperr.NewUnauthorized(nil, "Only admins can remove other members")
 	}
 
-	// Remove member from group
-	if err := helpers.RemoveGroupMember(groupID, req.UserID); err != nil { //TODO: Use GroupService/GroupMemberService
-		if errors.Is(err, helpers.ErrNotGroupMember) { //TODO: Use GroupService/GroupMemberService
+	// Remove member from group using GroupService
+	// Pass currentUser.ID as requestingUserID for authorization check within the service
+	if err := h.groupService.RemoveMember(groupID, req.UserID, currentUser.ID); err != nil {
+		// Handle specific service errors
+		if errors.Is(err, services.ErrGroupForbidden) {
+			return httperr.NewUnauthorized(err, "Not authorized to remove this member")
+		}
+		if errors.Is(err, repositories.ErrNotGroupMember) { // Assuming GroupService propagates repo errors
 			return httperr.NewNotFound(err, "User is not a member of this group")
 		}
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
+		// Handle other potential errors
 		return httperr.NewInternalServerError(err, "Failed to remove member")
 	}
 
@@ -181,55 +212,56 @@ groupID := r.URL.Query().Get("id")
 // @Failure 500 {object} httperr.ErrorResponse "Failed to list members or session error"
 // @Router /groups/members [get]
 func (h *GroupMemberHandler) ListGroupMembers(w http.ResponseWriter, r *http.Request) error {
-if r.Method != http.MethodGet {
-return httperr.NewMethodNotAllowed(nil, "")
-}
+	if r.Method != http.MethodGet {
+		return httperr.NewMethodNotAllowed(nil, "")
+	}
 
-// Get current user from session using AuthService
-currentUser, err := helpers.GetUserFromSession(r, h.authService)
-if err != nil {
-if errors.Is(err, helpers.ErrInvalidSession) {
-return httperr.NewUnauthorized(err, "Invalid session")
-}
-return httperr.NewInternalServerError(err, "Failed to get current user")
-}
+	// Get current user from session using AuthService
+	currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil {
+		if errors.Is(err, helpers.ErrInvalidSession) {
+			return httperr.NewUnauthorized(err, "Invalid session")
+		}
+		return httperr.NewInternalServerError(err, "Failed to get current user")
+	}
 
-groupID := r.URL.Query().Get("id")
+	groupID := r.URL.Query().Get("id")
 	if groupID == "" {
 		return httperr.NewBadRequest(nil, "Group ID is required")
 	}
 
-	// Check if current user is a member
-	isMember, err := helpers.IsGroupMember(groupID, currentUser.ID) //TODO: Use GroupService/GroupMemberService
+	// Check if current user is a member using GroupService
+	isMember, err := h.groupService.IsMember(groupID, currentUser.ID)
 	if err != nil {
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
 		return httperr.NewInternalServerError(err, "Failed to check member status")
 	}
 	if !isMember {
 		return httperr.NewUnauthorized(nil, "Only members can view the member list")
 	}
 
-	members, err := helpers.ListGroupMembers(groupID) //TODO: Use GroupService/GroupMemberService
+	// List members using GroupService
+	// Pass currentUser.ID as requestingUserID for authorization check within the service
+	members, err := h.groupService.ListMembers(groupID, currentUser.ID) // Returns []*UserResponse
 	if err != nil {
+		// Handle specific service errors
+		if errors.Is(err, services.ErrGroupMemberRequired) {
+			// This shouldn't happen if the IsMember check above passed, but handle defensively
+			return httperr.NewUnauthorized(err, "Membership required to view members")
+		}
+		if errors.Is(err, repositories.ErrGroupNotFound) { // Assuming GroupService propagates repo errors
+			return httperr.NewNotFound(err, "Group not found")
+		}
+		// Handle other potential errors
 		return httperr.NewInternalServerError(err, "Failed to list group members")
 	}
 
-	// Sanitize user data (remove password hash)
-	result := make([]map[string]interface{}, len(members))
-	for i, user := range members {
-		result[i] = map[string]interface{}{
-			"id":         user.ID,
-			"username":   user.Username,
-			"email":      user.Email,
-			"first_name": user.FirstName,
-			"last_name":  user.LastName,
-			"avatar_url": user.AvatarURL,
-			"about_me":   user.AboutMe,
-		}
-	}
-
+	// The service already returns []*UserResponse, which should be suitable for JSON encoding
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"members": result,
+		"members": members, // Use the response directly from the service
 		"count":   len(members),
 	})
 	return nil

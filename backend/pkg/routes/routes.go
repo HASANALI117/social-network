@@ -14,15 +14,18 @@ import (
 
 // Setup sets up all API routes
 func Setup(dbConn *sql.DB) http.Handler {
-	// Initialize Websocket Hub
-	handlers.InitWebsocket()
+	// Initialize Repositories and Services first
+	repos := repositories.InitRepositories(dbConn) // Initialize all repositories
+	services := services.InitServices(repos)       // Initialize all services using the repositories
+
+	// Initialize Websocket Hub with required repository and service
+	handlers.InitWebsocket(repos.ChatMessage, services.Group) // Pass GroupService
 
 	// This will ensure the swagger docs are registered
 	docs.SwaggerInfo.BasePath = "/api"
 
-	// --- Dependency Injection ---
-	repos := repositories.InitRepositories(dbConn) // Initialize all repositories
-	services := services.InitServices(repos)       // Initialize all services using the repositories
+	// --- Dependency Injection (Handlers) ---
+	// Repositories and Services are already initialized above
 	controllers := handlers.InitHandlers(services) // Initialize all handlers
 	// --- End Dependency Injection ---
 
@@ -46,23 +49,23 @@ func Setup(dbConn *sql.DB) http.Handler {
 	// Post routes - Use the PostHandler with prefix matching
 	mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP)) // Note the trailing slash
 
-	// Message routes
-	mux.HandleFunc("/api/messages", httperr.ErrorHandler(handlers.GetMessages))
+	// Message routes - Use the initialized MessageHandler
+	mux.HandleFunc("/api/messages", httperr.ErrorHandler(controllers.Message.GetMessages))
 
-// Group routes - Use the consolidated GroupHandler with prefix matching
-mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
+	// Group routes - Use the consolidated GroupHandler with prefix matching
+	mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
 
-// Comment routes - Use the CommentHandler with prefix matching
-// Handles POST /api/posts/{postId}/comments and GET /api/posts/{postId}/comments via PostHandler's prefix
-// Handles DELETE /api/comments/{commentId}
-mux.Handle("/api/comments/", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
+	// Comment routes - Use the CommentHandler with prefix matching
+	// Handles POST /api/posts/{postId}/comments and GET /api/posts/{postId}/comments via PostHandler's prefix
+	// Handles DELETE /api/comments/{commentId}
+	mux.Handle("/api/comments/", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
 
-// Note: The CommentHandler's ServeHTTP needs to correctly parse postID from /api/posts/{postId}/comments
-// The current PostHandler already handles /api/posts/, so we need to adjust routing or handler logic.
-// Let's assume for now the CommentHandler can parse the full path passed to it.
-// A more robust solution might involve a more sophisticated router like gorilla/mux or chi.
+	// Note: The CommentHandler's ServeHTTP needs to correctly parse postID from /api/posts/{postId}/comments
+	// The current PostHandler already handles /api/posts/, so we need to adjust routing or handler logic.
+	// Let's assume for now the CommentHandler can parse the full path passed to it.
+	// A more robust solution might involve a more sophisticated router like gorilla/mux or chi.
 
-// Remove old separate group member/message routes as they are handled by GroupHandler now
+	// Remove old separate group member/message routes as they are handled by GroupHandler now
 	// mux.HandleFunc("/api/groups/members/add", httperr.ErrorHandler(controllers.GroupMember.AddGroupMember))
 	// mux.HandleFunc("/api/groups/members/remove", httperr.ErrorHandler(controllers.GroupMember.RemoveGroupMember))
 	// mux.HandleFunc("/api/groups/members", httperr.ErrorHandler(controllers.GroupMember.ListGroupMembers))
