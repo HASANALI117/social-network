@@ -4,15 +4,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/HASANALI117/social-network/pkg/helpers"
-	"github.com/HASANALI117/social-network/pkg/models"
+	// "github.com/HASANALI117/social-network/pkg/helpers" // No longer needed
+	"github.com/HASANALI117/social-network/pkg/models" // Keep for message structs
+	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/services"
+	"github.com/google/uuid" // Import UUID library
 )
 
 type Hub struct {
-	Clients    map[string]*Client
-	Broadcast  chan *Message
-	Register   chan *Client
-	Unregister chan *Client
+	Clients         map[string]*Client
+	Broadcast       chan *Message
+	Register        chan *Client
+	Unregister      chan *Client
+	chatMessageRepo repositories.ChatMessageRepository // Correct field
+	groupService    services.GroupService              // Correct field
 }
 
 type Message struct {
@@ -23,12 +28,15 @@ type Message struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-func NewHub() *Hub {
+// Update NewHub signature to accept ChatMessageRepository and GroupService
+func NewHub(chatMessageRepo repositories.ChatMessageRepository, groupService services.GroupService) *Hub {
 	return &Hub{
-		Clients:    make(map[string]*Client),
-		Broadcast:  make(chan *Message),
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
+		Clients:         make(map[string]*Client),
+		Broadcast:       make(chan *Message),
+		Register:        make(chan *Client),
+		Unregister:      make(chan *Client),
+		chatMessageRepo: chatMessageRepo, // Correct initialization
+		groupService:    groupService,    // Correct initialization
 	}
 }
 
@@ -68,19 +76,43 @@ func (h *Hub) Run() {
 				fmt.Printf("   Content: %s\n", message.Content)
 				fmt.Printf("   Time: %s\n", message.CreatedAt)
 
+				// Generate a unique ID for the message
+				newMessageID := uuid.NewString()
+
 				msg := &models.Message{
+					ID:         newMessageID, // Assign the generated UUID
 					SenderID:   message.SenderID,
 					ReceiverID: message.ReceiverID,
 					Content:    message.Content,
 					CreatedAt:  message.CreatedAt,
 				}
 
-				if err := helpers.SaveMessage(msg); err != nil {
-					fmt.Printf("❌ Error storing message: %v\n", err)
+				// Use ChatMessageRepository directly to save the direct message
+				if err := h.chatMessageRepo.SaveDirectMessage(msg); err != nil {
+					fmt.Printf("❌ Error storing direct message: %v\n", err)
 				}
 
-				h.deliverMessage(message.SenderID, message)
-				h.deliverMessage(message.ReceiverID, message)
+				// Send direct message using direct channel send
+				// Sender
+				if client, ok := h.Clients[message.SenderID]; ok {
+					select {
+					case client.Send <- message: // Send the *Message struct
+					default:
+						fmt.Printf("⚠️ Failed to deliver direct message to sender %s - closing connection\n", message.SenderID)
+						delete(h.Clients, message.SenderID)
+						close(client.Send)
+					}
+				}
+				// Receiver
+				if client, ok := h.Clients[message.ReceiverID]; ok {
+					select {
+					case client.Send <- message: // Send the *Message struct
+					default:
+						fmt.Printf("⚠️ Failed to deliver direct message to receiver %s - closing connection\n", message.ReceiverID)
+						delete(h.Clients, message.ReceiverID)
+						close(client.Send)
+					}
+				}
 
 			case "group":
 				fmt.Printf("\n👥 New group message received:\n")
@@ -110,57 +142,82 @@ func (h *Hub) Run() {
 					CreatedAt: createdAt, // Use the parsed time.Time value
 				}
 
-				if err := helpers.SaveGroupMessage(groupMsg); err != nil {
+				// Use ChatMessageRepository directly to save the group message
+				if err := h.chatMessageRepo.SaveGroupMessage(groupMsg); err != nil {
 					fmt.Printf("❌ Error storing group message: %v\n", err)
 				}
 
-				// Check if sender is a member of the group
-				isMember, err := helpers.IsGroupMember(message.ReceiverID, message.SenderID)
-				if err != nil || !isMember {
-					fmt.Printf("❌ User %s is not a member of group %s\n", message.SenderID, message.ReceiverID)
-					continue
+				// Use GroupService to check if sender is a member of the group
+				isMember, err := h.groupService.IsMember(message.ReceiverID, message.SenderID)
+				if err != nil {
+					fmt.Printf("❌ Error checking group membership via service for user %s in group %s: %v\n", message.SenderID, message.ReceiverID, err)
+					continue // Skip if error checking membership
+				}
+				if !isMember {
+					fmt.Printf("❌ User %s is not a member of group %s, cannot send message\n", message.SenderID, message.ReceiverID)
+					continue // Skip if not a member
 				}
 
-				// Get all group members
-				members, err := helpers.ListGroupMembers(message.ReceiverID) // TODO: use the new services
+				// Use GroupService to get all group members, passing sender ID as requesting user
+				members, err := h.groupService.ListMembers(message.ReceiverID, message.SenderID)
 				if err != nil {
-					fmt.Printf("❌ Error getting group members: %v\n", err)
+					fmt.Printf("❌ Error getting group members via service for group %s: %v\n", message.ReceiverID, err)
 					continue
 				}
 
 				// Deliver the message to all online group members
 				for _, member := range members {
-					h.deliverMessage(member.ID, message)
+					// Send group message using direct channel send
+					if client, ok := h.Clients[member.ID]; ok {
+						select {
+						case client.Send <- message: // Send the *Message struct
+						default:
+							fmt.Printf("⚠️ Failed to deliver group message to member %s - closing connection\n", member.ID)
+							delete(h.Clients, member.ID)
+							close(client.Send)
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
-func (h *Hub) deliverMessage(userID string, message *Message) {
-	client, ok := h.Clients[userID]
-
-	if ok {
-		select {
-		case client.Send <- message:
-			fmt.Printf("✅ Message delivered to User %s\n", userID)
-
-		default:
-			fmt.Printf("⚠️ Failed to deliver message to User %s - connection closed\n", userID)
-			delete(h.Clients, userID)
-			close(client.Send)
-		}
-	}
-}
+// deliverMessage is removed as client.Send is now chan interface{} and handles *Message specifically.
+// Direct message sending logic will be handled in the broadcast loops.
 
 func (h *Hub) broadcastUserStatusChange() {
-	time.Sleep(500 * time.Millisecond)
-
-	message := &Message{
-		Type: "online_users",
+	// 1. Collect User IDs
+	onlineUserIDs := make([]string, 0, len(h.Clients))
+	// Use a temporary map to safely access clients while iterating
+	clientsToSend := make(map[string]*Client)
+	for userID, client := range h.Clients {
+		onlineUserIDs = append(onlineUserIDs, userID)
+		clientsToSend[userID] = client
 	}
 
-	for _, client := range h.Clients {
-		h.deliverMessage(client.UserID, message)
+	// 2. Create the payload map (this will be sent directly as interface{})
+	payload := map[string]interface{}{
+		"type":    "online_users",
+		"userIds": onlineUserIDs,
+	}
+
+	// 3. Broadcast the payload map directly to each client's Send channel (chan interface{})
+	fmt.Printf("📢 Broadcasting 'online_users' payload directly: %v\n", onlineUserIDs)
+	for userID, client := range clientsToSend {
+		// Check if client still exists in the main map (could have disconnected during iteration)
+		if _, ok := h.Clients[userID]; !ok {
+			continue // Skip if client disconnected
+		}
+
+		select {
+		case client.Send <- payload:
+			// Payload sent successfully
+		default:
+			// Failed to send (channel full or closed), assume client disconnected
+			fmt.Printf("⚠️ Failed to broadcast online_users to User %s - closing connection\n", userID)
+			delete(h.Clients, userID) // Remove from hub
+			close(client.Send)        // Close the channel
+		}
 	}
 }

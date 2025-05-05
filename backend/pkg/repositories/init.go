@@ -14,6 +14,7 @@ type Repositories struct {
 	Comment            CommentRepository
 	GroupEvent         GroupEventRepository         // Added GroupEvent repository
 	GroupEventResponse GroupEventResponseRepository // Added GroupEventResponse repository
+	ChatMessage        ChatMessageRepository        // Added ChatMessage repository
 }
 
 // InitRepositories initializes all repositories.
@@ -26,6 +27,7 @@ func InitRepositories(db *sql.DB) *Repositories {
 	commentRepo := NewCommentRepository(db)                       // Initialize CommentRepository
 	groupEventRepo := NewGroupEventRepository(db)                 // Initialize GroupEventRepository
 	groupEventResponseRepo := NewGroupEventResponseRepository(db) // Initialize GroupEventResponseRepository
+	chatMessageRepo := NewChatMessageRepository(db)               // Initialize ChatMessageRepository
 
 	return &Repositories{
 		User:               userRepo,
@@ -36,5 +38,6 @@ func InitRepositories(db *sql.DB) *Repositories {
 		Comment:            commentRepo,            // Assign initialized CommentRepository
 		GroupEvent:         groupEventRepo,         // Assign initialized GroupEventRepository
 		GroupEventResponse: groupEventResponseRepo, // Assign initialized GroupEventResponseRepository
+		ChatMessage:        chatMessageRepo,        // Assign initialized ChatMessageRepository
 	}
 }

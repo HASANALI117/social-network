@@ -117,9 +117,11 @@ type GroupService interface {
 	Delete(groupID string, requestingUserID string) error
 
 	// Member Management (Revised)
-	// AddMember is now implicit via accepting invites/requests
+	AddMember(groupID, targetUserID, role string, requestingUserID string) error  // Added back for direct admin addition
 	RemoveMember(groupID, targetUserID string, requestingUserID string) error     // Kick member (admin) or leave group (self)
 	ListMembers(groupID string, requestingUserID string) ([]*UserResponse, error) // Check membership before listing
+	IsAdmin(groupID, userID string) (bool, error)                                 // Added
+	IsMember(groupID, userID string) (bool, error)                                // Added
 
 	// Invitation Management
 	InviteUser(groupID, inviteeID string, inviterID string) (*GroupInvitationResponse, error)
@@ -565,6 +567,25 @@ func (s *groupService) ListMembers(groupID string, requestingUserID string) ([]*
 	// Map to response DTO
 	// TODO: Enhance mapping if role/joined_at needed in response
 	return mapUsersToUserResponse(members), nil
+}
+
+// IsAdmin checks if a user is an admin of a specific group.
+func (s *groupService) IsAdmin(groupID, userID string) (bool, error) {
+	isAdmin, err := s.groupRepo.IsAdmin(groupID, userID)
+	if err != nil {
+		// The repo method already wraps errors, so just return it.
+		return false, fmt.Errorf("failed to check group admin status: %w", err)
+	}
+	return isAdmin, nil
+}
+
+// IsMember checks if a user is a member of a specific group.
+func (s *groupService) IsMember(groupID, userID string) (bool, error) {
+	isMember, err := s.groupRepo.IsMember(groupID, userID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check group membership status: %w", err)
+	}
+	return isMember, nil
 }
 
 // TODO: Implement Group Message Service methods

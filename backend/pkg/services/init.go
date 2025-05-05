@@ -11,6 +11,7 @@ type Services struct {
 	Follower   FollowerService
 	Comment    CommentService
 	GroupEvent GroupEventService // Added GroupEvent service
+	Message    MessageService    // Added Message service
 }
 
 // InitServices initializes all services.
@@ -23,6 +24,7 @@ func InitServices(repos *repositories.Repositories) *Services {
 	// Update NewGroupEventService to include GroupEventResponseRepository
 	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User, repos.GroupEventResponse)
 	userService := NewUserService(repos.User, postService, followerService)
+	messageService := NewMessageService(repos.ChatMessage, repos.Group) // Initialize MessageService
 
 	return &Services{
 		Auth:       authService,
@@ -32,5 +34,6 @@ func InitServices(repos *repositories.Repositories) *Services {
 		Follower:   followerService,
 		Comment:    commentService,
 		GroupEvent: groupEventService, // Assign initialized GroupEventService
+		Message:    messageService,    // Assign initialized MessageService
 	}
 }

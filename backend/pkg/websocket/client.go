@@ -10,7 +10,7 @@ import (
 type Client struct {
 	Hub      *Hub
 	Conn     *websocket.Conn
-	Send     chan *Message
+	Send     chan interface{}
 	UserID   string
 	Username string
 	Image    string
@@ -20,7 +20,7 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID, username, image string) *
 	return &Client{
 		Hub:      hub,
 		Conn:     conn,
-		Send:     make(chan *Message, 256),
+		Send:     make(chan interface{}, 256),
 		UserID:   userID,
 		Username: username,
 		Image:    image,
@@ -78,7 +78,8 @@ func (c *Client) WritePump() {
 	}()
 
 	for message := range c.Send {
-		err := c.Conn.WriteJSON(&message)
+		// No need to take the address of message, as it's already an interface{}
+		err := c.Conn.WriteJSON(message)
 		if err != nil {
 			log.Println("write error:", err)
 			c.Conn.Close()

@@ -43,6 +43,7 @@ type GroupRepository interface {
 	ListMembers(groupID string) ([]*models.User, error) // Returns User models
 	IsMember(groupID, userID string) (bool, error)
 	IsAdmin(groupID, userID string) (bool, error)
+	ListGroupsByUser(userID string, limit, offset int) ([]*models.Group, error) // Added
 
 	// Invitation Management
 	CreateInvitation(invitation *models.GroupInvitation) error
@@ -424,6 +425,63 @@ func (r *groupRepository) IsAdmin(groupID, userID string) (bool, error) {
 		return false, fmt.Errorf("failed to check group admin status: %w", err)
 	}
 	return isAdmin, nil
+}
+
+// ListGroupsByUser returns groups a user is a member of with pagination
+func (r *groupRepository) ListGroupsByUser(userID string, limit, offset int) ([]*models.Group, error) {
+	query := `
+	       SELECT g.id, g.name, g.description, g.creator_id, g.avatar_url, g.created_at, g.updated_at
+	       FROM groups g
+	       JOIN group_members gm ON g.id = gm.group_id
+	       WHERE gm.user_id = ?
+	       ORDER BY g.created_at DESC
+	       LIMIT ? OFFSET ?
+	   `
+
+	rows, err := r.db.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list user's groups: %w", err)
+	}
+	defer rows.Close()
+
+	groups := make([]*models.Group, 0)
+	for rows.Next() {
+		group := &models.Group{}
+		var createdAt, updatedAt sql.NullString // Use NullString for nullable timestamps
+		err := rows.Scan(
+			&group.ID,
+			&group.Name,
+			&group.Description,
+			&group.CreatorID,
+			&group.AvatarURL,
+			&createdAt,
+			&updatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan group during ListGroupsByUser: %w", err)
+		}
+		// Parse timestamps
+		if createdAt.Valid {
+			group.CreatedAt, err = time.Parse(time.RFC3339, createdAt.String)
+			if err != nil {
+				fmt.Printf("Warning: Failed to parse group created_at timestamp '%s': %v\n", createdAt.String, err)
+				group.CreatedAt = time.Time{}
+			}
+		}
+		if updatedAt.Valid {
+			group.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt.String)
+			if err != nil {
+				fmt.Printf("Warning: Failed to parse group updated_at timestamp '%s': %v\n", updatedAt.String, err)
+			}
+		}
+		groups = append(groups, group)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating user's group list rows: %w", err)
+	}
+
+	return groups, nil
 }
 
 // --- Invitation Management ---
