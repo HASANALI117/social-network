@@ -92,8 +92,27 @@ func (h *Hub) Run() {
 					fmt.Printf("❌ Error storing direct message: %v\n", err)
 				}
 
-				h.deliverMessage(message.SenderID, message)
-				h.deliverMessage(message.ReceiverID, message)
+				// Send direct message using direct channel send
+				// Sender
+				if client, ok := h.Clients[message.SenderID]; ok {
+					select {
+					case client.Send <- message: // Send the *Message struct
+					default:
+						fmt.Printf("⚠️ Failed to deliver direct message to sender %s - closing connection\n", message.SenderID)
+						delete(h.Clients, message.SenderID)
+						close(client.Send)
+					}
+				}
+				// Receiver
+				if client, ok := h.Clients[message.ReceiverID]; ok {
+					select {
+					case client.Send <- message: // Send the *Message struct
+					default:
+						fmt.Printf("⚠️ Failed to deliver direct message to receiver %s - closing connection\n", message.ReceiverID)
+						delete(h.Clients, message.ReceiverID)
+						close(client.Send)
+					}
+				}
 
 			case "group":
 				fmt.Printf("\n👥 New group message received:\n")
@@ -148,37 +167,57 @@ func (h *Hub) Run() {
 
 				// Deliver the message to all online group members
 				for _, member := range members {
-					h.deliverMessage(member.ID, message)
+					// Send group message using direct channel send
+					if client, ok := h.Clients[member.ID]; ok {
+						select {
+						case client.Send <- message: // Send the *Message struct
+						default:
+							fmt.Printf("⚠️ Failed to deliver group message to member %s - closing connection\n", member.ID)
+							delete(h.Clients, member.ID)
+							close(client.Send)
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
-func (h *Hub) deliverMessage(userID string, message *Message) {
-	client, ok := h.Clients[userID]
-
-	if ok {
-		select {
-		case client.Send <- message:
-			fmt.Printf("✅ Message delivered to User %s\n", userID)
-
-		default:
-			fmt.Printf("⚠️ Failed to deliver message to User %s - connection closed\n", userID)
-			delete(h.Clients, userID)
-			close(client.Send)
-		}
-	}
-}
+// deliverMessage is removed as client.Send is now chan interface{} and handles *Message specifically.
+// Direct message sending logic will be handled in the broadcast loops.
 
 func (h *Hub) broadcastUserStatusChange() {
-	time.Sleep(500 * time.Millisecond)
-
-	message := &Message{
-		Type: "online_users",
+	// 1. Collect User IDs
+	onlineUserIDs := make([]string, 0, len(h.Clients))
+	// Use a temporary map to safely access clients while iterating
+	clientsToSend := make(map[string]*Client)
+	for userID, client := range h.Clients {
+		onlineUserIDs = append(onlineUserIDs, userID)
+		clientsToSend[userID] = client
 	}
 
-	for _, client := range h.Clients {
-		h.deliverMessage(client.UserID, message)
+	// 2. Create the payload map (this will be sent directly as interface{})
+	payload := map[string]interface{}{
+		"type":    "online_users",
+		"userIds": onlineUserIDs,
+	}
+
+	// 3. Broadcast the payload map directly to each client's Send channel (chan interface{})
+	fmt.Printf("📢 Broadcasting 'online_users' payload directly: %v\n", onlineUserIDs)
+	for userID, client := range clientsToSend {
+		// Check if client still exists in the main map (could have disconnected during iteration)
+		if _, ok := h.Clients[userID]; !ok {
+			continue // Skip if client disconnected
+		}
+
+		select {
+		case client.Send <- payload:
+			// Payload sent successfully
+		default:
+			// Failed to send (channel full or closed), assume client disconnected
+			fmt.Printf("⚠️ Failed to broadcast online_users to User %s - closing connection\n", userID)
+			delete(h.Clients, userID) // Remove from hub
+			close(client.Send)        // Close the channel
+		}
 	}
 }
