@@ -15,6 +15,7 @@ type Repositories struct {
 	GroupEvent         GroupEventRepository         // Added GroupEvent repository
 	GroupEventResponse GroupEventResponseRepository // Added GroupEventResponse repository
 	ChatMessage        ChatMessageRepository        // Added ChatMessage repository
+	Notification       NotificationRepository       // Added Notification repository
 }
 
 // InitRepositories initializes all repositories.
@@ -28,6 +29,7 @@ func InitRepositories(db *sql.DB) *Repositories {
 	groupEventRepo := NewGroupEventRepository(db)                 // Initialize GroupEventRepository
 	groupEventResponseRepo := NewGroupEventResponseRepository(db) // Initialize GroupEventResponseRepository
 	chatMessageRepo := NewChatMessageRepository(db)               // Initialize ChatMessageRepository
+	notificationRepo := NewSQLiteNotificationRepository(db)       // Initialize NotificationRepository
 
 	return &Repositories{
 		User:               userRepo,
@@ -39,5 +41,6 @@ func InitRepositories(db *sql.DB) *Repositories {
 		GroupEvent:         groupEventRepo,         // Assign initialized GroupEventRepository
 		GroupEventResponse: groupEventResponseRepo, // Assign initialized GroupEventResponseRepository
 		ChatMessage:        chatMessageRepo,        // Assign initialized ChatMessageRepository
+		Notification:       notificationRepo,       // Assign initialized NotificationRepository
 	}
 }

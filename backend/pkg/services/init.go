@@ -1,17 +1,20 @@
 package services
 
-import "github.com/HASANALI117/social-network/pkg/repositories"
+import (
+	"github.com/HASANALI117/social-network/pkg/repositories"
+)
 
 // Services holds all service instances.
 type Services struct {
-	Auth       AuthService
-	User       UserService
-	Post       PostService
-	Group      GroupService
-	Follower   FollowerService
-	Comment    CommentService
-	GroupEvent GroupEventService // Added GroupEvent service
-	Message    MessageService    // Added Message service
+	Auth         AuthService
+	User         UserService
+	Post         PostService
+	Group        GroupService
+	Follower     FollowerService
+	Comment      CommentService
+	GroupEvent   GroupEventService   // Added GroupEvent service
+	Message      MessageService      // Added Message service
+	Notification NotificationService // Added Notification service
 }
 
 // InitServices initializes all services.
@@ -25,15 +28,17 @@ func InitServices(repos *repositories.Repositories) *Services {
 	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User, repos.GroupEventResponse)
 	userService := NewUserService(repos.User, postService, followerService)
 	messageService := NewMessageService(repos.ChatMessage, repos.Group) // Initialize MessageService
+	notificationService := NewNotificationService(repos.Notification, groupService)
 
 	return &Services{
-		Auth:       authService,
-		User:       userService,
-		Post:       postService,
-		Group:      groupService,
-		Follower:   followerService,
-		Comment:    commentService,
-		GroupEvent: groupEventService, // Assign initialized GroupEventService
-		Message:    messageService,    // Assign initialized MessageService
+		Auth:         authService,
+		User:         userService,
+		Post:         postService,
+		Group:        groupService,
+		Follower:     followerService,
+		Comment:      commentService,
+		GroupEvent:   groupEventService,   // Assign initialized GroupEventService
+		Message:      messageService,      // Assign initialized MessageService
+		Notification: notificationService, // Assign initialized NotificationService
 	}
 }
