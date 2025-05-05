@@ -60,6 +60,12 @@ func Setup(dbConn *sql.DB) http.Handler {
 	// Handles DELETE /api/comments/{commentId}
 	mux.Handle("/api/comments/", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
 
+	// Notification routes - Use the NotificationHandler with prefix matching for all notification endpoints
+	// Handles GET /api/notifications (list)
+	// Handles PATCH /api/notifications/{id}/read (mark as read)
+	// Handles POST /api/notifications/read-all (mark all as read)
+	mux.Handle("/api/notifications/", httperr.ErrorHandler(controllers.Notification.ServeHTTP))
+
 	// Note: The CommentHandler's ServeHTTP needs to correctly parse postID from /api/posts/{postId}/comments
 	// The current PostHandler already handles /api/posts/, so we need to adjust routing or handler logic.
 	// Let's assume for now the CommentHandler can parse the full path passed to it.
