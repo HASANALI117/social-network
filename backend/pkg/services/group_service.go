@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/models"
@@ -144,15 +145,17 @@ type GroupService interface {
 
 // groupService implements GroupService interface
 type groupService struct {
-	groupRepo repositories.GroupRepository
-	userRepo  repositories.UserRepository // Needed for checking user existence
+	groupRepo       repositories.GroupRepository
+	userRepo        repositories.UserRepository
+	notificationSvc NotificationService
 }
 
 // NewGroupService creates a new GroupService
-func NewGroupService(groupRepo repositories.GroupRepository, userRepo repositories.UserRepository) GroupService {
+func NewGroupService(groupRepo repositories.GroupRepository, userRepo repositories.UserRepository, notificationSvc NotificationService) GroupService {
 	return &groupService{
-		groupRepo: groupRepo,
-		userRepo:  userRepo,
+		groupRepo:       groupRepo,
+		userRepo:        userRepo,
+		notificationSvc: notificationSvc,
 	}
 }
 
@@ -639,6 +642,15 @@ func (s *groupService) InviteUser(groupID, inviteeID string, inviterID string) (
 		return nil, fmt.Errorf("failed to create invitation in repository: %w", err)
 	}
 
+	// Send notification
+	inviteeIDInt, _ := strconv.Atoi(inviteeID)
+	inviterIDInt, _ := strconv.Atoi(inviterID)
+	groupIDInt, _ := strconv.Atoi(groupID)
+	if err := s.notificationSvc.NotifyGroupInvite(inviteeIDInt, inviterIDInt, groupIDInt); err != nil {
+		// Log but don't fail if notification fails
+		fmt.Printf("Warning: Failed to send group invitation notification: %v\n", err)
+	}
+
 	// 6. Map and return response (without details initially)
 	return mapInvitationToResponse(invitation, false, s.userRepo, s.groupRepo), nil
 }
@@ -681,7 +693,14 @@ func (s *groupService) AcceptInvitation(invitationID string, userID string) erro
 		}
 	}
 
-	// TODO: Send notification?
+	// Send notification about the accepted join request
+	inviteeIDInt, _ := strconv.Atoi(inv.InviteeID)
+	groupIDInt, _ := strconv.Atoi(inv.GroupID)
+	actorIDInt, _ := strconv.Atoi(userID)
+	if err := s.notificationSvc.NotifyGroupJoinRequest(inviteeIDInt, actorIDInt, groupIDInt); err != nil {
+		// Log but don't fail if notification fails
+		fmt.Printf("Warning: Failed to send group join request accepted notification: %v\n", err)
+	}
 	return nil
 }
 
@@ -767,6 +786,15 @@ func (s *groupService) RequestToJoin(groupID string, requesterID string) (*Group
 		return nil, fmt.Errorf("failed to create join request in repository: %w", err)
 	}
 
+	// Send notification
+	groupIDInt, _ := strconv.Atoi(groupID)
+	requesterIDInt, _ := strconv.Atoi(requesterID)
+	creatorIDInt, _ := strconv.Atoi(group.CreatorID)
+	if err := s.notificationSvc.NotifyGroupJoinRequest(creatorIDInt, requesterIDInt, groupIDInt); err != nil {
+		// Log but don't fail if notification fails
+		fmt.Printf("Warning: Failed to send group join request notification: %v\n", err)
+	}
+
 	// 6. Map and return response (without details initially)
 	return mapJoinRequestToResponse(request, false, s.userRepo, s.groupRepo), nil
 }
@@ -807,7 +835,14 @@ func (s *groupService) AcceptJoinRequest(requestID string, adminUserID string) e
 		}
 	}
 
-	// TODO: Send notification?
+	// Send notification about the accepted join request
+	requesterIDInt, _ := strconv.Atoi(req.RequesterID)
+	groupIDInt, _ := strconv.Atoi(req.GroupID)
+	adminIDInt, _ := strconv.Atoi(adminUserID)
+	if err := s.notificationSvc.NotifyGroupJoinRequest(requesterIDInt, adminIDInt, groupIDInt); err != nil {
+		// Log but don't fail if notification fails
+		fmt.Printf("Warning: Failed to send join request accepted notification: %v\n", err)
+	}
 	return nil
 }
 
@@ -838,7 +873,14 @@ func (s *groupService) RejectJoinRequest(requestID string, adminUserID string) e
 		return fmt.Errorf("failed to update join request status: %w", err)
 	}
 
-	// TODO: Send notification?
+	// Send notification about the rejected join request
+	requesterIDInt, _ := strconv.Atoi(req.RequesterID)
+	groupIDInt, _ := strconv.Atoi(req.GroupID)
+	adminIDInt, _ := strconv.Atoi(adminUserID)
+	if err := s.notificationSvc.NotifyGroupJoinRequest(requesterIDInt, adminIDInt, groupIDInt); err != nil {
+		// Log but don't fail if notification fails
+		fmt.Printf("Warning: Failed to send join request rejected notification: %v\n", err)
+	}
 	return nil
 }
 

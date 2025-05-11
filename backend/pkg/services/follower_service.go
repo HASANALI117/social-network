@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories"
@@ -26,15 +27,17 @@ type FollowerService interface {
 
 // followerService implements FollowerService
 type followerService struct {
-	followerRepo repositories.FollowerRepository
-	userRepo     repositories.UserRepository // Assuming UserRepository exists and is needed
+	followerRepo    repositories.FollowerRepository
+	userRepo        repositories.UserRepository
+	notificationSvc NotificationService
 }
 
 // NewFollowerService creates a new instance of FollowerService
-func NewFollowerService(followerRepo repositories.FollowerRepository, userRepo repositories.UserRepository) FollowerService {
+func NewFollowerService(followerRepo repositories.FollowerRepository, userRepo repositories.UserRepository, notificationSvc NotificationService) FollowerService {
 	return &followerService{
-		followerRepo: followerRepo,
-		userRepo:     userRepo,
+		followerRepo:    followerRepo,
+		userRepo:        userRepo,
+		notificationSvc: notificationSvc,
 	}
 }
 
@@ -79,6 +82,17 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 			log.Printf("Error creating follow request for private profile: %v", err)
 			return fmt.Errorf("failed to send follow request")
 		}
+
+		// Convert string IDs to int for notification
+		targetIDInt, _ := strconv.Atoi(targetID)
+		requesterIDInt, _ := strconv.Atoi(requesterID)
+
+		// Send notification for private profile follow request
+		if err := s.notificationSvc.NotifyFollowRequest(targetIDInt, requesterIDInt); err != nil {
+			// Log but don't fail the request if notification fails
+			log.Printf("Warning: Failed to send follow request notification: %v", err)
+		}
+
 		log.Printf("Follow request sent from %s to private user %s", requesterID, targetID)
 	} else {
 		// Public profile: Create request and immediately accept it

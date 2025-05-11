@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/types"
 )
 
 // Services holds all service instances.
@@ -18,17 +19,26 @@ type Services struct {
 }
 
 // InitServices initializes all services.
-func InitServices(repos *repositories.Repositories) *Services {
+func InitServices(repos *repositories.Repositories, wsNotifier types.WebSocketNotifier) *Services {
 	authService := NewAuthService(repos.User, repos.Session)
 	postService := NewPostService(repos.Post, repos.Follower, repos.Group)
-	groupService := NewGroupService(repos.Group, repos.User)
-	followerService := NewFollowerService(repos.Follower, repos.User)
+
+	// First create GroupService without notifications
+	groupService := &groupService{
+		groupRepo: repos.Group,
+		userRepo:  repos.User,
+	}
+
+	// Create NotificationService with the base group service
+	notificationService := NewNotificationService(repos.Notification, groupService, wsNotifier)
+
+	// Now initialize the rest with NotificationService
+	groupService.notificationSvc = notificationService // Inject notification service
+	followerService := NewFollowerService(repos.Follower, repos.User, notificationService)
 	commentService := NewCommentService(repos.Comment, postService, repos.Group)
-	// Update NewGroupEventService to include GroupEventResponseRepository
 	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User, repos.GroupEventResponse)
 	userService := NewUserService(repos.User, postService, followerService)
-	messageService := NewMessageService(repos.ChatMessage, repos.Group) // Initialize MessageService
-	notificationService := NewNotificationService(repos.Notification, groupService)
+	messageService := NewMessageService(repos.ChatMessage, repos.Group)
 
 	return &Services{
 		Auth:         authService,

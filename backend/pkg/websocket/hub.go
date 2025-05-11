@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	// "github.com/HASANALI117/social-network/pkg/helpers" // No longer needed
-	"github.com/HASANALI117/social-network/pkg/models" // Keep for message structs
+	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories"
 	"github.com/HASANALI117/social-network/pkg/services"
-	"github.com/google/uuid" // Import UUID library
+	"github.com/HASANALI117/social-network/pkg/types"
+	"github.com/google/uuid"
 )
+
+// Ensure Hub implements WebSocketNotifier
+var _ types.WebSocketNotifier = (*Hub)(nil)
 
 type Hub struct {
 	Clients         map[string]*Client
@@ -20,12 +23,42 @@ type Hub struct {
 	groupService    services.GroupService              // Correct field
 }
 
+// SetGroupService sets the group service after initialization
+func (h *Hub) SetGroupService(svc services.GroupService) {
+	h.groupService = svc
+}
+
 type Message struct {
 	Type       string `json:"type"`
 	SenderID   string `json:"sender_id"`
 	ReceiverID string `json:"receiver_id"`
 	Content    string `json:"content"`
 	CreatedAt  string `json:"created_at"`
+}
+
+// NotificationPingPayload represents a minimal notification broadcast message
+type NotificationPingPayload struct {
+	MessageType      string `json:"messageType"`
+	NotificationType string `json:"notificationType"`
+}
+
+// BroadcastNotification sends a notification ping to a specific user
+func (h *Hub) BroadcastNotification(userID string, notificationType string) {
+	payload := &NotificationPingPayload{
+		MessageType:      "notification_ping",
+		NotificationType: notificationType,
+	}
+
+	if client, ok := h.Clients[userID]; ok {
+		select {
+		case client.Send <- payload:
+			// Payload sent successfully
+		default:
+			fmt.Printf("⚠️ Failed to broadcast notification to User %s - closing connection\n", userID)
+			delete(h.Clients, userID)
+			close(client.Send)
+		}
+	}
 }
 
 // Update NewHub signature to accept ChatMessageRepository and GroupService

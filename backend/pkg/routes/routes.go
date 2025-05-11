@@ -7,19 +7,26 @@ import (
 	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
-	"github.com/HASANALI117/social-network/pkg/repositories" // Import repositories for Init
-	"github.com/HASANALI117/social-network/pkg/services"     // Import services for Init
+	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/services"
+	ws "github.com/HASANALI117/social-network/pkg/websocket"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // Setup sets up all API routes
 func Setup(dbConn *sql.DB) http.Handler {
-	// Initialize Repositories and Services first
-	repos := repositories.InitRepositories(dbConn) // Initialize all repositories
-	services := services.InitServices(repos)       // Initialize all services using the repositories
+	// Initialize Repositories first
+	repos := repositories.InitRepositories(dbConn)
 
-	// Initialize Websocket Hub with required repository and service
-	handlers.InitWebsocket(repos.ChatMessage, services.Group) // Pass GroupService
+	// Initialize Websocket Hub before services
+	hub := ws.NewHub(repos.ChatMessage, nil) // Temporarily pass nil for GroupService
+	go hub.Run()                             // Start the hub
+
+	// Initialize Services with the hub as WebSocketNotifier
+	services := services.InitServices(repos, hub)
+
+	// Now update the hub's GroupService using the setter
+	hub.SetGroupService(services.Group)
 
 	// This will ensure the swagger docs are registered
 	docs.SwaggerInfo.BasePath = "/api"

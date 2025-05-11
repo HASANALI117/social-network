@@ -6,6 +6,7 @@ import (
 
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/types"
 )
 
 // NotificationService defines the interface for notification business logic.
@@ -28,19 +29,27 @@ type NotificationService interface {
 type notificationService struct {
 	notificationRepo repositories.NotificationRepository
 	groupService     GroupService
+	wsNotifier       types.WebSocketNotifier
 }
 
 // NewNotificationService creates a new instance of NotificationService.
-func NewNotificationService(repo repositories.NotificationRepository, groupService GroupService) NotificationService {
+func NewNotificationService(repo repositories.NotificationRepository, groupService GroupService, wsNotifier types.WebSocketNotifier) NotificationService {
 	return &notificationService{
 		notificationRepo: repo,
 		groupService:     groupService,
+		wsNotifier:       wsNotifier,
 	}
 }
 
 // CreateNotification creates a new notification.
 func (s *notificationService) CreateNotification(notification *models.Notification) error {
-	return s.notificationRepo.Create(notification)
+	if err := s.notificationRepo.Create(notification); err != nil {
+		return err
+	}
+
+	// Broadcast minimal notification ping to user
+	s.wsNotifier.BroadcastNotification(fmt.Sprintf("%d", notification.UserID), string(notification.Type))
+	return nil
 }
 
 // GetNotificationsForUser retrieves paginated notifications for a user.
@@ -73,7 +82,13 @@ func (s *notificationService) NotifyFollowRequest(targetUserID, actorID int) err
 		// EntityID and EntityType not needed for follow requests
 		IsRead: false,
 	}
-	return s.notificationRepo.Create(notification)
+	if err := s.notificationRepo.Create(notification); err != nil {
+		return err
+	}
+
+	// Broadcast minimal notification ping to user
+	s.wsNotifier.BroadcastNotification(fmt.Sprintf("%d", notification.UserID), string(notification.Type))
+	return nil
 }
 
 // NotifyGroupInvite creates a group invitation notification.
@@ -87,7 +102,13 @@ func (s *notificationService) NotifyGroupInvite(targetUserID, actorID, groupID i
 		EntityType: &entityType,
 		IsRead:     false,
 	}
-	return s.notificationRepo.Create(notification)
+	if err := s.notificationRepo.Create(notification); err != nil {
+		return err
+	}
+
+	// Broadcast minimal notification ping to user
+	s.wsNotifier.BroadcastNotification(fmt.Sprintf("%d", notification.UserID), string(notification.Type))
+	return nil
 }
 
 // NotifyGroupJoinRequest creates a group join request notification.
@@ -101,7 +122,13 @@ func (s *notificationService) NotifyGroupJoinRequest(groupCreatorID, actorID, gr
 		EntityType: &entityType,
 		IsRead:     false,
 	}
-	return s.notificationRepo.Create(notification)
+	if err := s.notificationRepo.Create(notification); err != nil {
+		return err
+	}
+
+	// Broadcast minimal notification ping to user
+	s.wsNotifier.BroadcastNotification(fmt.Sprintf("%d", notification.UserID), string(notification.Type))
+	return nil
 }
 
 // NotifyNewGroupEvent creates notifications for all group members when a new event is created.
@@ -132,10 +159,14 @@ func (s *notificationService) NotifyNewGroupEvent(groupID, eventID int) error {
 			IsRead:     false,
 		}
 
-		if err := s.CreateNotification(notification); err != nil {
+		if err := s.notificationRepo.Create(notification); err != nil {
 			// Log error but continue with other members
 			fmt.Printf("Failed to create event notification for member %d: %v\n", memberID, err)
+			continue
 		}
+
+		// Broadcast minimal notification ping to each member
+		s.wsNotifier.BroadcastNotification(fmt.Sprintf("%d", memberID), string(notification.Type))
 	}
 
 	return nil
