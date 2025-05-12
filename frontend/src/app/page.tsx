@@ -12,7 +12,7 @@ export default function HomePage() {
   const { isLoading, data, error, get } = useRequest<UserType>();
 
   useEffect(() => {
-    get('/api/users/list', (data) => {
+    get('/api/users', (data) => {
       console.log(data);
     });
   }, []);

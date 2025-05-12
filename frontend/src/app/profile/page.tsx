@@ -38,7 +38,7 @@ export default function ProfilePage() {
 
       try {
         // Load user's posts
-        const result = await getPosts(`/api/posts/user?id=${user?.id}`);
+        const result = await getPosts(`/api/posts/user/${user?.id}`);
         if (result?.posts) {
           setPosts(transformPosts(result.posts));
         }
@@ -59,7 +59,7 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (userData: Partial<UserType>) => {
     if (!user) return;
     
-    await put(`/api/users/update?id=${user.id}`, userData, (data) => {
+    await put(`/api/users/${user.id}`, userData, (data) => {
       console.log('User updated:', userData);
       toast.success('Profile updated successfully!');
       update(data);
