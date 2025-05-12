@@ -5,7 +5,7 @@ interface ProfileHeaderProps {
   user: UserProfile | User;
   isPublic: boolean;
   onTogglePublic?: () => void;
-  onFollow: () => void;
+  onFollow?: () => void;
   onEdit?: () => void;
   isPreview?: boolean;
 }
@@ -38,13 +38,15 @@ export default function ProfileHeader({
               <p className="text-gray-400">@{user.username}</p>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                onClick={onFollow}
-                className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
-              >
-                <FiUsers className="text-lg" />
-                Follow
-              </button>
+              {onFollow && (
+                <button
+                  onClick={onFollow}
+                  className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
+                >
+                  <FiUsers className="text-lg" />
+                  Follow
+                </button>
+              )}
               {!isPreview && (
                 <button
                   onClick={onEdit}
