@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserType } from '@/types/User';
+import { User } from '@/types/User';
 import { Post, PostResponse, transformPosts } from '@/types/Post';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import EditProfileForm from '@/components/profile/EditProfileForm';
@@ -17,7 +17,7 @@ import toast from 'react-hot-toast';
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, update } = useUserStore();
-  const { put } = useRequest<UserType>();
+  const { put } = useRequest<User>();
   const { get: getPosts } = useRequest<{ posts: PostResponse[] }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
@@ -56,7 +56,7 @@ export default function ProfilePage() {
     setIsEditing(true);
   };
 
-  const handleUpdateProfile = async (userData: Partial<UserType>) => {
+  const handleUpdateProfile = async (userData: Partial<User>) => {
     if (!user) return;
     
     await put(`/api/users/${user.id}`, userData, (data) => {

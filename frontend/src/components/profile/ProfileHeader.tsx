@@ -1,8 +1,8 @@
 import { FiEdit, FiUsers, FiLock, FiUnlock } from 'react-icons/fi';
-import { UserType } from '@/types/User';
+import { User, UserProfile } from '@/types/User';
 
 interface ProfileHeaderProps {
-  user: UserType;
+  user: UserProfile | User;
   isPublic: boolean;
   onTogglePublic?: () => void;
   onFollow: () => void;
@@ -61,11 +61,11 @@ export default function ProfileHeader({
           <div className="flex items-center gap-6 text-gray-400">
             <div className="flex items-center gap-2">
               <FiUsers />
-              <span>1.2k followers</span>
+              <span>{('followers_count' in user ? user.followers_count : 0)} followers</span>
             </div>
             <div className="flex items-center gap-2">
               <FiUsers />
-              <span>856 following</span>
+              <span>{('following_count' in user ? user.following_count : 0)} following</span>
             </div>
             {!isPreview && onTogglePublic && (
               <button

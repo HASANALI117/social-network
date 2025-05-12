@@ -25,7 +25,7 @@ export default function PostCard({ post }: PostCardProps) {
             {post.user_first_name || 'Anonymous'} {post.user_last_name || 'User'}
           </h3>
           <p className="text-sm text-gray-400">
-            {formatDistanceToNow(post.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
           </p>
         </div>
       </div>

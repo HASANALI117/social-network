@@ -5,17 +5,10 @@ export interface Post {
   content: string;
   image_url?: string;
   privacy: string;
-  createdAt: Date;
+  created_at: string;
   user_first_name?: string;
   user_last_name?: string;
   user_avatar_url?: string;
-}
-
-export interface CreatePostFormValues {
-  title: string;
-  content: string;
-  imageUrl?: string;
-  privacy: string;
 }
 
 export interface PostResponse {
@@ -31,6 +24,13 @@ export interface PostResponse {
   user_avatar_url?: string;
 }
 
+export interface CreatePostFormValues {
+  title: string;
+  content: string;
+  imageUrl?: string;
+  privacy: string;
+}
+
 export const transformPost = (post: PostResponse): Post => ({
   id: post.id,
   user_id: post.user_id,
@@ -38,7 +38,7 @@ export const transformPost = (post: PostResponse): Post => ({
   content: post.content,
   image_url: post.image_url,
   privacy: post.privacy,
-  createdAt: new Date(post.created_at),
+  created_at: post.created_at,
   user_first_name: post.user_first_name,
   user_last_name: post.user_last_name,
   user_avatar_url: post.user_avatar_url
