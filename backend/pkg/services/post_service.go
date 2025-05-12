@@ -13,15 +13,17 @@ import (
 
 // PostResponse is the DTO for post data sent to clients
 type PostResponse struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	GroupID   *string   `json:"group_id,omitempty"` // Use pointer for optional field
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	ImageURL  string    `json:"image_url,omitempty"`
-	Privacy   string    `json:"privacy"` // Note: For group posts, this might always be 'public' conceptually
-	CreatedAt time.Time `json:"created_at"`
-	// TODO: Add user details (username, avatar) if needed
+	ID            string    `json:"id"`
+	UserID        string    `json:"user_id"`
+	GroupID       *string   `json:"group_id,omitempty"` // Use pointer for optional field
+	Title         string    `json:"title"`
+	Content       string    `json:"content"`
+	ImageURL      string    `json:"image_url,omitempty"`
+	Privacy       string    `json:"privacy"` // Note: For group posts, this might always be 'public' conceptually
+	CreatedAt     time.Time `json:"created_at"`
+	UserFirstName string    `json:"user_first_name,omitempty"`
+	UserLastName  string    `json:"user_last_name,omitempty"`
+	UserAvatarURL string    `json:"user_avatar_url,omitempty"`
 }
 
 // PostCreateRequest is the DTO for creating a new post
@@ -56,20 +58,22 @@ type postService struct {
 	postRepo     repositories.PostRepository
 	followerRepo repositories.FollowerRepository // Needed for non-group privacy checks
 	groupRepo    repositories.GroupRepository    // Needed for group membership/admin checks
+	userRepo     repositories.UserRepository     // Needed for user details in posts
 	// authService AuthService // Potentially needed if complex auth logic arises
 }
 
 // NewPostService creates a new PostService
-func NewPostService(postRepo repositories.PostRepository, followerRepo repositories.FollowerRepository, groupRepo repositories.GroupRepository) PostService {
+func NewPostService(postRepo repositories.PostRepository, followerRepo repositories.FollowerRepository, groupRepo repositories.GroupRepository, userRepo repositories.UserRepository) PostService {
 	return &postService{
 		postRepo:     postRepo,
 		followerRepo: followerRepo,
 		groupRepo:    groupRepo,
+		userRepo:     userRepo,
 	}
 }
 
 // mapPostToResponse converts a model.Post to a PostResponse DTO
-func mapPostToResponse(post *models.Post) *PostResponse {
+func (s *postService) mapPostToResponse(post *models.Post, author *models.User) *PostResponse {
 	if post == nil {
 		return nil
 	}
@@ -77,23 +81,37 @@ func mapPostToResponse(post *models.Post) *PostResponse {
 	if post.GroupID.Valid {
 		groupID = &post.GroupID.String
 	}
-	return &PostResponse{
+
+	response := &PostResponse{
 		ID:        post.ID,
 		UserID:    post.UserID,
-		GroupID:   groupID, // Map the GroupID
+		GroupID:   groupID,
 		Title:     post.Title,
 		Content:   post.Content,
 		ImageURL:  post.ImageURL,
 		Privacy:   post.Privacy,
 		CreatedAt: post.CreatedAt,
 	}
+
+	// Use pre-fetched author details if available, otherwise fetch from repository
+	if author != nil {
+		response.UserFirstName = author.FirstName
+		response.UserLastName = author.LastName
+		response.UserAvatarURL = author.AvatarURL
+	} else if user, err := s.userRepo.GetByID(post.UserID); err == nil && user != nil {
+		response.UserFirstName = user.FirstName
+		response.UserLastName = user.LastName
+		response.UserAvatarURL = user.AvatarURL
+	}
+
+	return response
 }
 
 // mapPostsToResponse converts a slice of model.Post to a slice of PostResponse DTOs
-func mapPostsToResponse(posts []*models.Post) []*PostResponse {
+func (s *postService) mapPostsToResponse(posts []*models.Post, author *models.User) []*PostResponse {
 	responses := make([]*PostResponse, len(posts))
 	for i, post := range posts {
-		responses[i] = mapPostToResponse(post)
+		responses[i] = s.mapPostToResponse(post, author)
 	}
 	return responses
 }
@@ -164,7 +182,7 @@ func (s *postService) Create(request *PostCreateRequest) (*PostResponse, error) 
 		}
 	}
 
-	return mapPostToResponse(post), nil
+	return s.mapPostToResponse(post, nil), nil
 }
 
 // GetByID retrieves a single post, performing authorization checks based on requestingUserID
@@ -233,7 +251,7 @@ func (s *postService) GetByID(postID string, requestingUserID string) (*PostResp
 		return nil, repositories.ErrPostNotFound
 	}
 
-	return mapPostToResponse(post), nil
+	return s.mapPostToResponse(post, nil), nil
 }
 
 // List retrieves a list of non-group posts for the general feed, filtered by the repository.
@@ -242,16 +260,24 @@ func (s *postService) List(requestingUserID string, limit, offset int) ([]*PostR
 	if err != nil {
 		return nil, fmt.Errorf("failed to list non-group posts from repository: %w", err)
 	}
-	return mapPostsToResponse(posts), nil
+	return s.mapPostsToResponse(posts, nil), nil
 }
 
 // ListPostsByUser retrieves non-group posts for a specific user's profile, filtered by the repository.
 func (s *postService) ListPostsByUser(targetUserID, requestingUserID string, limit, offset int) ([]*PostResponse, error) {
+	// Fetch target user details first
+	targetUser, err := s.userRepo.GetByID(targetUserID)
+	if err != nil {
+		log.Printf("Warning: Failed to fetch user details for user %s: %v", targetUserID, err)
+		// Continue without user details, they will be fetched individually
+		targetUser = nil
+	}
+
 	posts, err := s.postRepo.ListByUser(targetUserID, requestingUserID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list non-group posts by user from repository: %w", err)
 	}
-	return mapPostsToResponse(posts), nil
+	return s.mapPostsToResponse(posts, targetUser), nil
 }
 
 // ListGroupPosts retrieves posts belonging to a specific group, checking membership first.
@@ -276,7 +302,7 @@ func (s *postService) ListGroupPosts(groupID string, requestingUserID string, li
 	}
 
 	// 3. Map to response DTOs
-	return mapPostsToResponse(posts), nil
+	return s.mapPostsToResponse(posts, nil), nil
 }
 
 // Delete handles the deletion of a post, performing authorization checks
