@@ -16,8 +16,7 @@ export default function PostCard({ post }: PostCardProps) {
     <div className="bg-gray-800 rounded-lg shadow p-6 mb-4 hover:bg-gray-750 transition-colors">
       <div className="flex items-center gap-4 mb-4">
         <Avatar
-          src={post.user_avatar_url}
-          initials={initials}
+          src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${post.user_first_name}+${post.user_last_name}&background=3b82f6&color=fff&bold=true`}
           alt={`${post.user_first_name || 'Anonymous'} ${post.user_last_name || 'User'}`}
           className="w-12 h-12 border-2 border-gray-700"
         />
