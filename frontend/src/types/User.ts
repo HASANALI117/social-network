@@ -59,5 +59,15 @@ export interface UserSignupData {
   birth_date: string;
   username?: string;
   about_me?: string;
-  avatar_url?: File | null;
+  avatar_url?: string | null;
+}
+
+// Type for updating user profile data
+export interface UpdateUserProfileData {
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  about_me?: string;
+  avatar_url?: string;
+  // Add other updatable fields as needed, making them optional
 }

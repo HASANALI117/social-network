@@ -27,7 +27,7 @@ export interface PostResponse {
 export interface CreatePostFormValues {
   title: string;
   content: string;
-  imageUrl?: string;
+  image_url?: string | null;
   privacy: string;
 }
 
