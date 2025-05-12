@@ -118,6 +118,12 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 				return h.updatePrivacy(w, r, userID)
 			}
 			return httperr.NewMethodNotAllowed(nil, "Method PUT required for privacy")
+		case "cancel-follow-request":
+			if r.Method == http.MethodDelete {
+				h.followerHandler.HandleCancelFollowRequest(w, r)
+				return nil // Follower handler writes response
+			}
+			return httperr.NewMethodNotAllowed(nil, "Method DELETE required for cancel-follow-request")
 		default:
 			// Action didn't match any known follower or privacy action
 			return httperr.NewNotFound(nil, "Unknown user action: "+action)
