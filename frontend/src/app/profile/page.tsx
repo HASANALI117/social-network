@@ -71,7 +71,10 @@ export default function ProfilePage() {
 
     const newPrivacyState = !userProfile.is_private;
     await put(`/api/users/${user.id}/privacy`, { is_private: newPrivacyState }, (data) => {
-      setUserProfile(data);
+      setUserProfile(prevProfile => ({
+        ...prevProfile,
+        ...data
+      }));
       update(data);
       toast.success(`Profile is now ${newPrivacyState ? 'private' : 'public'}`);
     });
@@ -135,7 +138,7 @@ export default function ProfilePage() {
       {activeTab === 'posts' && (
         <div>
           <CreatePostForm onSubmit={handleCreatePost} />
-          <PostList posts={userProfile.latest_posts} />
+          <PostList posts={userProfile.latest_posts || []} />
         </div>
       )}
 
