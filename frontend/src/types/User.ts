@@ -15,6 +15,23 @@ export interface User {
   updated_at: string;
 }
 
+// Summary for user, used in FollowRequest
+export interface UserSummary {
+  id: string;
+  username: string;
+  avatar_url?: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface FollowRequest {
+  id: string;
+  requester: UserSummary;
+  target: UserSummary;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+}
+
 // Extended user profile type matching backend UserProfileResponse
 export interface UserProfile extends User {
   followers_count: number;
@@ -22,6 +39,9 @@ export interface UserProfile extends User {
   latest_posts: Post[];
   latest_followers: User[];
   latest_following: User[];
+  is_followed: boolean;
+  follow_request_state?: 'SENT' | 'RECEIVED' | '';
+  // is_private is already in User interface
 }
 
 // Type for user signup data
