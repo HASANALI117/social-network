@@ -22,6 +22,7 @@ type FollowerService interface {
 	FindFollow(followerID, followingID string) (*models.Follower, error)   // Added method
 	CountFollowers(userID string) (int, error)                             // Added follower count
 	CountFollowing(userID string) (int, error)                             // Added following count
+	CancelFollowRequest(cancellerID, targetID string) error
 }
 
 // followerService implements FollowerService
@@ -240,6 +241,37 @@ func (s *followerService) CountFollowers(userID string) (int, error) {
 		return 0, fmt.Errorf("failed to count followers")
 	}
 	return count, nil
+}
+
+// CancelFollowRequest handles the logic for cancelling a sent follow request.
+func (s *followerService) CancelFollowRequest(cancellerID, targetID string) error {
+	// Check if a "pending" follow request exists from cancellerID to targetID
+	followRequest, err := s.followerRepo.FindFollow(cancellerID, targetID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // Assuming FindFollow returns sql.ErrNoRows when not found
+			return errors.New("no follow request found to cancel")
+		}
+		log.Printf("Error finding follow request to cancel: %v", err)
+		return fmt.Errorf("internal server error checking follow request")
+	}
+
+	if followRequest == nil { // Double check if FindFollow might return nil, nil
+		return errors.New("no follow request found to cancel")
+	}
+
+	if followRequest.Status != "pending" {
+		return fmt.Errorf("cannot cancel a request that is not pending (status: %s)", followRequest.Status)
+	}
+
+	// If a pending request exists, delete it
+	err = s.followerRepo.DeleteFollow(cancellerID, targetID)
+	if err != nil {
+		log.Printf("Error deleting follow request: %v", err)
+		return fmt.Errorf("failed to cancel follow request")
+	}
+
+	log.Printf("Follow request from %s to %s cancelled successfully", cancellerID, targetID)
+	return nil
 }
 
 // CountFollowing retrieves the total count of users the given user is following (accepted).

@@ -285,3 +285,40 @@ func (h *FollowerHandler) HandleListPending(w http.ResponseWriter, r *http.Reque
 
 	writeJSONResponse(w, http.StatusOK, pendingRequestsMap)
 }
+
+// HandleCancelFollowRequest cancels a sent follow request
+// DELETE /api/users/{target_id}/cancel-follow-request
+func (h *FollowerHandler) HandleCancelFollowRequest(w http.ResponseWriter, r *http.Request) {
+	cancellerID, err := h.getAuthenticatedUserID(r)
+	if err != nil {
+		writeErrorResponse(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	// Expected: /api/users/{target_id}/cancel-follow-request -> parts: ["api", "users", "{target_id}", "cancel-follow-request"]
+	if len(pathParts) != 4 || pathParts[0] != "api" || pathParts[1] != "users" || pathParts[3] != "cancel-follow-request" {
+		writeErrorResponse(w, http.StatusBadRequest, "Invalid URL path format for cancel follow request")
+		return
+	}
+	targetID := pathParts[2]
+	if targetID == "" {
+		writeErrorResponse(w, http.StatusBadRequest, "Target user ID cannot be empty")
+		return
+	}
+
+	err = h.service.CancelFollowRequest(cancellerID, targetID)
+	if err != nil {
+		log.Printf("Error in HandleCancelFollowRequest service call: %v", err)
+		if err.Error() == "no follow request found to cancel" {
+			writeErrorResponse(w, http.StatusNotFound, err.Error())
+		} else if strings.Contains(err.Error(), "cannot cancel a request that is not pending") {
+			writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		} else {
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to cancel follow request")
+		}
+		return
+	}
+
+	writeJSONResponse(w, http.StatusOK, map[string]string{"message": "Follow request cancelled successfully"})
+}
