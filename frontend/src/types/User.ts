@@ -30,6 +30,12 @@ export interface FollowRequest {
   target: UserSummary;
   status: 'pending' | 'accepted' | 'declined';
   created_at: string;
+  // Note: The components for managing follow requests (ManageFollowRequestsSection,
+  // FollowRequestList, FollowRequestCard) when consuming data from the
+  // `/api/users/me/follow-requests` endpoint now operate directly on `UserSummary[]`
+  // (for `received` and `sent` lists) rather than this `FollowRequest` structure.
+  // This `FollowRequest` type might be used for other API responses or contexts
+  // where a full request object with requester, target, and status is provided.
 }
 
 // Extended user profile type matching backend UserProfileResponse

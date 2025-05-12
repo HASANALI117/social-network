@@ -1,66 +1,73 @@
 import React from 'react';
-import { FollowRequest, UserSummary } from '@/types/User';
+import { UserSummary } from '@/types/User';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar'; // Updated import
 import { FiCheck, FiX, FiTrash2 } from 'react-icons/fi';
-import { formatDistanceToNow } from 'date-fns';
+// import { formatDistanceToNow } from 'date-fns'; // Not used currently
+import Link from 'next/link'; // Import Link for navigation
 
-interface FollowRequestCardProps {
-  request: FollowRequest;
+export interface FollowRequestCardProps { // Exporting for use if needed
+  user: UserSummary;
   type: 'sent' | 'received';
-  onAccept?: (requestId: string, requesterId: string) => void;
-  onDecline?: (requestId: string, requesterId: string) => void;
-  onCancel?: (requestId: string, targetId: string) => void;
-  isLoading?: boolean; // To disable buttons during an action
+  onAccept?: (requesterId: string) => void; // Operates on user.id
+  onDecline?: (requesterId: string) => void; // Operates on user.id
+  onCancel?: (targetId: string) => void; // Operates on user.id
+  isLoading?: boolean;
 }
 
 const FollowRequestCard: React.FC<FollowRequestCardProps> = ({
-  request,
+  user, // Changed from request
   type,
   onAccept,
   onDecline,
   onCancel,
   isLoading = false,
 }) => {
-  const userToDisplay: UserSummary = type === 'sent' ? request.target : request.requester;
+  // user prop directly represents the user involved in the request
+  // If type is 'received', user is the requester.
+  // If type is 'sent', user is the target.
 
   const handleAccept = () => {
-    if (onAccept) {
-      onAccept(request.id, request.requester.id);
+    if (onAccept && type === 'received') { // Action for received requests
+      onAccept(user.id);
     }
   };
 
   const handleDecline = () => {
-    if (onDecline) {
-      onDecline(request.id, request.requester.id);
+    if (onDecline && type === 'received') { // Action for received requests
+      onDecline(user.id);
     }
   };
 
   const handleCancel = () => {
-    if (onCancel) {
-      onCancel(request.id, request.target.id);
+    if (onCancel && type === 'sent') { // Action for sent requests
+      onCancel(user.id);
     }
   };
 
-  const timeAgo = formatDistanceToNow(new Date(request.created_at), { addSuffix: true });
+  // The UserSummary from /api/users/me/follow-requests does not include the request timestamp.
+  // We will use user.created_at (account creation) for now, or omit it.
+  // For this iteration, let's omit the timestamp to avoid confusion,
+  // as it's not the request creation time.
+  // const timeAgo = user.created_at ? formatDistanceToNow(new Date(user.created_at), { addSuffix: true }) : '';
 
   return (
     <div className="bg-gray-800 p-4 rounded-lg shadow flex items-center justify-between hover:bg-gray-750 transition-colors duration-150">
-      <div className="flex items-center gap-4">
+      <Link href={`/profile/${user.id}`} className="flex items-center gap-4 group">
         <Avatar
-          src={userToDisplay.avatar_url}
-          initials={`${userToDisplay.first_name?.[0]?.toUpperCase() ?? ''}${userToDisplay.last_name?.[0]?.toUpperCase() ?? ''}`}
-          alt={`${userToDisplay.first_name} ${userToDisplay.last_name}'s avatar`}
-          className="h-12 w-12"
+          src={user.avatar_url}
+          initials={`${user.first_name?.[0]?.toUpperCase() ?? ''}${user.last_name?.[0]?.toUpperCase() ?? ''}`}
+          alt={`${user.first_name} ${user.last_name}'s avatar`}
+          className="h-12 w-12 group-hover:opacity-80 transition-opacity"
         />
         <div>
-          <p className="font-semibold text-gray-100">
-            {userToDisplay.first_name} {userToDisplay.last_name}
-            <span className="text-gray-400 ml-1">@{userToDisplay.username}</span>
+          <p className="font-semibold text-gray-100 group-hover:text-purple-300 transition-colors">
+            {user.first_name} {user.last_name}
+            <span className="text-gray-400 ml-1 group-hover:text-purple-400 transition-colors">@{user.username}</span>
           </p>
-          <p className="text-sm text-gray-400">{timeAgo}</p>
+          {/* Timestamp omitted as per previous decision */}
         </div>
-      </div>
+      </Link>
       <div className="flex gap-2">
         {type === 'received' && onAccept && onDecline && (
           <>

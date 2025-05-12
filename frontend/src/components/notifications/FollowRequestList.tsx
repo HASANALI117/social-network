@@ -1,19 +1,19 @@
 import React from 'react';
-import { FollowRequest } from '@/types/User';
+import { UserSummary } from '@/types/User';
 import FollowRequestCard from './FollowRequestCard';
 
-interface FollowRequestListProps {
-  requests: FollowRequest[];
+export interface FollowRequestListProps { // Exporting for use in ManageFollowRequestsSection if needed for typing
+  users: UserSummary[];
   type: 'sent' | 'received';
-  onAccept?: (requestId: string, requesterId: string) => void;
-  onDecline?: (requestId: string, requesterId: string) => void;
-  onCancel?: (requestId: string, targetId: string) => void;
-  isLoadingAction?: (requestId: string) => boolean; // To show loading on a specific card
+  onAccept?: (requesterId: string) => void; // Changed from (requestId, requesterId)
+  onDecline?: (requesterId: string) => void; // Changed from (requestId, requesterId)
+  onCancel?: (targetId: string) => void; // Changed from (requestId, targetId)
+  isLoadingAction?: (userId: string) => boolean; // Changed from (requestId)
   emptyMessage?: string;
 }
 
 const FollowRequestList: React.FC<FollowRequestListProps> = ({
-  requests,
+  users,
   type,
   onAccept,
   onDecline,
@@ -21,21 +21,21 @@ const FollowRequestList: React.FC<FollowRequestListProps> = ({
   isLoadingAction,
   emptyMessage = "No requests here."
 }) => {
-  if (requests.length === 0) {
+  if (users.length === 0) {
     return <p className="text-gray-400 text-center py-8">{emptyMessage}</p>;
   }
 
   return (
     <div className="space-y-3">
-      {requests.map((request) => (
+      {users.map((user) => (
         <FollowRequestCard
-          key={request.id}
-          request={request}
+          key={user.id} // Assuming UserSummary has an id
+          user={user}
           type={type}
-          onAccept={onAccept}
-          onDecline={onDecline}
-          onCancel={onCancel}
-          isLoading={isLoadingAction ? isLoadingAction(request.id) : false}
+          onAccept={onAccept ? () => onAccept(user.id) : undefined}
+          onDecline={onDecline ? () => onDecline(user.id) : undefined}
+          onCancel={onCancel ? () => onCancel(user.id) : undefined}
+          isLoading={isLoadingAction ? isLoadingAction(user.id) : false}
         />
       ))}
     </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { FollowRequest } from '@/types/User';
+import { UserSummary } from '@/types/User';
 import { useRequest } from '@/hooks/useRequest';
 import FollowRequestList from './FollowRequestList';
 import { Tab } from '@headlessui/react'; // Using Headless UI for tabs
@@ -12,21 +12,21 @@ function classNames(...classes: string[]) {
 }
 
 interface FollowRequestsResponse {
-  received_requests: FollowRequest[];
-  sent_requests: FollowRequest[];
+  received: UserSummary[];
+  sent: UserSummary[] | null; // API can return null for sent
 }
 
 const ManageFollowRequestsSection: React.FC = () => {
-  const { get, post, del, isLoading, error } = useRequest<FollowRequestsResponse>();
-  const [receivedRequests, setReceivedRequests] = useState<FollowRequest[]>([]);
-  const [sentRequests, setSentRequests] = useState<FollowRequest[]>([]);
-  const [loadingActionRequestId, setLoadingActionRequestId] = useState<string | null>(null);
+  const { get, post, del, isLoading, error } = useRequest<{ received: UserSummary[], sent: UserSummary[] | null }>();
+  const [receivedRequests, setReceivedRequests] = useState<UserSummary[]>([]);
+  const [sentRequests, setSentRequests] = useState<UserSummary[]>([]);
+  const [loadingActionUserId, setLoadingActionUserId] = useState<string | null>(null);
 
   const fetchFollowRequests = useCallback(() => {
     get('/api/users/me/follow-requests', (data) => {
       if (data) {
-        setReceivedRequests(data.received_requests || []);
-        setSentRequests(data.sent_requests || []);
+        setReceivedRequests(data.received || []);
+        setSentRequests(data.sent || []); // Handle null for sent
       }
     });
   }, [get]);
@@ -35,26 +35,26 @@ const ManageFollowRequestsSection: React.FC = () => {
     fetchFollowRequests();
   }, [fetchFollowRequests]);
 
-  const handleAccept = async (requestId: string, requesterId: string) => {
-    setLoadingActionRequestId(requestId);
+  // requesterId is the id of the user who sent the request
+  const handleAccept = async (requesterId: string) => {
+    setLoadingActionUserId(requesterId);
     try {
-      // The API endpoint for accepting is POST /api/users/{requester_id}/accept
       await post(`/api/users/${requesterId}/accept`, {});
       toast.success('Follow request accepted!');
-      fetchFollowRequests(); // Refetch to update lists
+      fetchFollowRequests();
     } catch (e: any) {
       const errorMessage = e?.response?.data?.error || e.message || 'Failed to accept follow request.';
       toast.error(errorMessage);
       console.error('Accept request failed:', e);
     } finally {
-      setLoadingActionRequestId(null);
+      setLoadingActionUserId(null);
     }
   };
 
-  const handleDecline = async (requestId: string, requesterId: string) => {
-    setLoadingActionRequestId(requestId);
+  // requesterId is the id of the user who sent the request
+  const handleDecline = async (requesterId: string) => {
+    setLoadingActionUserId(requesterId);
     try {
-      // The API endpoint for rejecting is DELETE /api/users/{requester_id}/reject
       await del(`/api/users/${requesterId}/reject`);
       toast.success('Follow request declined.');
       fetchFollowRequests();
@@ -63,16 +63,15 @@ const ManageFollowRequestsSection: React.FC = () => {
       toast.error(errorMessage);
       console.error('Decline request failed:', e);
     } finally {
-      setLoadingActionRequestId(null);
+      setLoadingActionUserId(null);
     }
   };
 
-  const handleCancel = async (requestId: string, targetId: string) => {
-    setLoadingActionRequestId(requestId);
+  // targetId is the id of the user to whom the request was sent
+  const handleCancel = async (targetId: string) => {
+    setLoadingActionUserId(targetId);
     try {
-      // The API endpoint for cancelling a sent request is DELETE /api/users/{target_id}/cancel-follow-request
-      // Or potentially /api/users/{target_id}/unfollow if it serves the same purpose for sent requests
-      await del(`/api/users/${targetId}/cancel-follow-request`); // Assuming a dedicated endpoint or adjust if it's 'unfollow'
+      await del(`/api/users/${targetId}/cancel-follow-request`);
       toast.success('Follow request cancelled.');
       fetchFollowRequests();
     } catch (e: any) {
@@ -80,11 +79,11 @@ const ManageFollowRequestsSection: React.FC = () => {
       toast.error(errorMessage);
       console.error('Cancel request failed:', e);
     } finally {
-      setLoadingActionRequestId(null);
+      setLoadingActionUserId(null);
     }
   };
   
-  const isLoadingAction = (requestId: string) => loadingActionRequestId === requestId;
+  const isLoadingAction = (userId: string) => loadingActionUserId === userId;
 
   if (isLoading && receivedRequests.length === 0 && sentRequests.length === 0) {
     return <p className="text-gray-400 text-center py-10">Loading requests...</p>;
@@ -128,7 +127,7 @@ const ManageFollowRequestsSection: React.FC = () => {
             )}
           >
             <FollowRequestList
-              requests={receivedRequests}
+              users={receivedRequests}
               type="received"
               onAccept={handleAccept}
               onDecline={handleDecline}
@@ -143,7 +142,7 @@ const ManageFollowRequestsSection: React.FC = () => {
             )}
           >
             <FollowRequestList
-              requests={sentRequests}
+              users={sentRequests}
               type="sent"
               onCancel={handleCancel}
               isLoadingAction={isLoadingAction}
