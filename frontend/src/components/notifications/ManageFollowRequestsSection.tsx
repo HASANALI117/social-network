@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { FollowRequest } from '@/types/User';
 import { useRequest } from '@/hooks/useRequest';
 import FollowRequestList from './FollowRequestList';
@@ -36,29 +37,51 @@ const ManageFollowRequestsSection: React.FC = () => {
 
   const handleAccept = async (requestId: string, requesterId: string) => {
     setLoadingActionRequestId(requestId);
-    // The API endpoint for accepting is POST /api/users/{requester_id}/accept
-    // Note: The `requestId` is the ID of the follow_request record itself,
-    // while `requesterId` is the ID of the user who sent the request.
-    await post(`/api/users/${requesterId}/accept`, {}); // Body might not be needed or could be { requestId }
-    fetchFollowRequests(); // Refetch to update lists
-    setLoadingActionRequestId(null);
+    try {
+      // The API endpoint for accepting is POST /api/users/{requester_id}/accept
+      await post(`/api/users/${requesterId}/accept`, {});
+      toast.success('Follow request accepted!');
+      fetchFollowRequests(); // Refetch to update lists
+    } catch (e: any) {
+      const errorMessage = e?.response?.data?.error || e.message || 'Failed to accept follow request.';
+      toast.error(errorMessage);
+      console.error('Accept request failed:', e);
+    } finally {
+      setLoadingActionRequestId(null);
+    }
   };
 
   const handleDecline = async (requestId: string, requesterId: string) => {
     setLoadingActionRequestId(requestId);
-    // The API endpoint for rejecting is DELETE /api/users/{requester_id}/reject
-    await del(`/api/users/${requesterId}/reject`);
-    fetchFollowRequests();
-    setLoadingActionRequestId(null);
+    try {
+      // The API endpoint for rejecting is DELETE /api/users/{requester_id}/reject
+      await del(`/api/users/${requesterId}/reject`);
+      toast.success('Follow request declined.');
+      fetchFollowRequests();
+    } catch (e: any) {
+      const errorMessage = e?.response?.data?.error || e.message || 'Failed to decline follow request.';
+      toast.error(errorMessage);
+      console.error('Decline request failed:', e);
+    } finally {
+      setLoadingActionRequestId(null);
+    }
   };
 
   const handleCancel = async (requestId: string, targetId: string) => {
     setLoadingActionRequestId(requestId);
-    // The API endpoint for cancelling a sent request is DELETE /api/users/{target_id}/unfollow
-    // (as per plan, this might be the same as unfollow)
-    await del(`/api/users/${targetId}/unfollow`);
-    fetchFollowRequests();
-    setLoadingActionRequestId(null);
+    try {
+      // The API endpoint for cancelling a sent request is DELETE /api/users/{target_id}/cancel-follow-request
+      // Or potentially /api/users/{target_id}/unfollow if it serves the same purpose for sent requests
+      await del(`/api/users/${targetId}/cancel-follow-request`); // Assuming a dedicated endpoint or adjust if it's 'unfollow'
+      toast.success('Follow request cancelled.');
+      fetchFollowRequests();
+    } catch (e: any) {
+      const errorMessage = e?.response?.data?.error || e.message || 'Failed to cancel follow request.';
+      toast.error(errorMessage);
+      console.error('Cancel request failed:', e);
+    } finally {
+      setLoadingActionRequestId(null);
+    }
   };
   
   const isLoadingAction = (requestId: string) => loadingActionRequestId === requestId;

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { UserProfile } from '@/types/User';
 import { useRequest } from '@/hooks/useRequest';
 import { useUserStore } from '@/store/useUserStore'; // To get current user ID
+import toast from 'react-hot-toast';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import PostList from '@/components/profile/PostList';
@@ -53,33 +54,59 @@ export default function UserProfilePage() {
           // The backend will determine the new state (is_followed, follow_request_state)
           // e.g. if user is private, follow_request_state becomes 'SENT'
           // if public, is_followed becomes true.
+          // We will show a generic message here, and the UI will update based on fetchProfileData
+          toast.success('Follow action processed. Profile updating...');
           break;
         case 'unfollow':
           await delFollow(`/api/users/${targetId}/unfollow`);
+          toast.success('Unfollowed successfully. Profile updating...');
           break;
         case 'cancel_request':
           // API for cancelling a request sent by current user to targetId
           await delFollow(`/api/users/${targetId}/cancel-follow-request`);
+          toast.success('Follow request cancelled. Profile updating...');
           break;
         case 'accept_request':
           // Current user accepts a request from userProfile.id (the profile owner)
           await postFollow(`/api/users/${userProfile.id}/accept`, {});
+          toast.success('Follow request accepted. Profile updating...');
           break;
         case 'decline_request':
           // Current user declines a request from userProfile.id (the profile owner)
           await delFollow(`/api/users/${userProfile.id}/reject`);
+          toast.success('Follow request declined. Profile updating...');
           break;
         default:
           console.warn("Unhandled follow action type:", actionType);
+          toast.error("Unknown action type.");
           return; // Do not proceed to fetchProfileData for unhandled types
       }
       fetchProfileData(); // Refetch to get the authoritative state from the backend
-    } catch (e) {
+    } catch (e: any) {
       console.error("Follow action failed:", e);
-      // Error is handled by useRequest hook (followError)
-      // fetchProfileData() will also run in the finally block if we add one,
-      // or we rely on it here for success cases.
-      // If an error occurs, the profile data might be stale, consider refetching or error handling.
+      const errorMessage = e?.response?.data?.error || e.message || 'An unknown error occurred.';
+      switch (actionType) {
+        case 'follow':
+          toast.error(`Failed to follow: ${errorMessage}`);
+          break;
+        case 'unfollow':
+          toast.error(`Failed to unfollow: ${errorMessage}`);
+          break;
+        case 'cancel_request':
+          toast.error(`Failed to cancel request: ${errorMessage}`);
+          break;
+        case 'accept_request':
+          toast.error(`Failed to accept request: ${errorMessage}`);
+          break;
+        case 'decline_request':
+          toast.error(`Failed to decline request: ${errorMessage}`);
+          break;
+        default:
+          toast.error(`Action failed: ${errorMessage}`);
+      }
+      // Error is handled by useRequest hook (followError), but we show a toast here.
+      // Consider if fetchProfileData() should be called here too to ensure UI consistency even on error.
+      // For now, relying on the existing logic where fetchProfileData is called after the switch.
     }
   };
 
