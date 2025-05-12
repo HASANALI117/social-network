@@ -44,7 +44,7 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
         privacy: data.privacy
       };
 
-      const result = await createPost('/api/posts/create', postData);
+      const result = await createPost('/api/posts', postData);
 
       if (result) {
         reset();

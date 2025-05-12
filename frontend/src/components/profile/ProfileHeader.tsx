@@ -1,11 +1,11 @@
 import { FiEdit, FiUsers, FiLock, FiUnlock } from 'react-icons/fi';
-import { UserType } from '@/types/User';
+import { User, UserProfile } from '@/types/User';
 
 interface ProfileHeaderProps {
-  user: UserType;
+  user: UserProfile | User;
   isPublic: boolean;
   onTogglePublic?: () => void;
-  onFollow: () => void;
+  onFollow?: () => void;
   onEdit?: () => void;
   isPreview?: boolean;
 }
@@ -38,13 +38,15 @@ export default function ProfileHeader({
               <p className="text-gray-400">@{user.username}</p>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                onClick={onFollow}
-                className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
-              >
-                <FiUsers className="text-lg" />
-                Follow
-              </button>
+              {onFollow && (
+                <button
+                  onClick={onFollow}
+                  className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
+                >
+                  <FiUsers className="text-lg" />
+                  Follow
+                </button>
+              )}
               {!isPreview && (
                 <button
                   onClick={onEdit}
@@ -61,11 +63,11 @@ export default function ProfileHeader({
           <div className="flex items-center gap-6 text-gray-400">
             <div className="flex items-center gap-2">
               <FiUsers />
-              <span>1.2k followers</span>
+              <span>{('followers_count' in user ? user.followers_count : 0)} followers</span>
             </div>
             <div className="flex items-center gap-2">
               <FiUsers />
-              <span>856 following</span>
+              <span>{('following_count' in user ? user.following_count : 0)} following</span>
             </div>
             {!isPreview && onTogglePublic && (
               <button

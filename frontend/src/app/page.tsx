@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useRequest } from '@/hooks/useRequest';
 import { useEffect } from 'react';
-import { UserType } from '@/types/User';
+import { User } from '@/types/User';
 
 export default function HomePage() {
-  const { isLoading, data, error, get } = useRequest<UserType>();
+  const { isLoading, data, error, get } = useRequest<User>();
 
   useEffect(() => {
-    get('/api/users/list', (data) => {
+    get('/api/users', (data) => {
       console.log(data);
     });
   }, []);

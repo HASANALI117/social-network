@@ -30,6 +30,17 @@ export default function TabSwitcher({ activeTab, onTabChange }: TabSwitcherProps
         <FiUsers />
         Followers
       </button>
+      <button
+        className={`px-6 py-3 flex items-center gap-2 ${
+          activeTab === 'following'
+            ? 'border-b-2 border-purple-500 text-purple-400'
+            : 'text-gray-400 hover:text-purple-400'
+        }`}
+        onClick={() => onTabChange('following')}
+      >
+        <FiUsers />
+        Following
+      </button>
     </div>
   );
 }

@@ -1,17 +1,30 @@
-// Global type declarations for the frontend
-export interface UserType {
+import { Post } from './Post';
+
+// Base user type matching backend UserResponse
+export interface User {
   id: string;
-  username?: string;
+  username: string;
   email: string;
   first_name: string;
   last_name: string;
   avatar_url?: string;
   about_me?: string;
   birth_date: string;
+  is_private: boolean;
   created_at: string;
   updated_at: string;
 }
 
+// Extended user profile type matching backend UserProfileResponse
+export interface UserProfile extends User {
+  followers_count: number;
+  following_count: number;
+  latest_posts: Post[];
+  latest_followers: User[];
+  latest_following: User[];
+}
+
+// Type for user signup data
 export interface UserSignupData {
   first_name: string;
   last_name: string;

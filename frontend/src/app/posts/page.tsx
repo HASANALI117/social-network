@@ -14,7 +14,7 @@ export default function PostsPage() {
   }, []);
 
   const loadPosts = async () => {
-    const result = await getPosts('/api/posts/list');
+    const result = await getPosts('/api/posts');
     if (result) {
       setPosts(transformPosts(result.posts));
     }

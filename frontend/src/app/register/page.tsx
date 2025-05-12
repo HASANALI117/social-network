@@ -78,7 +78,7 @@ export default function RegisterPage() {
       <form
         onSubmit={handleSubmit((data: FormValues) => {
           post<UserSignupData>(
-            '/api/users/register',
+            '/api/users',
             data,
             (userData: UserSignupData) => {
               toast.success('Account created successfully! Please log in.');

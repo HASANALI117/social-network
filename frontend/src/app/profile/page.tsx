@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserType } from '@/types/User';
-import { Post, PostResponse, transformPosts } from '@/types/Post';
+import { User, UserProfile } from '@/types/User';
+import { Post } from '@/types/Post';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import EditProfileForm from '@/components/profile/EditProfileForm';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import CreatePostForm from '@/components/profile/CreatePostForm';
 import PostList from '@/components/profile/PostList';
-import FollowersList from '@/components/profile/FollowersList';
+import UserList from '@/components/profile/UserList';
 import { useUserStore } from '@/store/useUserStore';
 import { useRequest } from '@/hooks/useRequest';
 import toast from 'react-hot-toast';
@@ -17,67 +17,84 @@ import toast from 'react-hot-toast';
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isAuthenticated, update } = useUserStore();
-  const { put } = useRequest<UserType>();
-  const { get: getPosts } = useRequest<{ posts: PostResponse[] }>();
+  const { get, put } = useRequest<UserProfile>();
   const [isLoading, setIsLoading] = useState(true);
-  const [isPublic, setIsPublic] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('posts');
   const [isEditing, setIsEditing] = useState(false);
-  const [posts, setPosts] = useState<Post[]>([]);
 
   useEffect(() => {
-    // Handle store hydration
     useUserStore.persist.rehydrate();
     
     const init = async () => {
-      // Check authentication after hydration
       if (!isAuthenticated) {
         router.push('/login');
         return;
       }
 
+      if (!user) return;
+
       try {
-        // Load user's posts
-        const result = await getPosts(`/api/posts/user?id=${user?.id}`);
-        if (result?.posts) {
-          setPosts(transformPosts(result.posts));
-        }
-      } catch (error) {
-        toast.error('Failed to load posts');
+        get(`/api/users/${user.id}`, (data) => {
+          setUserProfile(data);
+          setError(null);
+        });
+      } catch (err) {
+        setError(err as Error);
+        toast.error('Failed to load profile');
       } finally {
         setIsLoading(false);
       }
     };
 
     init();
-  }, [isAuthenticated, router, user?.id, getPosts]);
+  }, [isAuthenticated, router, user?.id, get]);
 
   const handleEdit = () => {
     setIsEditing(true);
   };
 
-  const handleUpdateProfile = async (userData: Partial<UserType>) => {
-    if (!user) return;
+  const handleUpdateProfile = async (userData: Partial<User>) => {
+    if (!user || !userProfile) return;
     
-    await put(`/api/users/update?id=${user.id}`, userData, (data) => {
-      console.log('User updated:', userData);
+    await put(`/api/users/${user.id}`, userData, (data) => {
       toast.success('Profile updated successfully!');
+      setUserProfile(data);
       update(data);
       setIsEditing(false);
     });
   };
 
-  const handleFollow = () => {
-    // TODO: Implement follow logic
+  const handleTogglePrivacy = async () => {
+    if (!user || !userProfile) return;
+
+    const newPrivacyState = !userProfile.is_private;
+    await put(`/api/users/${user.id}/privacy`, { is_private: newPrivacyState }, (data) => {
+      setUserProfile(prevProfile => ({
+        ...prevProfile,
+        ...data
+      }));
+      update(data);
+      toast.success(`Profile is now ${newPrivacyState ? 'private' : 'public'}`);
+    });
   };
 
   const handleCreatePost = async (post: Post) => {
+    if (!userProfile) return;
+    
     try {
-      setPosts(prevPosts => [post, ...prevPosts]);
+      setUserProfile({
+        ...userProfile,
+        latest_posts: [post, ...userProfile.latest_posts]
+      });
       toast.success('Post created successfully!');
     } catch (error) {
       toast.error('Failed to create post');
-      setPosts(prevPosts => prevPosts.filter(p => p.id !== post.id));
+      setUserProfile({
+        ...userProfile,
+        latest_posts: userProfile.latest_posts.filter(p => p.id !== post.id)
+      });
     }
   };
 
@@ -89,7 +106,15 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) return null;
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <div className="text-white">Error loading profile: {error.message}</div>
+      </div>
+    );
+  }
+
+  if (!userProfile || !user) return null;
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-900 min-h-screen text-gray-100">
@@ -101,23 +126,34 @@ export default function ProfilePage() {
         />
       ) : (
         <ProfileHeader
-          user={user}
-          isPublic={isPublic}
-          onTogglePublic={() => setIsPublic(!isPublic)}
-          onFollow={handleFollow}
+          user={userProfile}
+          isPublic={!userProfile.is_private}
+          onTogglePublic={handleTogglePrivacy}
           onEdit={handleEdit}
         />
       )}
 
       <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {activeTab === 'posts' ? (
+      {activeTab === 'posts' && (
         <div>
           <CreatePostForm onSubmit={handleCreatePost} />
-          <PostList posts={posts} />
+          <PostList posts={userProfile.latest_posts || []} />
         </div>
-      ) : (
-        <FollowersList />
+      )}
+
+      {activeTab === 'followers' && (
+        <UserList
+          users={userProfile.latest_followers}
+          emptyMessage="No followers yet"
+        />
+      )}
+
+      {activeTab === 'following' && (
+        <UserList
+          users={userProfile.latest_following}
+          emptyMessage="Not following anyone yet"
+        />
       )}
     </div>
   );

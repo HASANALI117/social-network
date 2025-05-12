@@ -42,23 +42,26 @@ func Setup(dbConn *sql.DB) http.Handler {
 	mux.HandleFunc("/api/auth/signout", httperr.ErrorHandler(controllers.Auth.SignOut))
 
 	// User and Follower routes
-	mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Handles /api/users/, /api/users/{id}, and /api/users/{id}/{action}
+	// Register handler for both with and without trailing slash to handle all user routes
+	mux.Handle("/api/users", httperr.ErrorHandler(controllers.User.ServeHTTP))  // Handles /api/users/, /api/users/{id}, and /api/users/{id}/{action}
+	mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Handles /api/users/{id} and /api/users/{id}/{action}
 	// Specific route for the current user's pending follow requests
 	mux.HandleFunc("/api/users/me/follow-requests", controllers.Follower.HandleListPending) // No ErrorHandler wrapper needed
 
 	// Post routes - Use the PostHandler with prefix matching
-	mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP)) // Note the trailing slash
+	mux.Handle("/api/posts", httperr.ErrorHandler(controllers.Post.ServeHTTP)) // Note the trailing slash
+	mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP))
 
 	// Message routes - Use the initialized MessageHandler
 	mux.HandleFunc("/api/messages", httperr.ErrorHandler(controllers.Message.GetMessages))
 
 	// Group routes - Use the consolidated GroupHandler with prefix matching
-	mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
+	mux.Handle("/api/groups", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
 
 	// Comment routes - Use the CommentHandler with prefix matching
 	// Handles POST /api/posts/{postId}/comments and GET /api/posts/{postId}/comments via PostHandler's prefix
 	// Handles DELETE /api/comments/{commentId}
-	mux.Handle("/api/comments/", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
+	mux.Handle("/api/comments", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
 
 	// Note: The CommentHandler's ServeHTTP needs to correctly parse postID from /api/posts/{postId}/comments
 	// The current PostHandler already handles /api/posts/, so we need to adjust routing or handler logic.
