@@ -1,36 +1,29 @@
 import { FiShare } from 'react-icons/fi';
 import { Post } from '@/types/Post';
 import { formatDistanceToNow } from 'date-fns';
-
-interface DummyUser {
-  avatar_url: string;
-  first_name: string;
-  last_name: string;
-}
+import { Avatar } from '@/components/ui/avatar';
 
 interface PostCardProps {
   post: Post;
 }
 
 export default function PostCard({ post }: PostCardProps) {
-  // Dummy user info until we have real user data
-  const dummyUser: DummyUser = {
-    avatar_url: 'https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff&bold=true',
-    first_name: 'John',
-    last_name: 'Doe'
-  };
+  const initials = post.user_first_name && post.user_last_name
+    ? `${post.user_first_name[0]}${post.user_last_name[0]}`
+    : undefined;
 
   return (
     <div className="bg-gray-800 rounded-lg shadow p-6 mb-4 hover:bg-gray-750 transition-colors">
       <div className="flex items-center gap-4 mb-4">
-        <img
-          src={dummyUser.avatar_url}
-          alt="Avatar"
-          className="w-12 h-12 rounded-full border-2 border-gray-700"
+        <Avatar
+          src={post.user_avatar_url}
+          initials={initials}
+          alt={`${post.user_first_name || 'Anonymous'} ${post.user_last_name || 'User'}`}
+          className="w-12 h-12 border-2 border-gray-700"
         />
         <div>
           <h3 className="font-semibold text-gray-100">
-            {dummyUser.first_name} {dummyUser.last_name}
+            {post.user_first_name || 'Anonymous'} {post.user_last_name || 'User'}
           </h3>
           <p className="text-sm text-gray-400">
             {formatDistanceToNow(post.createdAt, { addSuffix: true })}
