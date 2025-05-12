@@ -2,6 +2,8 @@
 
 import { useForm } from 'react-hook-form';
 import { useState, useEffect, ChangeEvent } from 'react';
+import ImageCropperModal from '@/components/common/ImageCropperModal';
+import 'react-image-crop/dist/ReactCrop.css';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -55,6 +57,11 @@ type FormValues = z.infer<typeof formSchema>;
 export default function RegisterPage() {
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+  const [originalFileName, setOriginalFileName] = useState<string | null>(null);
+  const [originalFileType, setOriginalFileType] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -95,25 +102,71 @@ export default function RegisterPage() {
       if (file.size > 5 * 1024 * 1024) { // 5MB
         toast.error('File must be less than 5MB');
         setSelectedAvatarFile(null);
-        event.target.value = ''; // Reset file input
+        if (event.target) event.target.value = ''; // Reset file input
         return;
       }
       if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
         toast.error('Only JPEG, PNG, WEBP, and GIF formats are allowed');
         setSelectedAvatarFile(null);
-        event.target.value = ''; // Reset file input
+        if (event.target) event.target.value = ''; // Reset file input
         return;
       }
-      setSelectedAvatarFile(file);
-      setAvatarPreviewUrl(URL.createObjectURL(file));
+      
+      setOriginalFileName(file.name);
+      setOriginalFileType(file.type);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperImageSrc(reader.result as string);
+        setIsCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
+      // Clear the file input so the same file can be selected again if needed after closing cropper without saving
+      if (event.target) event.target.value = '';
     } else {
       setSelectedAvatarFile(null);
+      setCropperImageSrc(null);
+      setOriginalFileName(null);
+      setOriginalFileType(null);
+    }
+  };
+
+  const handleCropComplete = (croppedImageBlob: Blob | null) => {
+    if (croppedImageBlob) {
+      const fileName = originalFileName || 'avatar.png';
+      const fileType = originalFileType || croppedImageBlob.type || 'image/png';
+      
+      // Ensure the filename has an appropriate extension
+      let finalFileName = fileName;
+      const currentExtension = fileName.split('.').pop()?.toLowerCase();
+      const blobExtension = fileType.split('/')[1];
+
+      if (blobExtension && currentExtension !== blobExtension) {
+        finalFileName = `${fileName.substring(0, fileName.lastIndexOf('.')) || fileName}.${blobExtension}`;
+      }
+
+
+      const croppedFile = new File([croppedImageBlob], finalFileName, { type: fileType });
+      setSelectedAvatarFile(croppedFile);
+
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+      setAvatarPreviewUrl(URL.createObjectURL(croppedFile));
+    }
+    setIsCropperOpen(false);
+    setCropperImageSrc(null);
+    // Reset original file info if not used or if cropper is simply closed
+    if (!croppedImageBlob) {
+        setOriginalFileName(null);
+        setOriginalFileType(null);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md dark:bg-zinc-900">
-      <h1 className="text-2xl font-bold mb-6 text-center">Create Account</h1>
+    <>
+      <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md dark:bg-zinc-900">
+        <h1 className="text-2xl font-bold mb-6 text-center">Create Account</h1>
       <form
         onSubmit={handleSubmit(async (formData: FormValues) => {
           let avatarUrl = '';
@@ -366,6 +419,22 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
-    </div>
+      </div>
+      {cropperImageSrc && (
+        <ImageCropperModal
+          isOpen={isCropperOpen}
+          onClose={() => {
+            setIsCropperOpen(false);
+            setCropperImageSrc(null);
+            setOriginalFileName(null);
+            setOriginalFileType(null);
+          }}
+          imageSrc={cropperImageSrc}
+          onCropComplete={handleCropComplete}
+          aspect={1}
+          circularCrop={true}
+        />
+      )}
+    </>
   );
 }

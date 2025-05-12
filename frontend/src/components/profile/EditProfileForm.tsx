@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, useEffect, ChangeEvent } from 'react';
 import Image from 'next/image';
 import { uploadFileToMinio } from '@/lib/minioUploader'; // Adjusted path
+import ImageCropperModal from '@/components/common/ImageCropperModal'; // Added import
+import 'react-image-crop/dist/ReactCrop.css'; // Ensure CSS is imported
 // import { toast } from 'react-hot-toast'; // Assuming you have a toast library
 
 const profileSchema = z.object({
@@ -30,6 +32,10 @@ export default function EditProfileForm({ user, onSubmit, onCancel }: EditProfil
   const [newAvatarFile, setNewAvatarFile] = useState<File | null>(null);
   const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+  const [originalFileName, setOriginalFileName] = useState<string | null>(null);
+  const [originalFileType, setOriginalFileType] = useState<string | null>(null);
 
   const {
     register,
@@ -56,17 +62,47 @@ export default function EditProfileForm({ user, onSubmit, onCancel }: EditProfil
   }, [newAvatarPreviewUrl]);
 
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (newAvatarPreviewUrl) {
-      URL.revokeObjectURL(newAvatarPreviewUrl);
-      setNewAvatarPreviewUrl(null);
-    }
     const file = event.target.files?.[0];
     if (file) {
-      setNewAvatarFile(file);
-      setNewAvatarPreviewUrl(URL.createObjectURL(file));
-    } else {
-      setNewAvatarFile(null);
+      // Basic validation (can be expanded)
+      if (!file.type.startsWith('image/')) {
+        // toast.error('Please select an image file.');
+        console.error('Please select an image file.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        // toast.error('Image size should be less than 5MB.');
+        console.error('Image size should be less than 5MB.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCropperImageSrc(reader.result as string);
+        setOriginalFileName(file.name);
+        setOriginalFileType(file.type);
+        setIsCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
+      // Clear the input value to allow selecting the same file again if needed
+      event.target.value = '';
     }
+  };
+
+  const handleCropComplete = (croppedImageBlob: Blob) => {
+    if (newAvatarPreviewUrl) {
+      URL.revokeObjectURL(newAvatarPreviewUrl);
+    }
+    const fileName = originalFileName || `avatar-${Date.now()}.png`;
+    const fileType = originalFileType || croppedImageBlob.type || 'image/png';
+    const croppedFile = new File([croppedImageBlob], fileName, { type: fileType });
+
+    setNewAvatarFile(croppedFile);
+    setNewAvatarPreviewUrl(URL.createObjectURL(croppedFile));
+    setIsCropperOpen(false);
+    setCropperImageSrc(null);
+    setOriginalFileName(null);
+    setOriginalFileType(null);
   };
 
   const handleFormSubmit = async (data: ProfileFormData) => {
@@ -231,6 +267,21 @@ export default function EditProfileForm({ user, onSubmit, onCancel }: EditProfil
           </div>
         </div>
       </form>
+      {cropperImageSrc && (
+        <ImageCropperModal
+          isOpen={isCropperOpen}
+          onClose={() => {
+            setIsCropperOpen(false);
+            setCropperImageSrc(null);
+            setOriginalFileName(null);
+            setOriginalFileType(null);
+          }}
+          imageSrc={cropperImageSrc}
+          onCropComplete={handleCropComplete}
+          aspect={1}
+          circularCrop={true}
+        />
+      )}
     </div>
   );
 }
