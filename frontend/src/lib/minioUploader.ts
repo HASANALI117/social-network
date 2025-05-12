@@ -33,10 +33,14 @@ export const uploadFileToMinio = async (file: File): Promise<string> => {
     const uniqueFileName = `${uuidv4()}.${fileExtension}`;
     const objectKey = `uploads/${uniqueFileName}`; // Optional: organize in a subfolder
 
+    // Read file as ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
     const params = {
         Bucket: MINIO_BUCKET_NAME,
         Key: objectKey,
-        Body: file,
+        Body: uint8Array, // Use Uint8Array
         ContentType: file.type,
         // ACL: 'public-read', // Not needed if bucket policy is public-read
     };

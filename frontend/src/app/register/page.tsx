@@ -1,6 +1,7 @@
 'use client';
 
 import { useForm } from 'react-hook-form';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { useRequest } from '@/hooks/useRequest';
 import { UserSignupData } from '@/types/User';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { uploadFileToMinio } from '../../lib/minioUploader';
 
 const formSchema = z.object({
   first_name: z.string().min(2, 'First name must be at least 2 characters'),
@@ -51,6 +53,8 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function RegisterPage() {
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -72,22 +76,87 @@ export default function RegisterPage() {
 
   const router = useRouter();
 
+  useEffect(() => {
+    // Clean up the object URL when the component unmounts or the file changes
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
+  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl);
+      setAvatarPreviewUrl(null);
+    }
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        toast.error('File must be less than 5MB');
+        setSelectedAvatarFile(null);
+        event.target.value = ''; // Reset file input
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+        toast.error('Only JPEG, PNG, WEBP, and GIF formats are allowed');
+        setSelectedAvatarFile(null);
+        event.target.value = ''; // Reset file input
+        return;
+      }
+      setSelectedAvatarFile(file);
+      setAvatarPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setSelectedAvatarFile(null);
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-lg shadow-md dark:bg-zinc-900">
       <h1 className="text-2xl font-bold mb-6 text-center">Create Account</h1>
       <form
-        onSubmit={handleSubmit((data: FormValues) => {
+        onSubmit={handleSubmit(async (formData: FormValues) => {
+          let avatarUrl = '';
+          if (selectedAvatarFile) {
+            try {
+              // uploadFileToMinio returns the URL string directly or throws an error
+              avatarUrl = await uploadFileToMinio(selectedAvatarFile);
+              if (!avatarUrl) { // Should not happen if uploadFileToMinio resolves
+                toast.error('Avatar upload failed to return a URL. Please try again.');
+                return;
+              }
+            } catch (uploadError) {
+              console.error('Avatar upload error:', uploadError);
+              toast.error('Avatar upload failed. Please try again.');
+              return;
+            }
+          }
+
+          const registrationData = {
+            ...formData,
+            avatar_url: avatarUrl || null, // Send null or empty string if no avatar
+          };
+
           post<UserSignupData>(
             '/api/users',
-            data,
+            registrationData,
             (userData: UserSignupData) => {
               toast.success('Account created successfully! Please log in.');
               console.log('User created:', userData);
               router.push('/login');
             }
+            // Error handling is managed by the useRequest hook's 'error' state.
+            // We can check 'error' from useRequest after this call if needed.
           );
 
-          console.log(data);
+          // Check for errors from useRequest hook after the post call
+          if (error) {
+            const message = error.message || 'Registration failed. Please try again.';
+            toast.error(message);
+            console.error('Registration error:', error);
+          }
+
+          console.log('Submitting registration data:', registrationData);
         })}
       >
         <Fieldset className="space-y-6">
@@ -179,17 +248,25 @@ export default function RegisterPage() {
 
           <Field>
             <label className="block text-sm font-medium mb-1" htmlFor="avatar">
-              Profile Picture (Optional)
+              Profile Picture (Optional, max 5MB, JPG/PNG/WEBP/GIF)
             </label>
+            {avatarPreviewUrl && (
+              <div className="mt-2 mb-2">
+                <img
+                  src={avatarPreviewUrl}
+                  alt="Avatar Preview"
+                  className="w-24 h-24 rounded-full object-cover mx-auto"
+                />
+              </div>
+            )}
             <Input
               id="avatar"
               type="file"
-              accept="image/*"
-              // {...register('avatar_url')}
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleAvatarChange}
+              className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-zinc-700 dark:border-zinc-600 dark:placeholder-zinc-400"
             />
-            {/* {errors.avatar_url?.message && (
-              <ErrorMessage>{errors.avatar_url.message}</ErrorMessage>
-            )} */}
+            {/* No direct form error for avatar via react-hook-form, handled by toast */}
           </Field>
 
           <Field>
