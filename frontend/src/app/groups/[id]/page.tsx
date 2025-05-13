@@ -7,11 +7,13 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { useRequest } from '../../../hooks/useRequest';
 import { Group } from '../../../types/Group';
 import { User } from '../../../types/User';
+import { Post } from '../../../types/Post'; // Added Post type
 import { GroupInvitation } from '../../../types/GroupInvitation';
 import { GroupJoinRequest } from '../../../types/GroupJoinRequest';
 import { useUserStore } from '../../../store/useUserStore';
 import { Heading } from '../../../components/ui/heading';
 import { Text } from '../../../components/ui/text';
+import { Textarea } from '../../../components/ui/textarea'; // Added Textarea
 import { Avatar } from '../../../components/ui/avatar';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -19,6 +21,11 @@ import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/aler
 
 interface InviteUserFormValues {
   userIdToInvite: string;
+}
+
+interface CreateGroupPostFormValues {
+  content: string;
+  image_url?: string; // Optional
 }
 
 interface GroupJoinRequestsApiResponse {
@@ -59,6 +66,10 @@ export default function GroupDetailPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
+  // State for creating group posts
+  const [createPostError, setCreatePostError] = useState<string | null>(null);
+  const [createPostSuccess, setCreatePostSuccess] = useState<string | null>(null);
+
   // New state for comprehensive user group status
   const [currentUserGroupStatus, setCurrentUserGroupStatus] = useState<UserGroupStatus>('loading');
   // const [joinRequestStatus, setJoinRequestStatus] = useState<'idle' | 'pending' | 'requested' | 'member' | 'creator' | 'error'>('idle'); // To be removed or integrated
@@ -86,6 +97,11 @@ export default function GroupDetailPage() {
   const { del: leaveGroupRequest, isLoading: isLeavingGroup, error: leaveGroupApiError } = useRequest<void>(); // For leaving group
   const { get: fetchGroupRequest, error: groupApiError } = useRequest<Group>();
   const { get: fetchUserRequest, error: userApiError } = useRequest<User>(); // For creator
+
+  // Hooks for creating group posts
+  const { register: registerGroupPost, handleSubmit: handleSubmitGroupPost, formState: { errors: groupPostFormErrors }, reset: resetGroupPostForm } = useForm<CreateGroupPostFormValues>();
+  const { post: createGroupPostRequest, isLoading: isCreatingGroupPost, error: createGroupPostApiError } = useRequest<Post>();
+
 
   // Hooks for fetching and updating join requests (for creator view)
   const { get: fetchJoinRequests, error: fetchJoinRequestsApiError } = useRequest<GroupJoinRequestsApiResponse>();
@@ -386,6 +402,37 @@ export default function GroupDetailPage() {
     }
   };
 
+  const onGroupPostSubmit: SubmitHandler<CreateGroupPostFormValues> = async (data) => {
+    if (!currentUser || !group || (currentUserGroupStatus !== 'member' && currentUserGroupStatus !== 'creator')) {
+      setCreatePostError('You must be a member or creator to post in this group.');
+      return;
+    }
+
+    setCreatePostError(null);
+    setCreatePostSuccess(null);
+
+    // TODO: Handle image upload if croppedImage exists (upload to MinIO, get URL, set data.image_url)
+
+    try {
+      await createGroupPostRequest(
+        `/api/groups/${groupId}/posts`,
+        data,
+        (newPost) => {
+          setCreatePostSuccess('Post created successfully!');
+          resetGroupPostForm();
+          // setCroppedImage(null); setSelectedImage(null); // If image upload is implemented
+          // TODO: Add the new post to the list of displayed group posts
+          console.log('New group post created:', newPost);
+          // For now, just log. Later, update state that holds group posts.
+        }
+      );
+    } catch (err: any) {
+      // The useRequest hook's error (createGroupPostApiError) should be populated
+      console.error("Group post submission error:", err);
+      setCreatePostError(createGroupPostApiError?.message || err.message || 'Failed to create post.');
+    }
+  };
+
 
   if (isLoading) {
     return <div className="container mx-auto p-4 text-center text-white"><Text>Loading group details...</Text></div>;
@@ -579,6 +626,74 @@ export default function GroupDetailPage() {
         </section>
       )}
 
+{/* Create Group Post Form */}
+      {(currentUserGroupStatus === 'member' || currentUserGroupStatus === 'creator') && (
+        <section className="mt-8 p-6 bg-gray-800 rounded-lg shadow-xl">
+          <Heading level={2} className="mb-4">Create Post in Group</Heading>
+          <form onSubmit={handleSubmitGroupPost(onGroupPostSubmit)} className="space-y-4">
+            <div>
+              <Textarea
+                id="groupPostContent"
+                {...registerGroupPost('content', { required: 'Post content cannot be empty.' })}
+                rows={3}
+                className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                placeholder={`What's on your mind, ${currentUser?.first_name}?`}
+              />
+              {groupPostFormErrors.content && <Text className="mt-1 text-sm text-red-400">{groupPostFormErrors.content.message}</Text>}
+            </div>
+
+            {/* Image input and cropper logic can be added here later */}
+            {/* 
+            <div>
+              <label htmlFor="groupPostImage" className="block text-sm font-medium text-gray-300 mb-1">
+                Add an image (optional)
+              </label>
+              <Input
+                id="groupPostImage"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    // setSelectedImage(URL.createObjectURL(e.target.files[0]));
+                    // setShowCropperModal(true);
+                  }
+                }}
+                className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+              />
+            </div>
+            {croppedImage && (
+              <div className="mt-2">
+                <img src={croppedImage} alt="Cropped preview" className="max-h-40 rounded"/>
+              </div>
+            )}
+            */}
+
+            {createPostSuccess && <Text className="text-sm text-green-400">{createPostSuccess}</Text>}
+            {createPostError && <Text className="text-sm text-red-400">{createPostError}</Text>}
+            {createGroupPostApiError && !createPostError && <Text className="text-sm text-red-400">Error: {createGroupPostApiError.message}</Text>}
+
+            <Button type="submit" disabled={isCreatingGroupPost} className="w-full sm:w-auto">
+              {isCreatingGroupPost ? 'Posting...' : 'Create Post'}
+            </Button>
+          </form>
+          {/* 
+          {showCropperModal && selectedImage && (
+            <ImageCropperModal
+              isOpen={showCropperModal}
+              onClose={() => setShowCropperModal(false)}
+              imageSrc={selectedImage}
+              onCropComplete={(croppedAreaPixels) => {
+                // Logic to get cropped image data URL using a canvas
+                // const canvas = document.createElement('canvas'); ...
+                // setCroppedImage(canvas.toDataURL('image/jpeg'));
+                // setShowCropperModal(false);
+              }}
+              aspect={16/9} // Or desired aspect ratio
+            />
+          )}
+          */}
+        </section>
+      )}
       {/* Placeholder for Group Content (Posts) */}
       <section className="my-8 p-6 bg-gray-800 rounded-lg shadow-xl"> {/* Added margin and styling like other sections */}
         <Heading level={2} className="mb-4">Group Posts</Heading>
