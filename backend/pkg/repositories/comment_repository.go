@@ -39,19 +39,20 @@ db: db,
 // Create inserts a new comment record into the database
 func (r *commentRepository) Create(comment *models.Comment) error {
 query := `
-        INSERT INTO comments (id, post_id, user_id, content, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    `
+       INSERT INTO comments (id, post_id, user_id, content, image_url, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+   `
 comment.ID = uuid.New().String()
 comment.CreatedAt = time.Now()
 
 _, err := r.db.Exec(
-query,
-comment.ID,
-comment.PostID,
-comment.UserID,
-comment.Content,
-comment.CreatedAt,
+	query,
+	comment.ID,
+	comment.PostID,
+	comment.UserID,
+	comment.Content,
+	comment.ImageURL, // New parameter
+	comment.CreatedAt,
 )
 if err != nil {
 // TODO: Handle potential foreign key constraint errors (e.g., post_id doesn't exist)
@@ -63,19 +64,20 @@ return nil
 // GetByID retrieves a comment by its ID
 func (r *commentRepository) GetByID(id string) (*models.Comment, error) {
 query := `
-        SELECT id, post_id, user_id, content, created_at
-        FROM comments
-        WHERE id = ?
-    `
+       SELECT id, post_id, user_id, content, image_url, created_at
+       FROM comments
+       WHERE id = ?
+   `
 var comment models.Comment
 var createdAt string // Scan as string first
 
 err := r.db.QueryRow(query, id).Scan(
-&comment.ID,
-&comment.PostID,
-&comment.UserID,
-&comment.Content,
-&createdAt, // Scan into string
+	&comment.ID,
+	&comment.PostID,
+	&comment.UserID,
+	&comment.Content,
+	&comment.ImageURL, // New field to scan
+	&createdAt,
 )
 if err != nil {
 if errors.Is(err, sql.ErrNoRows) {
@@ -97,12 +99,12 @@ return &comment, nil
 // GetByPostID retrieves a paginated list of comments for a specific post
 func (r *commentRepository) GetByPostID(postID string, limit, offset int) ([]*models.Comment, error) {
 query := `
-        SELECT id, post_id, user_id, content, created_at
-        FROM comments
-        WHERE post_id = ?
-        ORDER BY created_at ASC -- Or DESC depending on desired order
-        LIMIT ? OFFSET ?
-    `
+       SELECT id, post_id, user_id, content, image_url, created_at
+       FROM comments
+       WHERE post_id = ?
+       ORDER BY created_at ASC -- Or DESC depending on desired order
+       LIMIT ? OFFSET ?
+   `
 rows, err := r.db.Query(query, postID, limit, offset)
 if err != nil {
 return nil, fmt.Errorf("failed to get comments by post ID %s: %w", postID, err)
@@ -114,11 +116,12 @@ for rows.Next() {
 var comment models.Comment
 var createdAt string
 err := rows.Scan(
-&comment.ID,
-&comment.PostID,
-&comment.UserID,
-&comment.Content,
-&createdAt,
+	&comment.ID,
+	&comment.PostID,
+	&comment.UserID,
+	&comment.Content,
+	&comment.ImageURL, // New field to scan
+	&createdAt,
 )
 if err != nil {
 return nil, fmt.Errorf("failed to scan comment for post ID %s: %w", postID, err)
