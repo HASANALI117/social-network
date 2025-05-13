@@ -4,11 +4,20 @@ import { FiPlus, FiX, FiImage } from 'react-icons/fi';
 import { useForm } from 'react-hook-form';
 import { useRequest } from '@/hooks/useRequest';
 import { useUserStore } from '@/store/useUserStore';
-import { CreatePostFormValues, Post } from '@/types/Post';
+import { Post } from '@/types/Post'; // Removed CreatePostFormValues
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import toast from 'react-hot-toast';
 import { uploadFileToMinio } from '../../lib/minioUploader';
 import Image from 'next/image';
+
+// Define CreatePostFormValues locally
+interface CreatePostFormValues {
+  title: string;
+  content: string;
+  image_url: string | null;
+  privacy: 'public' | 'semi_private' | 'private'; // Match Post type
+  // group_id is not part of this form currently
+}
 
 interface CreatePostFormProps {
   onSubmit?: (post: Post) => void;
@@ -198,7 +207,7 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
             disabled={isLoading}
           >
             <option value="public">Public</option>
-            <option value="friends">Friends Only</option>
+            <option value="semi_private">Followers Only</option>
             <option value="private">Private</option>
           </select>
         </div>

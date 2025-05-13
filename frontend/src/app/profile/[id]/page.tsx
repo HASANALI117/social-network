@@ -8,7 +8,7 @@ import { useUserStore } from '@/store/useUserStore'; // To get current user ID
 import toast from 'react-hot-toast';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import TabSwitcher from '@/components/profile/TabSwitcher';
-import PostList from '@/components/profile/PostList';
+import PostList from '@/components/common/PostList';
 import UserList from '@/components/profile/UserList';
 
 export default function UserProfilePage() {

@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import CreatePostForm from "@/components/profile/CreatePostForm"
-import { Post, PostResponse, transformPosts } from "@/types/Post"
+import { Post } from "@/types/Post" // Removed PostResponse and transformPosts
 import { useRequest } from '@/hooks/useRequest';
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const { get: getPosts, isLoading } = useRequest<{ posts: PostResponse[] }>();
+  const { get: getPosts, isLoading } = useRequest<{ posts: Post[] }>(); // Changed to Post[]
 
   useEffect(() => {
     loadPosts();
@@ -16,7 +16,7 @@ export default function PostsPage() {
   const loadPosts = async () => {
     const result = await getPosts('/api/posts');
     if (result) {
-      setPosts(transformPosts(result.posts));
+      setPosts(result.posts); // Removed transformPosts
     }
   };
 
