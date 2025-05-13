@@ -25,18 +25,23 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    useUserStore.persist.rehydrate();
-    
     const init = async () => {
-      if (!isAuthenticated) {
+      await useUserStore.persist.rehydrate();
+      const { isAuthenticated: rehydratedIsAuthenticated, user: rehydratedUser } = useUserStore.getState();
+
+      if (!rehydratedIsAuthenticated) {
         router.push('/login');
         return;
       }
 
-      if (!user) return;
+      if (!rehydratedUser) {
+        setIsLoading(false); // Set loading to false if user is not available after rehydration
+        return;
+      }
 
       try {
-        get(`/api/users/${user.id}`, (data) => {
+        // Use rehydratedUser.id for the API call
+        get(`/api/users/${rehydratedUser.id}`, (data) => {
           setUserProfile(data);
           setError(null);
         });
@@ -49,7 +54,7 @@ export default function ProfilePage() {
     };
 
     init();
-  }, [isAuthenticated, router, user?.id, get]);
+  }, [router, get]); // Removed isAuthenticated and user from dependencies as they are now fetched after rehydration
 
   const handleEdit = () => {
     setIsEditing(true);
