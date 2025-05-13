@@ -127,9 +127,10 @@ export default function ProfilePage() {
       ) : (
         <ProfileHeader
           user={userProfile}
-          isPublic={!userProfile.is_private}
           onTogglePublic={handleTogglePrivacy}
           onEdit={handleEdit}
+          pageType="own-static"
+          currentUserId={user?.id}
         />
       )}
 
