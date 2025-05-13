@@ -49,7 +49,7 @@ export default function PostsPage() {
                 )}
                 <p className="text-gray-300">{post.content}</p>
                 <div className="mt-4 text-sm text-gray-400">
-                  Posted on {new Date(post.createdAt).toLocaleDateString()}
+                  Posted on {new Date(post.created_at).toLocaleDateString()}
                 </div>
               </div>
             ))}
