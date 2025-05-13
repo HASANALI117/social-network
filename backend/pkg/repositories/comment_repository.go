@@ -80,17 +80,19 @@ err := r.db.QueryRow(query, id).Scan(
 	&createdAt,
 )
 if err != nil {
-if errors.Is(err, sql.ErrNoRows) {
-return nil, ErrCommentNotFound
-}
-return nil, fmt.Errorf("failed to get comment by ID: %w", err)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrCommentNotFound
+	}
+	return nil, fmt.Errorf("failed to get comment by ID: %w", err)
 }
 
 // Parse timestamp
-comment.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+// Custom layout for "YYYY-MM-DD HH:MM:SS.FFFFFFFFF+ZZ:ZZ"
+const customTimeLayout = "2006-01-02 15:04:05.999999999Z07:00"
+comment.CreatedAt, err = time.Parse(customTimeLayout, createdAt)
 if err != nil {
-fmt.Printf("Warning: Failed to parse comment created_at timestamp '%s': %v\n", createdAt, err)
-comment.CreatedAt = time.Time{}
+	fmt.Printf("Warning: Failed to parse comment created_at timestamp '%s' with layout '%s': %v\n", createdAt, customTimeLayout, err)
+	comment.CreatedAt = time.Time{}
 }
 
 return &comment, nil
@@ -124,13 +126,15 @@ err := rows.Scan(
 	&createdAt,
 )
 if err != nil {
-return nil, fmt.Errorf("failed to scan comment for post ID %s: %w", postID, err)
+	return nil, fmt.Errorf("failed to scan comment for post ID %s: %w", postID, err)
 }
 // Parse timestamp
-comment.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+// Custom layout for "YYYY-MM-DD HH:MM:SS.FFFFFFFFF+ZZ:ZZ"
+const customTimeLayout = "2006-01-02 15:04:05.999999999Z07:00"
+comment.CreatedAt, err = time.Parse(customTimeLayout, createdAt)
 if err != nil {
-fmt.Printf("Warning: Failed to parse comment created_at timestamp '%s': %v\n", createdAt, err)
-comment.CreatedAt = time.Time{}
+	fmt.Printf("Warning: Failed to parse comment created_at timestamp '%s' with layout '%s': %v\n", createdAt, customTimeLayout, err)
+	comment.CreatedAt = time.Time{}
 }
 comments = append(comments, &comment)
 }
