@@ -11,6 +11,8 @@ import (
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
 
+	// "github.com/HASANALI117/social-network/pkg/middlewares" // Removed problematic import
+
 	// "github.com/HASANALI117/social-network/pkg/models" // Model used via service request/response
 	"github.com/HASANALI117/social-network/pkg/repositories" // For error checking
 	"github.com/HASANALI117/social-network/pkg/services"
@@ -45,18 +47,32 @@ func (h *PostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	log.Printf("PostHandler: Method=%s, Path=%s, Parts=%v\n", r.Method, r.URL.Path, parts)
 
 	// Get current user for authorization (required for most actions)
-	currentUser, err := helpers.GetUserFromSession(r, h.authService)
-	if err != nil && !(r.Method == http.MethodGet && len(parts) == 1 && parts[0] != "") {
-		// Allow anonymous GET /api/posts/{id} for public posts (checked in service)
-		// Allow anonymous GET /api/posts/ for public posts (checked in service)
-		// Allow anonymous GET /api/posts/user/{userID} for public posts (checked in service)
-		// For other methods (POST, DELETE) or paths, require authentication.
-		if errors.Is(err, helpers.ErrInvalidSession) {
-			return httperr.NewUnauthorized(err, "Invalid session")
+	// For routes that strictly require authentication (like create, delete, or the new /following),
+	// the specific handler will check or rely on middleware.
+	// For GET routes that can be partially public, currentUser might be nil.
+	var currentUser *services.UserResponse
+	var err error
+	// Only attempt to get user from session if not a public GET endpoint that doesn't strictly need it for path parsing.
+	// The new /following route will handle its own auth check.
+	// Explore, get by ID, list, list by user can be partially public.
+	isPotentiallyPublicGet := r.Method == http.MethodGet &&
+		(len(parts) == 1 && (parts[0] == "explore" || parts[0] == "" || parts[0] != "")) ||
+		(len(parts) == 2 && parts[0] == "user")
+
+	if !(isPotentiallyPublicGet && r.Method == http.MethodGet) { // If not one of these specific public GETs, or if not GET at all
+		currentUser, err = helpers.GetUserFromSession(r, h.authService)
+		if err != nil {
+			if errors.Is(err, helpers.ErrInvalidSession) {
+				return httperr.NewUnauthorized(err, "Invalid session")
+			}
+			return httperr.NewInternalServerError(err, "Failed to get current user")
 		}
-		return httperr.NewInternalServerError(err, "Failed to get current user")
+		if currentUser == nil && r.Method != http.MethodGet { // Non-GET methods require a user
+			return httperr.NewUnauthorized(errors.New("authentication required"), "Authentication required")
+		}
+	} else if r.Method == http.MethodGet { // For public GETs, still try to get user, but don't fail if not present
+		currentUser, _ = helpers.GetUserFromSession(r, h.authService) // Error ignored, currentUser will be nil if not logged in
 	}
-	// If currentUser is nil here, it means it's an anonymous GET request
 
 	// Check if this is a comment-related route nested under posts
 	// e.g., /api/posts/{postId}/comments -> parts = ["{postId}", "comments"]
@@ -86,10 +102,18 @@ func (h *PostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 		// IMPORTANT: Place this check BEFORE the `len(parts) == 1 && parts[0] != ""` check for `/{id}`
 		// GET /api/posts/explore -> List all public posts
 		if len(parts) == 1 && parts[0] == "explore" {
-			return h.listExplorePosts(w, r) // New method
+			return h.listExplorePosts(w, r)
+		}
+		// GET /api/posts/following -> List posts from followed users
+		if len(parts) == 1 && parts[0] == "following" {
+			// This route requires authentication
+			if currentUser == nil {
+				return httperr.NewUnauthorized(errors.New("authentication required"), "Authentication required to view following feed.")
+			}
+			return h.listFollowingPosts(w, r, currentUser) // Pass currentUser
 		}
 		// GET /api/posts/{id} -> Get Post by ID
-		if len(parts) == 1 && parts[0] != "" { // This was the original check for /api/posts/{id}
+		if len(parts) == 1 && parts[0] != "" { // Ensure this doesn't catch "explore" or "following"
 			postID := parts[0]
 			requestingUserID := ""
 			if currentUser != nil {
@@ -360,6 +384,47 @@ func (h *PostHandler) deletePost(w http.ResponseWriter, r *http.Request, postID 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Post deleted successfully",
+	})
+	return nil
+}
+
+// listFollowingPosts handles GET /api/posts/following
+func (h *PostHandler) listFollowingPosts(w http.ResponseWriter, r *http.Request, currentUser *services.UserResponse) error {
+	// currentUser is already validated by the caller (ServeHTTP) for this route
+	if currentUser == nil || currentUser.ID == "" {
+		// This should ideally not be reached if ServeHTTP correctly gatekeeps,
+		// but as a safeguard:
+		return httperr.NewUnauthorized(errors.New("user not authenticated"), "Authentication required to view following feed.")
+	}
+	requestingUserID := currentUser.ID
+
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // Default limit
+	if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+		limit = parsedLimit
+	}
+
+	offset := 0 // Default offset
+	if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+		offset = parsedOffset
+	}
+
+	postsResponse, err := h.postService.ListFollowingFeed(requestingUserID, limit, offset)
+	if err != nil {
+		log.Printf("Error in listFollowingPosts service call for user %s: %v", requestingUserID, err)
+		// Avoid exposing internal error details directly to client unless wrapped.
+		// The service layer should return specific error types if needed for different HTTP responses.
+		return httperr.NewInternalServerError(errors.New("failed to retrieve feed"), "Failed to list posts from followed users. "+err.Error())
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts":  postsResponse,
+		"limit":  limit,
+		"offset": offset,
+		"count":  len(postsResponse),
 	})
 	return nil
 }
