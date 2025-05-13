@@ -11,14 +11,14 @@ import { uploadFileToMinio } from '../../lib/minioUploader';
 import Image from 'next/image';
 
 interface CreatePostFormProps {
-  onSubmitSuccess?: (post: Post) => void;
+  onSubmit?: (post: Post) => void;
 }
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-export default function CreatePostForm({ onSubmitSuccess }: CreatePostFormProps) {
+export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
   const { user } = useUserStore();
   const { post: createPostRequest, isLoading: isCreatingPost } = useRequest<Post>();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -122,8 +122,8 @@ export default function CreatePostForm({ onSubmitSuccess }: CreatePostFormProps)
         toast.success('Post created successfully!', { id: createPostToastId });
         reset();
         handleRemoveImage(); // Clear image selection and preview
-        if (onSubmitSuccess) {
-          onSubmitSuccess(result);
+        if (onSubmit) {
+          onSubmit(result);
         }
       } else {
         // This case might not be hit if useRequest throws on non-2xx

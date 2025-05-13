@@ -2,8 +2,8 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from 'uuid'; // For generating unique filenames
 
 const MINIO_ENDPOINT = process.env.NEXT_PUBLIC_MINIO_ENDPOINT || "http://localhost:9000";
-const MINIO_ACCESS_KEY = process.env.NEXT_PUBLIC_MINIO_ACCESS_KEY || "YOUR_MINIO_ACCESS_KEY"; // Get from .env
-const MINIO_SECRET_KEY = process.env.NEXT_PUBLIC_MINIO_SECRET_KEY || "YOUR_MINIO_SECRET_KEY"; // Get from .env
+const MINIO_ACCESS_KEY = process.env.NEXT_PUBLIC_MINIO_ACCESS_KEY || "ak-123456"; // Get from .env
+const MINIO_SECRET_KEY = process.env.NEXT_PUBLIC_MINIO_SECRET_KEY || "sk-123456"; // Get from .env
 const MINIO_BUCKET_NAME = process.env.NEXT_PUBLIC_MINIO_BUCKET_NAME || "images";
 const MINIO_REGION = process.env.NEXT_PUBLIC_MINIO_REGION || "us-east-1"; // MinIO is region-agnostic but SDK might require one
 

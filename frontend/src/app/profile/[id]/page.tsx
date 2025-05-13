@@ -172,6 +172,7 @@ export default function UserProfilePage() {
         onFollowAction={handleFollowAction}
         isPreview={false}
         isLoadingFollowAction={isLoadingFollowAction}
+        pageType="dynamic"
       />
       {followError && !isLoadingFollowAction && <p className="text-red-500 mt-2 text-center">Error: {followError.message}</p>}
 

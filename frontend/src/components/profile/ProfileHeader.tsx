@@ -6,10 +6,11 @@ interface ProfileHeaderProps {
   user: UserProfile | User;
   currentUserId?: string;
   onTogglePublic?: () => void;
-  onFollowAction: (actionType: 'follow' | 'unfollow' | 'cancel_request' | 'accept_request' | 'decline_request') => void;
+  onFollowAction?: (actionType: 'follow' | 'unfollow' | 'cancel_request' | 'accept_request' | 'decline_request') => void;
   onEdit?: () => void;
   isPreview?: boolean;
   isLoadingFollowAction?: boolean;
+  pageType?: 'own-static' | 'dynamic';
 }
 
 export default function ProfileHeader({
@@ -20,21 +21,32 @@ export default function ProfileHeader({
   onEdit,
   isPreview = false,
   isLoadingFollowAction = false,
+  pageType = 'dynamic',
 }: ProfileHeaderProps) {
   const isOwnProfile = user.id === currentUserId;
   const profileUser = user as UserProfile;
 
-  console.log('[ProfileHeader] Props received:', { user, currentUserId, isOwnProfile, isFollowed: profileUser.is_followed, followRequestState: profileUser.follow_request_state });
-
   const getFollowButton = () => {
-    if (isOwnProfile) {
+    if (pageType === 'own-static') {
       return null;
+    }
+    
+    if (isOwnProfile) {
+      return (
+        <Button
+          className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full opacity-50 cursor-not-allowed"
+          disabled={true}
+        >
+          <FiUserPlus className="text-lg" />
+          Follow
+        </Button>
+      );
     }
 
     if (profileUser.is_followed) {
       return (
         <Button
-          onClick={() => onFollowAction('unfollow')}
+          onClick={() => onFollowAction?.('unfollow')}
           className="flex items-center gap-2 bg-red-600 text-gray-100 px-6 py-2 rounded-full hover:bg-red-500 transition-colors"
           disabled={isLoadingFollowAction}
         >
@@ -47,7 +59,7 @@ export default function ProfileHeader({
         case 'SENT':
           return (
             <Button
-              onClick={() => onFollowAction('cancel_request')}
+              onClick={() => onFollowAction?.('cancel_request')}
               className="flex items-center gap-2 bg-yellow-500 text-gray-900 px-6 py-2 rounded-full hover:bg-yellow-400 transition-colors"
               disabled={isLoadingFollowAction}
             >
@@ -59,7 +71,7 @@ export default function ProfileHeader({
           return (
             <>
               <Button
-                onClick={() => onFollowAction('accept_request')}
+                onClick={() => onFollowAction?.('accept_request')}
                 className="flex items-center gap-2 bg-green-500 text-gray-100 px-4 py-2 rounded-full hover:bg-green-400 transition-colors"
                 disabled={isLoadingFollowAction}
               >
@@ -67,7 +79,7 @@ export default function ProfileHeader({
                 Accept
               </Button>
               <Button
-                onClick={() => onFollowAction('decline_request')}
+                onClick={() => onFollowAction?.('decline_request')}
                 className="flex items-center gap-2 bg-gray-600 text-gray-100 px-4 py-2 rounded-full hover:bg-gray-500 transition-colors"
                 disabled={isLoadingFollowAction}
               >
@@ -79,7 +91,7 @@ export default function ProfileHeader({
         default: // Includes empty or undefined follow_request_state
           return (
             <Button
-              onClick={() => onFollowAction('follow')}
+              onClick={() => onFollowAction?.('follow')}
               className="flex items-center gap-2 bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors"
               disabled={isLoadingFollowAction}
             >
@@ -111,7 +123,7 @@ export default function ProfileHeader({
               <p className="text-gray-400">@{user.username}</p>
             </div>
             <div className="flex items-center gap-4">
-              {!isOwnProfile && getFollowButton()}
+              {getFollowButton()}
               {!isPreview && onEdit && !isOwnProfile && ( // Edit button should not show on own profile if follow buttons are present
                 <button
                   onClick={onEdit}
