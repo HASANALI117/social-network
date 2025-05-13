@@ -147,7 +147,7 @@ export default function PostDetailPage() {
               <div key={comment.id} className="bg-slate-800 p-4 rounded-lg shadow-md">
                 <div className="flex items-start mb-3">
                   <Avatar
-                    src={comment.user_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user_first_name || 'U')}+${encodeURIComponent(comment.user_last_name || 'N')}&background=random&color=fff&size=128`}
+                    src={comment.user_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user_first_name || 'U')}+${encodeURIComponent(comment.user_last_name || 'N')}&background=random&color=random&size=128&bold=true`}
                     alt={comment.user_first_name || `User ${comment.user_id.substring(0,4)}`}
                     className="w-10 h-10 mr-3 rounded-full flex-shrink-0"
                   />

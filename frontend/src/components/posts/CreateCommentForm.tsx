@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
 import { useUserStore } from '@/store/useUserStore';
 import { uploadFileToMinio } from '@/lib/minioUploader';
-import ImageCropperModal from '@/components/common/ImageCropperModal';
 
 interface CommentFormValues {
   content: string;
@@ -28,58 +27,24 @@ const CreateCommentForm: React.FC<CreateCommentFormProps> = ({ postId, onComment
   const { post: submitComment, isLoading: isPostingComment, error: commentPostError } = useRequest<Comment>();
 
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-  const [croppedImageFile, setCroppedImageFile] = useState<File | null>(null);
-  const [showCropperModal, setShowCropperModal] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImageToCrop(reader.result as string);
-        setShowCropperModal(true);
+        setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     } else {
-      setImageToCrop(null);
+      setSelectedFile(null);
       setImagePreview(null);
-      setCroppedImageFile(null);
       setValue('image', undefined);
     }
   };
-
-  const handleCropComplete = useCallback((croppedBlob: Blob | null) => {
-    setShowCropperModal(false);
-    if (croppedBlob) {
-      const file = new File([croppedBlob], `cropped-image-${Date.now()}.png`, { type: 'image/png' });
-      setCroppedImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-      // We don't directly set react-hook-form's FileList here as we'll use croppedImageFile for upload
-    } else {
-      // Crop was cancelled or failed in modal
-      setImageToCrop(null);
-      // Keep existing preview/file if user cancels, or clear if needed
-      // For now, let's clear if crop is explicitly cancelled by passing null
-      // setImagePreview(null);
-      // setCroppedImageFile(null);
-      // setValue('image', undefined);
-    }
-  }, [setValue]);
-
-  const handleCancelCrop = useCallback(() => {
-    setShowCropperModal(false);
-    setImageToCrop(null);
-    // Reset the file input if crop is cancelled
-    const fileInput = document.getElementById('comment-image-upload') as HTMLInputElement;
-    if (fileInput) {
-        fileInput.value = ''; // Clears the selected file in the input
-    }
-    setValue('image', undefined); // Clear RHF value
-    // Don't clear existing preview or croppedImageFile here, user might want to keep it if they just closed modal
-  }, [setValue]);
-
 
   const onSubmit: SubmitHandler<CommentFormValues> = async (data) => {
     if (!user) {
@@ -91,13 +56,13 @@ const CreateCommentForm: React.FC<CreateCommentFormProps> = ({ postId, onComment
     let imageUrl: string | undefined = undefined;
 
     try {
-      if (croppedImageFile) {
-        const uploadedUrl = await uploadFileToMinio(croppedImageFile);
-        if (!uploadedUrl) {
-          setSubmissionError("Failed to upload image. Please try again.");
-          return;
+      if (selectedFile) { // Use selectedFile instead of croppedImageFile
+        const uploadedUrl = await uploadFileToMinio(selectedFile); // Removed second argument
+        if (uploadedUrl) { // Assuming uploadFileToMinio returns string URL directly or null/undefined on failure
+          imageUrl = uploadedUrl;
+        } else {
+          throw new Error('Failed to get image URL from upload.');
         }
-        imageUrl = uploadedUrl;
       }
 
       const payload = {
@@ -107,14 +72,15 @@ const CreateCommentForm: React.FC<CreateCommentFormProps> = ({ postId, onComment
 
       await submitComment(`/api/posts/${postId}/comments`, payload, (newComment: Comment) => {
         onCommentCreated(newComment);
-        reset();
+        reset(); // Clears react-hook-form fields
+        setSelectedFile(null);
         setImagePreview(null);
-        setImageToCrop(null);
-        setCroppedImageFile(null);
+        // Clear the file input in react-hook-form if it's registered
         const fileInput = document.getElementById('comment-image-upload') as HTMLInputElement;
         if (fileInput) {
-            fileInput.value = '';
+            fileInput.value = ''; // Clears the selected file in the input element
         }
+        setValue('image', undefined); // Ensure RHF state is also cleared
       });
 
       if (commentPostError) { // Check error state from useRequest after await
@@ -123,7 +89,7 @@ const CreateCommentForm: React.FC<CreateCommentFormProps> = ({ postId, onComment
 
     } catch (error: any) {
       console.error("Comment submission error:", error);
-      setSubmissionError(error.message || "An unexpected error occurred while posting your comment.");
+      setSubmissionError((error as Error).message || "An unexpected error occurred while posting your comment.");
     }
   };
 
@@ -150,25 +116,24 @@ const CreateCommentForm: React.FC<CreateCommentFormProps> = ({ postId, onComment
           id="comment-image-upload"
           type="file"
           accept="image/*"
-          {...register('image')}
+          {...register("image")}
           onChange={handleFileChange}
-          className="mt-1"
+          className="mt-2 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
         />
       </div>
 
       {imagePreview && (
         <div className="mt-2">
-          <img src={imagePreview} alt="Selected preview" className="max-h-40 rounded-md border" />
-          <Button type="button" outline={true} onClick={() => {
+          <img src={imagePreview} alt="Selected image" className="max-h-40 rounded-md border border-gray-600" />
+          <Button type="button" onClick={() => { // Removed variant="ghost" and size="sm"
             setImagePreview(null);
-            setCroppedImageFile(null);
-            setImageToCrop(null);
-            setValue('image', undefined);
+            setSelectedFile(null);
+            setValue("image", undefined); // Clear the file input in react-hook-form
             const fileInput = document.getElementById('comment-image-upload') as HTMLInputElement;
             if (fileInput) {
-                fileInput.value = '';
+                fileInput.value = ''; // Also clear the native file input
             }
-          }} className="mt-1 text-xs">
+          }} className="mt-1 text-xs text-red-400">
             Remove Image
           </Button>
         </div>
@@ -189,16 +154,6 @@ const CreateCommentForm: React.FC<CreateCommentFormProps> = ({ postId, onComment
       <Button type="submit" disabled={isPostingComment}>
         {isPostingComment ? 'Posting...' : 'Post Comment'}
       </Button>
-
-      {showCropperModal && imageToCrop && (
-        <ImageCropperModal
-          imageSrc={imageToCrop}
-          onCropComplete={handleCropComplete}
-          onClose={handleCancelCrop}
-          aspect={1}
-          isOpen={showCropperModal}
-        />
-      )}
     </form>
   );
 };
