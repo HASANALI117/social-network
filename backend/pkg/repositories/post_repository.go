@@ -22,6 +22,7 @@ type PostRepository interface {
 	List(requestingUserID string, limit, offset int) ([]*models.Post, error)                     // General feed (non-group posts)
 	ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) // User profile posts (non-group)
 	ListByGroupID(groupID string, limit, offset int) ([]*models.Post, error)                     // Group-specific posts
+	ListPublic(limit, offset int) ([]*models.Post, error)                                        // For "Explore" feed
 	// Update(post *models.Post) error // TODO: Implement Update
 	Delete(id string) error
 
@@ -439,4 +440,58 @@ func (r *postRepository) GetAllowedUsers(postID string) ([]string, error) {
 	}
 
 	return allowedUserIDs, nil
+}
+
+// ListPublic retrieves a paginated list of public, non-group posts.
+func (r *postRepository) ListPublic(limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT id, user_id, title, content, image_url, privacy, group_id, created_at
+		FROM posts
+		WHERE privacy = ? AND group_id IS NULL
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?;
+	`
+	rows, err := r.db.Query(query, models.PrivacyPublic, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list public posts: %w", err)
+	}
+	defer rows.Close()
+
+	posts := make([]*models.Post, 0)
+	for rows.Next() {
+		var post models.Post
+		var createdAtStr string
+		var groupID sql.NullString // Ensure GroupID is scanned as sql.NullString
+
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL, // This is string, can be empty
+			&post.Privacy,
+			&groupID, // Scan into sql.NullString
+			&createdAtStr,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan public post row: %w", err)
+		}
+
+		post.GroupID = groupID // Assign scanned NullString
+
+		parsedTime, timeErr := time.Parse(time.RFC3339, createdAtStr)
+		if timeErr != nil {
+			// Log error and/or decide on fallback. For now, set to zero time.
+			fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAtStr, timeErr)
+			post.CreatedAt = time.Time{}
+		} else {
+			post.CreatedAt = parsedTime
+		}
+		posts = append(posts, &post)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating public post rows: %w", err)
+	}
+	return posts, nil
 }

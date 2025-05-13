@@ -49,6 +49,7 @@ type PostService interface {
 	List(requestingUserID string, limit, offset int) ([]*PostResponse, error)                           // General feed (non-group)
 	ListPostsByUser(targetUserID, requestingUserID string, limit, offset int) ([]*PostResponse, error)  // User profile (non-group)
 	ListGroupPosts(groupID string, requestingUserID string, limit, offset int) ([]*PostResponse, error) // Group posts
+	ListExplore(limit, offset int) ([]*PostResponse, error)                                             // For "Explore" feed
 	// Update(...) // TODO: Implement Update
 	Delete(postID string, requestingUserID string) error // requestingUserID for auth check
 }
@@ -367,4 +368,15 @@ func (s *postService) Delete(postID string, requestingUserID string) error {
 	}
 
 	return nil
+}
+
+// ListExplore retrieves public, non-group posts for the "Explore" feed.
+// No specific requestingUserID is needed here as it's for public content.
+func (s *postService) ListExplore(limit, offset int) ([]*PostResponse, error) {
+	posts, err := s.postRepo.ListPublic(limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list public posts from repository for explore: %w", err)
+	}
+	// The existing mapPostsToResponse should fetch user details for each post.
+	return s.mapPostsToResponse(posts, nil), nil
 }

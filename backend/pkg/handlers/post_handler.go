@@ -18,18 +18,18 @@ import (
 
 // PostHandler handles HTTP requests for posts and delegates comment routes
 type PostHandler struct {
-postService    services.PostService
-authService    services.AuthService
-commentHandler *CommentHandler // Added CommentHandler
+	postService    services.PostService
+	authService    services.AuthService
+	commentHandler *CommentHandler // Added CommentHandler
 }
 
 // NewPostHandler creates a new PostHandler
 func NewPostHandler(postService services.PostService, authService services.AuthService, commentHandler *CommentHandler) *PostHandler {
-return &PostHandler{
-postService:    postService,
-authService:    authService,
-commentHandler: commentHandler, // Store CommentHandler
-}
+	return &PostHandler{
+		postService:    postService,
+		authService:    authService,
+		commentHandler: commentHandler, // Store CommentHandler
+	}
 }
 
 // ServeHTTP routes the request to the appropriate handler method
@@ -56,23 +56,23 @@ func (h *PostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 		}
 		return httperr.NewInternalServerError(err, "Failed to get current user")
 	}
-// If currentUser is nil here, it means it's an anonymous GET request
+	// If currentUser is nil here, it means it's an anonymous GET request
 
-// Check if this is a comment-related route nested under posts
-// e.g., /api/posts/{postId}/comments -> parts = ["{postId}", "comments"]
-if len(parts) >= 2 && parts[1] == "comments" {
-// Delegate to CommentHandler. ServeHTTP needs to handle this specific path structure.
-// We might need to adjust CommentHandler's ServeHTTP if it relies on a different path format.
-log.Printf("PostHandler delegating to CommentHandler for path: %s", r.URL.Path)
-// Re-route by calling the CommentHandler's ServeHTTP directly
-// Note: The CommentHandler's ServeHTTP will re-parse the path, which might be inefficient
-// or require adjustments in CommentHandler.
-return h.commentHandler.ServeHTTP(w, r)
-}
+	// Check if this is a comment-related route nested under posts
+	// e.g., /api/posts/{postId}/comments -> parts = ["{postId}", "comments"]
+	if len(parts) >= 2 && parts[1] == "comments" {
+		// Delegate to CommentHandler. ServeHTTP needs to handle this specific path structure.
+		// We might need to adjust CommentHandler's ServeHTTP if it relies on a different path format.
+		log.Printf("PostHandler delegating to CommentHandler for path: %s", r.URL.Path)
+		// Re-route by calling the CommentHandler's ServeHTTP directly
+		// Note: The CommentHandler's ServeHTTP will re-parse the path, which might be inefficient
+		// or require adjustments in CommentHandler.
+		return h.commentHandler.ServeHTTP(w, r)
+	}
 
-// --- Original Post Routing Logic ---
-switch r.Method {
-case http.MethodPost:
+	// --- Original Post Routing Logic ---
+	switch r.Method {
+	case http.MethodPost:
 		// POST /api/posts/ -> Create Post
 		if len(parts) == 1 && parts[0] == "" {
 			if currentUser == nil { // Must be logged in to create
@@ -83,8 +83,13 @@ case http.MethodPost:
 		return httperr.NewNotFound(nil, "Invalid path for POST")
 
 	case http.MethodGet:
+		// IMPORTANT: Place this check BEFORE the `len(parts) == 1 && parts[0] != ""` check for `/{id}`
+		// GET /api/posts/explore -> List all public posts
+		if len(parts) == 1 && parts[0] == "explore" {
+			return h.listExplorePosts(w, r) // New method
+		}
 		// GET /api/posts/{id} -> Get Post by ID
-		if len(parts) == 1 && parts[0] != "" {
+		if len(parts) == 1 && parts[0] != "" { // This was the original check for /api/posts/{id}
 			postID := parts[0]
 			requestingUserID := ""
 			if currentUser != nil {
@@ -289,6 +294,38 @@ func (h *PostHandler) listUserPosts(w http.ResponseWriter, r *http.Request, targ
 		"limit":  limit,
 		"offset": offset,
 		"count":  len(postsResponse), // Count of returned posts
+	})
+	return nil
+}
+
+// listExplorePosts handles GET /api/posts/explore
+func (h *PostHandler) listExplorePosts(w http.ResponseWriter, r *http.Request) error {
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // Default limit
+	if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+		limit = parsedLimit
+	}
+
+	offset := 0 // Default offset
+	if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+		offset = parsedOffset
+	}
+
+	postsResponse, err := h.postService.ListExplore(limit, offset)
+	if err != nil {
+		// Log the full error for server-side debugging
+		log.Printf("Error in listExplorePosts service call: %v", err)
+		return httperr.NewInternalServerError(err, "Failed to list explore posts")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts":  postsResponse,
+		"limit":  limit,
+		"offset": offset,             // Return the offset used for the query
+		"count":  len(postsResponse), // Count of items in the current response
 	})
 	return nil
 }
