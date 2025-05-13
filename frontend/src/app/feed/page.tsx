@@ -3,9 +3,10 @@ import { useState, useEffect, useCallback } from 'react';
 import PostCard from '@/components/common/PostCard'; // Updated import path
 import { Post } from '@/types/Post';
 import { useRequest } from '@/hooks/useRequest';
-import { Button } from '@/components/ui/button'; 
+import { Button } from '@/components/ui/button';
+import { useUserStore } from '@/store/useUserStore';
 
-const FEED_LIMIT = 10; 
+const FEED_LIMIT = 10;
 
 export default function FeedPage() {
   const [activeTab, setActiveTab] = useState<'forYou' | 'explore'>('explore');
@@ -15,7 +16,16 @@ export default function FeedPage() {
   const [isLoadingExplore, setIsLoadingExplore] = useState(false);
   const [errorExplore, setErrorExplore] = useState<string | null>(null);
 
-  const { get } = useRequest<{ posts: Post[], count: number, limit: number, offset: number }>(); // Type argument moved here
+  // State for "For You" tab
+  const [forYouPosts, setForYouPosts] = useState<Post[]>([]);
+  const [forYouOffset, setForYouOffset] = useState(0);
+  const [canLoadMoreForYou, setCanLoadMoreForYou] = useState(true);
+  const [isLoadingForYou, setIsLoadingForYou] = useState(false);
+  const [errorForYou, setErrorForYou] = useState<string | null>(null);
+
+  const { user, isAuthenticated, hydrated } = useUserStore();
+
+  const { get } = useRequest<{ posts: Post[], count: number, limit: number, offset: number }>();
 
   const fetchExplorePosts = useCallback(async (currentOffset: number, isInitialLoad: boolean = false) => {
     setIsLoadingExplore(true);
@@ -39,16 +49,61 @@ export default function FeedPage() {
     }
   }, [get]);
 
+  const fetchForYouPosts = useCallback(async (currentOffset: number, isInitialLoad: boolean = false) => {
+    if (!isAuthenticated || !user) { // Don't fetch if not logged in or user object is null
+      setForYouPosts([]);
+      setCanLoadMoreForYou(false);
+      setErrorForYou(null); // Clear any previous error
+      return;
+    }
+    setIsLoadingForYou(true);
+    setErrorForYou(null);
+    try {
+      // Type argument for `get` is defined when `useRequest` is called, not here.
+      const response = await get(
+        `/api/posts/following?limit=${FEED_LIMIT}&offset=${currentOffset}`
+      );
+      if (response && response.posts) {
+        setForYouPosts(prev => isInitialLoad ? response.posts : [...prev, ...response.posts]);
+        setForYouOffset(currentOffset + response.posts.length);
+        setCanLoadMoreForYou(response.posts.length === FEED_LIMIT);
+      } else {
+        setCanLoadMoreForYou(false);
+      }
+    } catch (err: any) {
+      setErrorForYou(err.message || 'Failed to fetch your feed');
+      setCanLoadMoreForYou(false);
+    } finally {
+      setIsLoadingForYou(false);
+    }
+  }, [get, user]); // Add user to dependencies
+
   useEffect(() => {
     if (activeTab === 'explore') {
       fetchExplorePosts(0, true); // Initial load for explore tab
-    } else {
-      // Optionally clear explore posts or handle other tab logic
+      // Clear "For You" posts when switching to explore
+      setForYouPosts([]);
+      setForYouOffset(0);
+      setCanLoadMoreForYou(true);
+      setErrorForYou(null);
+    } else if (activeTab === 'forYou') {
+      if (hydrated) { // Only fetch if auth state is resolved (store is hydrated)
+        if (isAuthenticated && user) {
+          fetchForYouPosts(0, true); // Initial load for "For You" tab
+        } else {
+          setForYouPosts([]); // Clear posts if user logs out or is not authenticated
+          setForYouOffset(0);
+          setCanLoadMoreForYou(false); // Cannot load more if not logged in
+          setErrorForYou(null); // Clear any previous errors
+        }
+      }
+      // Clear explore posts when switching to "For You"
       setExplorePosts([]);
       setExploreOffset(0);
       setCanLoadMoreExplore(true);
+      setErrorExplore(null);
     }
-  }, [activeTab, fetchExplorePosts]); // fetchExplorePosts is stable due to useCallback
+  }, [activeTab, fetchExplorePosts, fetchForYouPosts, user, isAuthenticated, hydrated]);
   
   const handleLoadMoreExplore = () => {
     if (canLoadMoreExplore && !isLoadingExplore) {
@@ -56,10 +111,16 @@ export default function FeedPage() {
     }
   };
 
+  const handleLoadMoreForYou = () => {
+    if (canLoadMoreForYou && !isLoadingForYou && isAuthenticated && user) {
+      fetchForYouPosts(forYouOffset);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 text-white"> {/* Added text-white for better visibility on dark bg */}
       <div className="mb-6 flex border-b border-gray-700">
-        <button 
+        <button
           className={`py-2 px-4 text-lg font-medium ${activeTab === 'forYou' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400 hover:text-gray-200'}`}
           onClick={() => setActiveTab('forYou')}
         >
@@ -97,8 +158,37 @@ export default function FeedPage() {
       )}
 
       {activeTab === 'forYou' && (
-        <div className="text-center text-gray-400 py-4">
-          <p>"For You" feed coming soon!</p>
+        <div>
+          {!hydrated && <p className="text-center text-gray-400 py-4">Loading user session...</p>}
+          {hydrated && !isAuthenticated && (
+            <p className="text-center text-gray-400 py-4">
+              Please <a href="/login" className="text-blue-500 hover:underline">log in</a> to see posts from users you follow.
+            </p>
+          )}
+          {hydrated && isAuthenticated && user && (
+            <>
+              {forYouPosts.map(post => (
+                <PostCard key={post.id} post={post} />
+              ))}
+              {isLoadingForYou && <p className="text-center text-gray-400 py-4">Loading your feed...</p>}
+              {errorForYou && <p className="text-center text-red-500 py-4">{errorForYou}</p>}
+              {!isLoadingForYou && forYouPosts.length === 0 && !errorForYou && (
+                <p className="text-center text-gray-400 py-4">
+                  No posts from users you follow yet. Explore and follow some interesting people!
+                </p>
+              )}
+              {canLoadMoreForYou && !isLoadingForYou && forYouPosts.length > 0 && (
+                <div className="text-center mt-6">
+                  <Button onClick={handleLoadMoreForYou} outline disabled={isLoadingForYou}>
+                    {isLoadingForYou ? 'Loading...' : 'Load More'}
+                  </Button>
+                </div>
+              )}
+              {!canLoadMoreForYou && !isLoadingForYou && forYouPosts.length > 0 && (
+                <p className="text-center text-gray-500 py-4">No more posts to load from your feed.</p>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
