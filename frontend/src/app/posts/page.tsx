@@ -80,6 +80,15 @@ export default function PostsPage() {
     }
   };
 
+  const handlePostSubmit = useCallback((newPost: Post) => {
+    setPosts(prevPosts => [newPost, ...prevPosts]);
+    // Optionally, adjust nextPageOffset if the new post affects pagination counts.
+    // For now, prepending is the main goal for optimistic update.
+    // The next "Load More" will fetch correctly based on the existing nextPageOffset.
+    // If the API guarantees unique IDs and sorted order, this is generally safe.
+    // If total_posts is used for hasMore, consider incrementing a local total count.
+  }, []);
+
   // Initial loading state: shown only when no posts are loaded yet.
   if (isLoadingInitial && posts.length === 0) {
     return <div className="text-center py-10">Loading posts...</div>;
@@ -94,7 +103,7 @@ export default function PostsPage() {
     <div className="max-w-2xl mx-auto py-8 px-4 text-white">
       <h1 className="text-3xl font-bold text-white mb-6 text-center">All Posts</h1>
       <div className="mb-8">
-        <CreatePostForm />
+        <CreatePostForm onSubmit={handlePostSubmit} />
       </div>
       
       {/* No posts message: Show if not loading, no error, no posts, and no more to fetch */}
