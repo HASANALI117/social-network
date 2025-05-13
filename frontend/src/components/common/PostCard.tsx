@@ -2,21 +2,23 @@ import { FiShare } from 'react-icons/fi';
 import { Post } from '@/types/Post';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar } from '@/components/ui/avatar';
+import Image from 'next/image'; // Add this import
 
 interface PostCardProps {
   post: Post;
 }
 
 export default function PostCard({ post }: PostCardProps) {
-  const initials = post.user_first_name && post.user_last_name
-    ? `${post.user_first_name[0]}${post.user_last_name[0]}`
-    : undefined;
+  // const initials are not used with Avatar src logic change, can be removed if not needed elsewhere
+  // const initials = post.user_first_name && post.user_last_name
+  //   ? `${post.user_first_name[0]}${post.user_last_name[0]}`
+  //   : undefined;
 
   return (
     <div className="bg-gray-800 rounded-lg shadow p-6 mb-4 hover:bg-gray-750 transition-colors">
       <div className="flex items-center gap-4 mb-4">
         <Avatar
-          src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${post.user_first_name}+${post.user_last_name}&background=3b82f6&color=fff&bold=true`}
+          src={post.user_avatar_url || '/default-avatar.png'} // Changed from ui-avatars.com
           alt={`${post.user_first_name || 'Anonymous'} ${post.user_last_name || 'User'}`}
           className="w-12 h-12 border-2 border-gray-700"
         />
@@ -33,17 +35,21 @@ export default function PostCard({ post }: PostCardProps) {
         <h2 className="text-xl font-semibold text-gray-100">{post.title}</h2>
         <p className="text-gray-200">{post.content}</p>
         {post.image_url && (
-          <img
-            src={post.image_url}
-            alt={post.title}
-            className="w-full rounded-lg"
-          />
+          <div className="my-3 relative" style={{ paddingTop: '56.25%' /* 16:9 Aspect Ratio for responsive height */ }}>
+            <Image
+              src={post.image_url}
+              alt={post.title || "Post image"}
+              layout="fill"
+              objectFit="cover"
+              className="rounded-lg"
+            />
+          </div>
         )}
       </div>
       <div className="flex items-center gap-6 mt-4 text-gray-400">
         <div className="flex items-center gap-2">
           <button className="text-sm text-gray-500">
-            {post.privacy === 'public' ? 'Public' : post.privacy === 'friends' ? 'Friends Only' : 'Private'}
+            {post.privacy === 'public' ? 'Public' : post.privacy === 'semi_private' ? 'Followers Only' : 'Private'}
           </button>
         </div>
         <button className="flex items-center gap-2 hover:text-purple-400">

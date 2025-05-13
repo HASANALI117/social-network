@@ -1,48 +1,13 @@
 export interface Post {
   id: string;
   user_id: string;
+  group_id?: string | null; // Match backend (sql.NullString becomes string | null)
   title: string;
   content: string;
-  image_url?: string;
-  privacy: string;
-  created_at: string;
-  user_first_name?: string;
-  user_last_name?: string;
-  user_avatar_url?: string;
+  image_url?: string; // Optional
+  privacy: 'public' | 'semi_private' | 'private'; // Match backend model constants
+  created_at: string; // ISO date string from backend
+  user_first_name?: string; // Optional, from PostResponse
+  user_last_name?: string;  // Optional, from PostResponse
+  user_avatar_url?: string; // Optional, from PostResponse
 }
-
-export interface PostResponse {
-  id: string;
-  user_id: string;
-  title: string;
-  content: string;
-  image_url?: string;
-  privacy: string;
-  created_at: string;
-  user_first_name?: string;
-  user_last_name?: string;
-  user_avatar_url?: string;
-}
-
-export interface CreatePostFormValues {
-  title: string;
-  content: string;
-  image_url?: string | null;
-  privacy: string;
-}
-
-export const transformPost = (post: PostResponse): Post => ({
-  id: post.id,
-  user_id: post.user_id,
-  title: post.title,
-  content: post.content,
-  image_url: post.image_url,
-  privacy: post.privacy,
-  created_at: post.created_at,
-  user_first_name: post.user_first_name,
-  user_last_name: post.user_last_name,
-  user_avatar_url: post.user_avatar_url
-});
-
-export const transformPosts = (posts: PostResponse[]): Post[] =>
-  posts.map(transformPost);
