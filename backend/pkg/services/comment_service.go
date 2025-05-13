@@ -12,19 +12,24 @@ import (
 
 // CommentResponse is the DTO for comment data sent to clients
 type CommentResponse struct {
-	ID        string    `json:"id"`
-	PostID    string    `json:"post_id"`
-	UserID    string    `json:"user_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	// TODO: Add user details (username, avatar) if needed
+	ID            string    `json:"id"`
+	PostID        string    `json:"post_id"`
+	UserID        string    `json:"user_id"`
+	Content       string    `json:"content"`
+	ImageURL      string    `json:"image_url,omitempty"` // New field
+	CreatedAt     time.Time `json:"created_at"`
+	UserFirstName string    `json:"user_first_name,omitempty"`
+	UserLastName  string    `json:"user_last_name,omitempty"`
+	UserAvatarURL string    `json:"user_avatar_url,omitempty"`
+	Username      string    `json:"username,omitempty"`
 }
 
 // CommentCreateRequest is the DTO for creating a new comment
 type CommentCreateRequest struct {
-	UserID  string `json:"-"` // Set internally from authenticated user
-	PostID  string `json:"-"` // Set from URL parameter
-	Content string `json:"content" validate:"required,max=500"`
+	UserID   string `json:"-"` // Set internally from authenticated user
+	PostID   string `json:"-"` // Set from URL parameter
+	Content  string `json:"content" validate:"required,max=500"`
+	ImageURL string `json:"image_url" validate:"omitempty,url"` // New field
 }
 
 var (
