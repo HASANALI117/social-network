@@ -26,10 +26,25 @@ interface GroupJoinRequestsApiResponse {
   // Pagination fields if applicable
 }
 
+interface GroupInvitationsApiResponse { // Added for fetching specific invitations
+  invitations: GroupInvitation[];
+  // Pagination fields if applicable
+}
+
 interface GroupMembersApiResponse {
   members: User[];
   // Pagination fields if applicable
 }
+
+// New State Type for User's Group Status
+type UserGroupStatus =
+  | 'creator'
+  | 'member'
+  | 'pending_invitation' // User has an invitation to this group
+  | 'pending_join_request' // User has requested to join this group
+  | 'not_affiliated'
+  | 'loading'
+  | 'unknown_error';
 
 export default function GroupDetailPage() {
   const params = useParams();
@@ -44,12 +59,15 @@ export default function GroupDetailPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
-  // State for Join Request
-  const [joinRequestStatus, setJoinRequestStatus] = useState<'idle' | 'pending' | 'requested' | 'member' | 'creator' | 'error'>('idle');
-  const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
-  const [isProcessingJoin, setIsProcessingJoin] = useState(false);
+  // New state for comprehensive user group status
+  const [currentUserGroupStatus, setCurrentUserGroupStatus] = useState<UserGroupStatus>('loading');
+  // const [joinRequestStatus, setJoinRequestStatus] = useState<'idle' | 'pending' | 'requested' | 'member' | 'creator' | 'error'>('idle'); // To be removed or integrated
+  const [joinRequestError, setJoinRequestError] = useState<string | null>(null); // May still be useful for specific join action errors
+  const [isProcessingJoin, setIsProcessingJoin] = useState(false); // For join/cancel join request button
+  const [pendingJoinRequestId, setPendingJoinRequestId] = useState<string | null>(null); // To store ID for cancellation
 
-  // State for managing join requests list
+
+  // State for managing join requests list (for creator view)
   const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
   const [isLoadingJoinRequests, setIsLoadingJoinRequests] = useState(false);
   const [joinRequestsError, setJoinRequestsError] = useState<string | null>(null);
@@ -64,13 +82,20 @@ export default function GroupDetailPage() {
   const { register: registerInvite, handleSubmit: handleSubmitInvite, formState: { errors: inviteFormErrors }, reset: resetInviteForm } = useForm<InviteUserFormValues>();
   const { post: sendInviteRequest, isLoading: isSendingInvite, error: sendInviteApiError } = useRequest<GroupInvitation>();
   const { post: sendJoinRequest, isLoading: isSendingJoin, error: joinRequestApiError } = useRequest<GroupJoinRequest>();
+  const { del: cancelJoinRequest, isLoading: isCancelingJoinRequest, error: cancelJoinRequestApiError } = useRequest<void>(); // For cancelling join request
+  const { del: leaveGroupRequest, isLoading: isLeavingGroup, error: leaveGroupApiError } = useRequest<void>(); // For leaving group
   const { get: fetchGroupRequest, error: groupApiError } = useRequest<Group>();
   const { get: fetchUserRequest, error: userApiError } = useRequest<User>(); // For creator
 
-  // Hooks for fetching and updating join requests
+  // Hooks for fetching and updating join requests (for creator view)
   const { get: fetchJoinRequests, error: fetchJoinRequestsApiError } = useRequest<GroupJoinRequestsApiResponse>();
   const { put: updateJoinRequest, isLoading: isUpdatingJoinRequest, error: updateJoinRequestApiError } = useRequest<GroupJoinRequest>();
+  
+  // Hooks for fetching members and specific user status data
   const { get: fetchMembers, error: fetchMembersApiError } = useRequest<GroupMembersApiResponse>();
+  const { get: fetchMyGroupInvitation, error: fetchMyGroupInvitationError } = useRequest<GroupInvitationsApiResponse>();
+  const { get: fetchMyGroupJoinRequest, error: fetchMyGroupJoinRequestError } = useRequest<GroupJoinRequestsApiResponse>();
+
 
   const loadGroupDetails = useCallback(async (id: string) => {
     setIsLoading(true);
@@ -161,21 +186,66 @@ export default function GroupDetailPage() {
   }, [currentUser, group, fetchJoinRequests, fetchJoinRequestsApiError]);
 
   useEffect(() => {
-    if (groupId && currentUser && group) {
-      if (currentUser.id === group.creator_id) {
-        setJoinRequestStatus('creator');
-        loadJoinRequests(groupId); // Load join requests if creator
-      } else {
-        // Placeholder: In a real app, fetch actual status (member, pending invite, pending request)
-        // For now, if not creator, assume 'idle' to show the button.
-        // This might need adjustment if the user is already a member or has a pending request.
-        // We'll set it to 'idle' and let the button logic handle visibility.
-        // A more robust check would involve an API call here.
-        setJoinRequestStatus('idle');
-      }
+    if (groupId && currentUser && group && group.creator_id) { // Ensure group.creator_id is available
+        loadJoinRequests(groupId); // Load join requests if creator (logic inside loadJoinRequests checks for creator status)
     }
-  }, [groupId, currentUser, group, loadJoinRequests]); // Added loadJoinRequests
+  }, [groupId, currentUser, group, loadJoinRequests]);
+
+
+  // Main useEffect to determine currentUserGroupStatus
+  useEffect(() => {
+    const determineStatus = async () => {
+      if (!currentUser || !group || !groupId || !members) { // Added members to dependency
+        setCurrentUserGroupStatus('loading');
+        return;
+      }
+
+      setCurrentUserGroupStatus('loading');
+
+      if (currentUser.id === group.creator_id) {
+        setCurrentUserGroupStatus('creator');
+        return;
+      }
+
+      if (!isLoadingMembers && members.some(m => m.id === currentUser.id)) {
+        setCurrentUserGroupStatus('member');
+        return;
+      }
+
+      try {
+        // Fetch pending invitation for this group
+        const invData = await fetchMyGroupInvitation(`/api/users/me/group-invitations?group_id=${groupId}&status=pending`);
+        if (invData && invData.invitations && invData.invitations.length > 0) {
+          setCurrentUserGroupStatus('pending_invitation');
+          return;
+        }
+
+        // Fetch pending join request for this group
+        const reqData = await fetchMyGroupJoinRequest(`/api/users/me/group-join-requests?group_id=${groupId}&status=pending`);
+        if (reqData && reqData.requests && reqData.requests.length > 0) {
+          setPendingJoinRequestId(reqData.requests[0].id); // Store request ID for cancellation
+          setCurrentUserGroupStatus('pending_join_request');
+          return;
+        }
+        
+        setCurrentUserGroupStatus('not_affiliated');
+
+      } catch (error) {
+        console.error("Error determining user group status:", error);
+        // Check specific API errors if available
+        if (fetchMyGroupInvitationError) console.error("Invitation fetch error:", fetchMyGroupInvitationError.message);
+        if (fetchMyGroupJoinRequestError) console.error("Join request fetch error:", fetchMyGroupJoinRequestError.message);
+        setCurrentUserGroupStatus('unknown_error');
+      }
+    };
+
+    if (group && currentUser && groupId && members) { // Ensure essential data is present
+        determineStatus();
+    }
+  // Dependencies: currentUser, group, groupId, members, isLoadingMembers, fetchMyGroupInvitation, fetchMyGroupJoinRequest
+  }, [currentUser, group, groupId, members, isLoadingMembers, fetchMyGroupInvitation, fetchMyGroupJoinRequest, fetchMyGroupInvitationError, fetchMyGroupJoinRequestError]);
   
+
   // Consolidate error display
   useEffect(() => {
     if (groupApiError && !group) setError(groupApiError.message || 'Failed to load group details.');
@@ -219,7 +289,9 @@ export default function GroupDetailPage() {
         `/api/groups/${groupId}/join-requests`,
         {}, // Empty body for POST, or include a message if your API supports it
         (newRequest) => {
-          setJoinRequestStatus('requested');
+          // setJoinRequestStatus('requested'); // Replaced by currentUserGroupStatus
+          setCurrentUserGroupStatus('pending_join_request');
+          if(newRequest.id) setPendingJoinRequestId(newRequest.id);
           // Optionally, display a success message to the user via a toast or state update
           console.log("Join request sent successfully:", newRequest);
         }
@@ -227,10 +299,56 @@ export default function GroupDetailPage() {
     } catch (err: any) {
       // The useRequest hook's error (joinRequestApiError) should be populated
       setJoinRequestError(joinRequestApiError?.message || 'Failed to send join request.');
-      setJoinRequestStatus('error');
+      // setJoinRequestStatus('error'); // Replaced by currentUserGroupStatus
+      setCurrentUserGroupStatus('unknown_error'); // Or a more specific error state
       console.error("Failed to send join request:", err);
     } finally {
       setIsProcessingJoin(false);
+    }
+  };
+
+  const handleCancelJoinRequest = async () => {
+    if (!groupId || !pendingJoinRequestId || !currentUser) {
+      setJoinRequestError("Cannot cancel request: Missing group or request ID.");
+      return;
+    }
+    setIsProcessingJoin(true); // Reuse for loading state
+    setJoinRequestError(null);
+    try {
+      await cancelJoinRequest(`/api/groups/${groupId}/join-requests/${pendingJoinRequestId}`);
+      setCurrentUserGroupStatus('not_affiliated');
+      setPendingJoinRequestId(null);
+      // Optionally, display success message
+      console.log("Join request cancelled successfully.");
+    } catch (err: any) {
+      setJoinRequestError(cancelJoinRequestApiError?.message || 'Failed to cancel join request.');
+      // Keep current status or set to unknown_error, as the request might still exist
+      console.error("Failed to cancel join request:", err);
+    } finally {
+      setIsProcessingJoin(false);
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!groupId || !currentUser) {
+      // setSomeError("Cannot leave group: Missing information."); // Define a generic error state if needed
+      console.error("Cannot leave group: Missing information.");
+      return;
+    }
+    // Consider adding a confirmation dialog here
+    setIsProcessingJoin(true); // Reuse for loading state, or create a new one e.g., setIsProcessingLeave
+    try {
+      await leaveGroupRequest(`/api/groups/${groupId}/members/me`); // Assuming 'me' resolves to current user on backend
+      setCurrentUserGroupStatus('not_affiliated');
+      // Optionally, display success message and redirect or refresh data
+      console.log("Successfully left the group.");
+      // router.push('/groups'); or refresh group data
+      loadMembers(groupId); // Refresh members list
+    } catch (err: any) {
+      // setSomeError(leaveGroupApiError?.message || 'Failed to leave group.');
+      console.error("Failed to leave group:", leaveGroupApiError?.message || err);
+    } finally {
+      setIsProcessingJoin(false); // Or setIsProcessingLeave(false)
     }
   };
 
@@ -309,11 +427,13 @@ export default function GroupDetailPage() {
         </div>
       </header>
 
-      {/* Group Actions: Request to Join */}
+      {/* Group Actions Section */}
       <section className="my-8 p-6 bg-gray-800 rounded-lg shadow-xl">
         <Heading level={2} className="mb-4">Group Actions</Heading>
-        <div className="flex flex-col space-y-2">
-          {currentUser && group && currentUser.id !== group.creator_id && joinRequestStatus === 'idle' && (
+        <div className="flex flex-col space-y-3">
+          {currentUserGroupStatus === 'loading' && <Text className="text-gray-400">Loading status...</Text>}
+
+          {currentUserGroupStatus === 'not_affiliated' && (
             <Button
               onClick={handleRequestToJoin}
               disabled={isProcessingJoin || isSendingJoin}
@@ -322,22 +442,54 @@ export default function GroupDetailPage() {
               {isProcessingJoin || isSendingJoin ? 'Sending Request...' : 'Request to Join Group'}
             </Button>
           )}
-          {joinRequestStatus === 'requested' && (
-            <Text className="text-green-400">Join request sent!</Text>
+
+          {currentUserGroupStatus === 'pending_join_request' && (
+            <>
+              <Text className="text-yellow-400">Your request to join this group is pending.</Text>
+              <Button
+                onClick={handleCancelJoinRequest}
+                disabled={isProcessingJoin || isCancelingJoinRequest}
+                color="red"
+                className="w-full sm:w-auto"
+              >
+                {isProcessingJoin || isCancelingJoinRequest ? 'Cancelling...' : 'Cancel Join Request'}
+              </Button>
+            </>
           )}
-          {joinRequestStatus === 'member' && ( /* This status would be set by a more complete initial check */
-            <Text className="text-blue-400">You are a member of this group.</Text>
+
+          {currentUserGroupStatus === 'pending_invitation' && (
+            <Text className="text-blue-400">
+              You have a pending invitation to this group. Check your <Link href="/notifications" className="underline hover:text-blue-300">notifications</Link> to respond.
+            </Text>
           )}
-          {currentUser && group && currentUser.id === group.creator_id && (
-             <Text className="text-gray-400 italic">You are the creator of this group.</Text>
+
+          {currentUserGroupStatus === 'member' && (
+            <>
+              <Text className="text-green-400">You are a member of this group.</Text>
+              <Button
+                onClick={handleLeaveGroup}
+                disabled={isProcessingJoin || isLeavingGroup} // Re-use isProcessingJoin or use isLeavingGroup
+                color="red" // Or a suitable color for leaving
+                className="w-full sm:w-auto"
+              >
+                {isProcessingJoin || isLeavingGroup ? 'Leaving...' : 'Leave Group'}
+              </Button>
+            </>
           )}
-          {joinRequestError && <Text className="text-red-500">{joinRequestError}</Text>}
-          {joinRequestStatus === 'error' && !joinRequestError && <Text className="text-red-500">An error occurred with your join request.</Text>}
+          
+          {currentUserGroupStatus === 'creator' && (
+             <Text className="text-purple-400 italic">You are the creator of this group.</Text>
+          )}
+
+          {joinRequestError && <Text className="text-red-500 mt-2">{joinRequestError}</Text>}
+          {currentUserGroupStatus === 'unknown_error' && !joinRequestError && (
+            <Text className="text-red-500">An error occurred determining your group status or with your last action.</Text>
+          )}
         </div>
       </section>
 
       {/* Invite User Form */}
-      {currentUser && group && (currentUser.id === group.creator_id) && (
+      {currentUser && group && !isLoadingMembers && (currentUser.id === group.creator_id || members.some(member => member.id === currentUser.id)) && (
         <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
           <Heading level={2} className="mb-4">Invite User to Group</Heading>
           <form onSubmit={handleSubmitInvite(onInviteUserSubmit)} className="space-y-4">
