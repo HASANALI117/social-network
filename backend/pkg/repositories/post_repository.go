@@ -22,6 +22,8 @@ type PostRepository interface {
 	List(requestingUserID string, limit, offset int) ([]*models.Post, error)                     // General feed (non-group posts)
 	ListByUser(targetUserID, requestingUserID string, limit, offset int) ([]*models.Post, error) // User profile posts (non-group)
 	ListByGroupID(groupID string, limit, offset int) ([]*models.Post, error)                     // Group-specific posts
+	ListPublic(limit, offset int) ([]*models.Post, error)                                        // For "Explore" feed
+	ListFollowedByUser(requestingUserID string, limit, offset int) ([]*models.Post, error)
 	// Update(post *models.Post) error // TODO: Implement Update
 	Delete(id string) error
 
@@ -439,4 +441,140 @@ func (r *postRepository) GetAllowedUsers(postID string) ([]string, error) {
 	}
 
 	return allowedUserIDs, nil
+}
+
+// ListPublic retrieves a paginated list of public, non-group posts.
+func (r *postRepository) ListPublic(limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT id, user_id, title, content, image_url, privacy, group_id, created_at
+		FROM posts
+		WHERE privacy = ? AND group_id IS NULL
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?;
+	`
+	rows, err := r.db.Query(query, models.PrivacyPublic, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list public posts: %w", err)
+	}
+	defer rows.Close()
+
+	posts := make([]*models.Post, 0)
+	for rows.Next() {
+		var post models.Post
+		var createdAtStr string
+		var groupID sql.NullString // Ensure GroupID is scanned as sql.NullString
+
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL, // This is string, can be empty
+			&post.Privacy,
+			&groupID, // Scan into sql.NullString
+			&createdAtStr,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan public post row: %w", err)
+		}
+
+		post.GroupID = groupID // Assign scanned NullString
+
+		parsedTime, timeErr := time.Parse(time.RFC3339, createdAtStr)
+		if timeErr != nil {
+			// Log error and/or decide on fallback. For now, set to zero time.
+			fmt.Printf("Warning: Failed to parse post created_at timestamp '%s': %v\n", createdAtStr, timeErr)
+			post.CreatedAt = time.Time{}
+		} else {
+			post.CreatedAt = parsedTime
+		}
+		posts = append(posts, &post)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating public post rows: %w", err)
+	}
+	return posts, nil
+}
+
+// ListFollowedByUser retrieves posts from users that the requestingUserID follows.
+// It includes 'public', 'semi-private' (almost_private), and 'private' posts (if the user is allowed) and excludes group posts.
+func (r *postRepository) ListFollowedByUser(requestingUserID string, limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT DISTINCT p.id, p.user_id, p.title, p.content, p.image_url, p.privacy, p.group_id, p.created_at
+		FROM posts p
+		JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ? AND f.status = 'accepted'
+		LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ? -- For checking private post access
+		WHERE
+		    f.follower_id = ? -- Ensures we are only getting posts from followed users
+		  AND f.status = 'accepted'
+		  AND p.group_id IS NULL
+		  AND (
+		    p.privacy = ? -- Public posts from followed user
+		    OR p.privacy = ? -- Semi-private posts from followed user
+		    OR (p.privacy = ? AND pau.user_id IS NOT NULL) -- Private posts from followed user where requestingUser is allowed
+		  )
+		ORDER BY p.created_at DESC
+		LIMIT ? OFFSET ?;
+	`
+	// Parameters for the query:
+	// 1. requestingUserID (for JOIN followers f ON p.user_id = f.following_id AND f.follower_id = ?)
+	// 2. requestingUserID (for LEFT JOIN post_allowed_users pau ON p.id = pau.post_id AND pau.user_id = ?)
+	// 3. requestingUserID (for WHERE f.follower_id = ?)
+	// 4. models.PrivacyPublic
+	// 5. models.PrivacyAlmostPrivate
+	// 6. models.PrivacyPrivate
+	// 7. limit
+	// 8. offset
+	rows, err := r.db.Query(query,
+		requestingUserID,
+		requestingUserID,
+		requestingUserID,
+		models.PrivacyPublic,
+		models.PrivacyAlmostPrivate,
+		models.PrivacyPrivate,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list posts followed by user %s: %w", requestingUserID, err)
+	}
+	defer rows.Close()
+
+	posts := make([]*models.Post, 0)
+	for rows.Next() {
+		var post models.Post
+		var createdAtStr string
+		var groupID sql.NullString // Handles potential NULL group_id
+
+		err := rows.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Title,
+			&post.Content,
+			&post.ImageURL,
+			&post.Privacy,
+			&groupID,
+			&createdAtStr,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan post row for followed user feed: %w", err)
+		}
+		post.GroupID = groupID // Assign scanned NullString
+		parsedTime, timeErr := time.Parse(time.RFC3339, createdAtStr)
+		if timeErr != nil {
+			// Use log package if available, otherwise fmt.Printf
+			// log.Printf("Warning: Failed to parse post created_at timestamp '%s' in ListFollowedByUser: %v\n", createdAtStr, timeErr)
+			fmt.Printf("Warning: Failed to parse post created_at timestamp '%s' in ListFollowedByUser: %v\n", createdAtStr, timeErr)
+			post.CreatedAt = time.Time{}
+		} else {
+			post.CreatedAt = parsedTime
+		}
+		posts = append(posts, &post)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating post rows for followed user feed: %w", err)
+	}
+	return posts, nil
 }

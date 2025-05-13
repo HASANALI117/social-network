@@ -49,6 +49,8 @@ type PostService interface {
 	List(requestingUserID string, limit, offset int) ([]*PostResponse, error)                           // General feed (non-group)
 	ListPostsByUser(targetUserID, requestingUserID string, limit, offset int) ([]*PostResponse, error)  // User profile (non-group)
 	ListGroupPosts(groupID string, requestingUserID string, limit, offset int) ([]*PostResponse, error) // Group posts
+	ListExplore(limit, offset int) ([]*PostResponse, error)                                             // For "Explore" feed
+	ListFollowingFeed(requestingUserID string, limit, offset int) ([]*PostResponse, error)
 	// Update(...) // TODO: Implement Update
 	Delete(postID string, requestingUserID string) error // requestingUserID for auth check
 }
@@ -108,10 +110,18 @@ func (s *postService) mapPostToResponse(post *models.Post, author *models.User) 
 }
 
 // mapPostsToResponse converts a slice of model.Post to a slice of PostResponse DTOs
-func (s *postService) mapPostsToResponse(posts []*models.Post, author *models.User) []*PostResponse {
+// The requestingUserID is optional and used if specific privacy checks per post are needed in the future,
+// but currently, the repository layer handles most privacy filtering.
+func (s *postService) mapPostsToResponse(posts []*models.Post, requestingUserID *string) []*PostResponse {
 	responses := make([]*PostResponse, len(posts))
+	// Fetch user details in bulk if possible, or individually if not.
+	// For simplicity here, we fetch individually within mapPostToResponse.
+	// A more optimized approach might gather all unique UserIDs from posts
+	// and fetch them in a single query to s.userRepo.
 	for i, post := range posts {
-		responses[i] = s.mapPostToResponse(post, author)
+		// Pass nil for author, mapPostToResponse will fetch it.
+		// If mapPostToResponse were to use requestingUserID for further checks, pass it here.
+		responses[i] = s.mapPostToResponse(post, nil)
 	}
 	return responses
 }
@@ -260,24 +270,18 @@ func (s *postService) List(requestingUserID string, limit, offset int) ([]*PostR
 	if err != nil {
 		return nil, fmt.Errorf("failed to list non-group posts from repository: %w", err)
 	}
-	return s.mapPostsToResponse(posts, nil), nil
+	return s.mapPostsToResponse(posts, &requestingUserID), nil
 }
 
 // ListPostsByUser retrieves non-group posts for a specific user's profile, filtered by the repository.
 func (s *postService) ListPostsByUser(targetUserID, requestingUserID string, limit, offset int) ([]*PostResponse, error) {
-	// Fetch target user details first
-	targetUser, err := s.userRepo.GetByID(targetUserID)
-	if err != nil {
-		log.Printf("Warning: Failed to fetch user details for user %s: %v", targetUserID, err)
-		// Continue without user details, they will be fetched individually
-		targetUser = nil
-	}
-
 	posts, err := s.postRepo.ListByUser(targetUserID, requestingUserID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list non-group posts by user from repository: %w", err)
 	}
-	return s.mapPostsToResponse(posts, targetUser), nil
+	// The mapPostsToResponse function will handle fetching author details for each post.
+	// The requestingUserID is passed for context, in case mapPostsToResponse evolves to use it.
+	return s.mapPostsToResponse(posts, &requestingUserID), nil
 }
 
 // ListGroupPosts retrieves posts belonging to a specific group, checking membership first.
@@ -302,7 +306,7 @@ func (s *postService) ListGroupPosts(groupID string, requestingUserID string, li
 	}
 
 	// 3. Map to response DTOs
-	return s.mapPostsToResponse(posts, nil), nil
+	return s.mapPostsToResponse(posts, &requestingUserID), nil
 }
 
 // Delete handles the deletion of a post, performing authorization checks
@@ -367,4 +371,29 @@ func (s *postService) Delete(postID string, requestingUserID string) error {
 	}
 
 	return nil
+}
+
+// ListExplore retrieves public, non-group posts for the "Explore" feed.
+// No specific requestingUserID is needed here as it's for public content.
+func (s *postService) ListExplore(limit, offset int) ([]*PostResponse, error) {
+	posts, err := s.postRepo.ListPublic(limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list public posts from repository for explore: %w", err)
+	}
+	// The existing mapPostsToResponse should fetch user details for each post.
+	return s.mapPostsToResponse(posts, nil), nil
+}
+
+// ListFollowingFeed retrieves posts from users that the requestingUserID follows.
+func (s *postService) ListFollowingFeed(requestingUserID string, limit, offset int) ([]*PostResponse, error) {
+	if requestingUserID == "" {
+		return nil, errors.New("requestingUserID is required for following feed")
+	}
+	posts, err := s.postRepo.ListFollowedByUser(requestingUserID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list posts from followed users: %w", err)
+	}
+	// Pass requestingUserID to mapPostsToResponse; it might be used for additional checks
+	// or to enrich responses based on the viewer, though current mapPostsToResponse primarily uses it for author details.
+	return s.mapPostsToResponse(posts, &requestingUserID), nil
 }

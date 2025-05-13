@@ -11,6 +11,8 @@ import (
 	"github.com/HASANALI117/social-network/pkg/helpers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
 
+	// "github.com/HASANALI117/social-network/pkg/middlewares" // Removed problematic import
+
 	// "github.com/HASANALI117/social-network/pkg/models" // Model used via service request/response
 	"github.com/HASANALI117/social-network/pkg/repositories" // For error checking
 	"github.com/HASANALI117/social-network/pkg/services"
@@ -18,18 +20,18 @@ import (
 
 // PostHandler handles HTTP requests for posts and delegates comment routes
 type PostHandler struct {
-postService    services.PostService
-authService    services.AuthService
-commentHandler *CommentHandler // Added CommentHandler
+	postService    services.PostService
+	authService    services.AuthService
+	commentHandler *CommentHandler // Added CommentHandler
 }
 
 // NewPostHandler creates a new PostHandler
 func NewPostHandler(postService services.PostService, authService services.AuthService, commentHandler *CommentHandler) *PostHandler {
-return &PostHandler{
-postService:    postService,
-authService:    authService,
-commentHandler: commentHandler, // Store CommentHandler
-}
+	return &PostHandler{
+		postService:    postService,
+		authService:    authService,
+		commentHandler: commentHandler, // Store CommentHandler
+	}
 }
 
 // ServeHTTP routes the request to the appropriate handler method
@@ -45,34 +47,48 @@ func (h *PostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	log.Printf("PostHandler: Method=%s, Path=%s, Parts=%v\n", r.Method, r.URL.Path, parts)
 
 	// Get current user for authorization (required for most actions)
-	currentUser, err := helpers.GetUserFromSession(r, h.authService)
-	if err != nil && !(r.Method == http.MethodGet && len(parts) == 1 && parts[0] != "") {
-		// Allow anonymous GET /api/posts/{id} for public posts (checked in service)
-		// Allow anonymous GET /api/posts/ for public posts (checked in service)
-		// Allow anonymous GET /api/posts/user/{userID} for public posts (checked in service)
-		// For other methods (POST, DELETE) or paths, require authentication.
-		if errors.Is(err, helpers.ErrInvalidSession) {
-			return httperr.NewUnauthorized(err, "Invalid session")
+	// For routes that strictly require authentication (like create, delete, or the new /following),
+	// the specific handler will check or rely on middleware.
+	// For GET routes that can be partially public, currentUser might be nil.
+	var currentUser *services.UserResponse
+	var err error
+	// Only attempt to get user from session if not a public GET endpoint that doesn't strictly need it for path parsing.
+	// The new /following route will handle its own auth check.
+	// Explore, get by ID, list, list by user can be partially public.
+	isPotentiallyPublicGet := r.Method == http.MethodGet &&
+		(len(parts) == 1 && (parts[0] == "explore" || parts[0] == "" || parts[0] != "")) ||
+		(len(parts) == 2 && parts[0] == "user")
+
+	if !(isPotentiallyPublicGet && r.Method == http.MethodGet) { // If not one of these specific public GETs, or if not GET at all
+		currentUser, err = helpers.GetUserFromSession(r, h.authService)
+		if err != nil {
+			if errors.Is(err, helpers.ErrInvalidSession) {
+				return httperr.NewUnauthorized(err, "Invalid session")
+			}
+			return httperr.NewInternalServerError(err, "Failed to get current user")
 		}
-		return httperr.NewInternalServerError(err, "Failed to get current user")
+		if currentUser == nil && r.Method != http.MethodGet { // Non-GET methods require a user
+			return httperr.NewUnauthorized(errors.New("authentication required"), "Authentication required")
+		}
+	} else if r.Method == http.MethodGet { // For public GETs, still try to get user, but don't fail if not present
+		currentUser, _ = helpers.GetUserFromSession(r, h.authService) // Error ignored, currentUser will be nil if not logged in
 	}
-// If currentUser is nil here, it means it's an anonymous GET request
 
-// Check if this is a comment-related route nested under posts
-// e.g., /api/posts/{postId}/comments -> parts = ["{postId}", "comments"]
-if len(parts) >= 2 && parts[1] == "comments" {
-// Delegate to CommentHandler. ServeHTTP needs to handle this specific path structure.
-// We might need to adjust CommentHandler's ServeHTTP if it relies on a different path format.
-log.Printf("PostHandler delegating to CommentHandler for path: %s", r.URL.Path)
-// Re-route by calling the CommentHandler's ServeHTTP directly
-// Note: The CommentHandler's ServeHTTP will re-parse the path, which might be inefficient
-// or require adjustments in CommentHandler.
-return h.commentHandler.ServeHTTP(w, r)
-}
+	// Check if this is a comment-related route nested under posts
+	// e.g., /api/posts/{postId}/comments -> parts = ["{postId}", "comments"]
+	if len(parts) >= 2 && parts[1] == "comments" {
+		// Delegate to CommentHandler. ServeHTTP needs to handle this specific path structure.
+		// We might need to adjust CommentHandler's ServeHTTP if it relies on a different path format.
+		log.Printf("PostHandler delegating to CommentHandler for path: %s", r.URL.Path)
+		// Re-route by calling the CommentHandler's ServeHTTP directly
+		// Note: The CommentHandler's ServeHTTP will re-parse the path, which might be inefficient
+		// or require adjustments in CommentHandler.
+		return h.commentHandler.ServeHTTP(w, r)
+	}
 
-// --- Original Post Routing Logic ---
-switch r.Method {
-case http.MethodPost:
+	// --- Original Post Routing Logic ---
+	switch r.Method {
+	case http.MethodPost:
 		// POST /api/posts/ -> Create Post
 		if len(parts) == 1 && parts[0] == "" {
 			if currentUser == nil { // Must be logged in to create
@@ -83,8 +99,21 @@ case http.MethodPost:
 		return httperr.NewNotFound(nil, "Invalid path for POST")
 
 	case http.MethodGet:
+		// IMPORTANT: Place this check BEFORE the `len(parts) == 1 && parts[0] != ""` check for `/{id}`
+		// GET /api/posts/explore -> List all public posts
+		if len(parts) == 1 && parts[0] == "explore" {
+			return h.listExplorePosts(w, r)
+		}
+		// GET /api/posts/following -> List posts from followed users
+		if len(parts) == 1 && parts[0] == "following" {
+			// This route requires authentication
+			if currentUser == nil {
+				return httperr.NewUnauthorized(errors.New("authentication required"), "Authentication required to view following feed.")
+			}
+			return h.listFollowingPosts(w, r, currentUser) // Pass currentUser
+		}
 		// GET /api/posts/{id} -> Get Post by ID
-		if len(parts) == 1 && parts[0] != "" {
+		if len(parts) == 1 && parts[0] != "" { // Ensure this doesn't catch "explore" or "following"
 			postID := parts[0]
 			requestingUserID := ""
 			if currentUser != nil {
@@ -293,6 +322,38 @@ func (h *PostHandler) listUserPosts(w http.ResponseWriter, r *http.Request, targ
 	return nil
 }
 
+// listExplorePosts handles GET /api/posts/explore
+func (h *PostHandler) listExplorePosts(w http.ResponseWriter, r *http.Request) error {
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // Default limit
+	if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+		limit = parsedLimit
+	}
+
+	offset := 0 // Default offset
+	if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+		offset = parsedOffset
+	}
+
+	postsResponse, err := h.postService.ListExplore(limit, offset)
+	if err != nil {
+		// Log the full error for server-side debugging
+		log.Printf("Error in listExplorePosts service call: %v", err)
+		return httperr.NewInternalServerError(err, "Failed to list explore posts")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts":  postsResponse,
+		"limit":  limit,
+		"offset": offset,             // Return the offset used for the query
+		"count":  len(postsResponse), // Count of items in the current response
+	})
+	return nil
+}
+
 // deletePost handles DELETE /api/posts/{id}
 // @Summary Delete post
 // @Description Delete a post by ID
@@ -323,6 +384,47 @@ func (h *PostHandler) deletePost(w http.ResponseWriter, r *http.Request, postID 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Post deleted successfully",
+	})
+	return nil
+}
+
+// listFollowingPosts handles GET /api/posts/following
+func (h *PostHandler) listFollowingPosts(w http.ResponseWriter, r *http.Request, currentUser *services.UserResponse) error {
+	// currentUser is already validated by the caller (ServeHTTP) for this route
+	if currentUser == nil || currentUser.ID == "" {
+		// This should ideally not be reached if ServeHTTP correctly gatekeeps,
+		// but as a safeguard:
+		return httperr.NewUnauthorized(errors.New("user not authenticated"), "Authentication required to view following feed.")
+	}
+	requestingUserID := currentUser.ID
+
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // Default limit
+	if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+		limit = parsedLimit
+	}
+
+	offset := 0 // Default offset
+	if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+		offset = parsedOffset
+	}
+
+	postsResponse, err := h.postService.ListFollowingFeed(requestingUserID, limit, offset)
+	if err != nil {
+		log.Printf("Error in listFollowingPosts service call for user %s: %v", requestingUserID, err)
+		// Avoid exposing internal error details directly to client unless wrapped.
+		// The service layer should return specific error types if needed for different HTTP responses.
+		return httperr.NewInternalServerError(errors.New("failed to retrieve feed"), "Failed to list posts from followed users. "+err.Error())
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"posts":  postsResponse,
+		"limit":  limit,
+		"offset": offset,
+		"count":  len(postsResponse),
 	})
 	return nil
 }

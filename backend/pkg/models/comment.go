@@ -8,6 +8,6 @@ type Comment struct {
 	PostID    string    `json:"post_id"`
 	UserID    string    `json:"user_id"`
 	Content   string    `json:"content"`
+	ImageURL  string    `json:"image_url,omitempty"` // New field
 	CreatedAt time.Time `json:"created_at"`
-	// TODO: Consider adding User details (username, avatar) if needed for responses
 }

@@ -8,7 +8,7 @@ import ProfileHeader from '@/components/profile/ProfileHeader';
 import EditProfileForm from '@/components/profile/EditProfileForm';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import CreatePostForm from '@/components/profile/CreatePostForm';
-import PostList from '@/components/profile/PostList';
+import PostList from '@/components/common/PostList';
 import UserList from '@/components/profile/UserList';
 import { useUserStore } from '@/store/useUserStore';
 import { useRequest } from '@/hooks/useRequest';

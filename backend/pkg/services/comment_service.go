@@ -12,19 +12,24 @@ import (
 
 // CommentResponse is the DTO for comment data sent to clients
 type CommentResponse struct {
-	ID        string    `json:"id"`
-	PostID    string    `json:"post_id"`
-	UserID    string    `json:"user_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	// TODO: Add user details (username, avatar) if needed
+	ID            string    `json:"id"`
+	PostID        string    `json:"post_id"`
+	UserID        string    `json:"user_id"`
+	Content       string    `json:"content"`
+	ImageURL      string    `json:"image_url,omitempty"` // New field
+	CreatedAt     time.Time `json:"created_at"`
+	UserFirstName string    `json:"user_first_name,omitempty"`
+	UserLastName  string    `json:"user_last_name,omitempty"`
+	UserAvatarURL string    `json:"user_avatar_url,omitempty"`
+	Username      string    `json:"username,omitempty"`
 }
 
 // CommentCreateRequest is the DTO for creating a new comment
 type CommentCreateRequest struct {
-	UserID  string `json:"-"` // Set internally from authenticated user
-	PostID  string `json:"-"` // Set from URL parameter
-	Content string `json:"content" validate:"required,max=500"`
+	UserID   string `json:"-"` // Set internally from authenticated user
+	PostID   string `json:"-"` // Set from URL parameter
+	Content  string `json:"content" validate:"required,max=500"`
+	ImageURL string `json:"image_url" validate:"omitempty,url"` // New field
 }
 
 var (
@@ -45,37 +50,53 @@ type commentService struct {
 	commentRepo repositories.CommentRepository
 	postService PostService                  // Use PostService to check post view permissions
 	groupRepo   repositories.GroupRepository // Needed for group admin check on delete
+	userRepo    repositories.UserRepository  // New dependency
 	// authService AuthService // Potentially needed if complex auth logic arises
 }
 
 // NewCommentService creates a new CommentService
-func NewCommentService(commentRepo repositories.CommentRepository, postService PostService, groupRepo repositories.GroupRepository) CommentService {
+func NewCommentService(commentRepo repositories.CommentRepository, postService PostService, groupRepo repositories.GroupRepository, userRepo repositories.UserRepository) CommentService {
 	return &commentService{
 		commentRepo: commentRepo,
 		postService: postService,
 		groupRepo:   groupRepo,
+		userRepo:    userRepo, // Store userRepo
 	}
 }
 
-// mapCommentToResponse converts a model.Comment to a CommentResponse DTO
-func mapCommentToResponse(comment *models.Comment) *CommentResponse {
+// mapCommentToResponse converts a model.Comment to a CommentResponse DTO, enriching with user details
+func (s *commentService) mapCommentToResponse(comment *models.Comment) *CommentResponse {
 	if comment == nil {
 		return nil
 	}
-	return &CommentResponse{
+	response := &CommentResponse{
 		ID:        comment.ID,
 		PostID:    comment.PostID,
 		UserID:    comment.UserID,
 		Content:   comment.Content,
+		ImageURL:  comment.ImageURL, // Map ImageURL
 		CreatedAt: comment.CreatedAt,
 	}
+
+	// Fetch and populate user details
+	user, err := s.userRepo.GetByID(comment.UserID)
+	if err == nil && user != nil {
+		response.UserFirstName = user.FirstName
+		response.UserLastName = user.LastName
+		response.UserAvatarURL = user.AvatarURL
+		response.Username = user.Username // Assuming User model has Username
+	} else if err != nil {
+		// Log error if user not found, but don't fail the whole comment mapping
+		log.Printf("Error fetching user details for comment %s (user %s): %v", comment.ID, comment.UserID, err)
+	}
+	return response
 }
 
 // mapCommentsToResponse converts a slice of model.Comment to a slice of CommentResponse DTOs
-func mapCommentsToResponse(comments []*models.Comment) []*CommentResponse {
+func (s *commentService) mapCommentsToResponse(comments []*models.Comment) []*CommentResponse {
 	responses := make([]*CommentResponse, len(comments))
 	for i, comment := range comments {
-		responses[i] = mapCommentToResponse(comment)
+		responses[i] = s.mapCommentToResponse(comment) // Call the service's map method
 	}
 	return responses
 }
@@ -105,9 +126,10 @@ func (s *commentService) CreateComment(request *CommentCreateRequest) (*CommentR
 
 	// 3. Create the comment model
 	comment := &models.Comment{
-		PostID:  request.PostID,
-		UserID:  request.UserID, // Assumes UserID is set correctly before calling
-		Content: request.Content,
+		PostID:   request.PostID,
+		UserID:   request.UserID, // Assumes UserID is set correctly before calling
+		Content:  request.Content,
+		ImageURL: request.ImageURL, // Map ImageURL from request
 	}
 
 	// 4. Save the comment to the repository
@@ -119,7 +141,7 @@ func (s *commentService) CreateComment(request *CommentCreateRequest) (*CommentR
 	}
 
 	// 5. Return the response DTO
-	return mapCommentToResponse(comment), nil
+	return s.mapCommentToResponse(comment), nil
 }
 
 // GetCommentsByPost retrieves comments for a post, checking view permissions first
@@ -144,7 +166,7 @@ func (s *commentService) GetCommentsByPost(postID string, requestingUserID strin
 	}
 
 	// 3. Map to response DTOs
-	return mapCommentsToResponse(comments), nil
+	return s.mapCommentsToResponse(comments), nil
 }
 
 // DeleteComment handles the deletion of a comment, checking ownership or group admin status
