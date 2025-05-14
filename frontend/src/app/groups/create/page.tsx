@@ -13,14 +13,15 @@ import { Text } from '../../../components/ui/text';
 import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/alert';
 import { Avatar } from '../../../components/ui/avatar';
 import { useUserStore } from '../../../store/useUserStore';
-import { UserBasicInfo } from '../../../types/User';
+import { UserBasicInfo, User } from '../../../types/User'; // Added User for currentUser mapping
 import Link from 'next/link';
-import Image from 'next/image'; // Added for avatar preview
-import { FiUploadCloud } from 'react-icons/fi'; // Added for upload icon
+import Image from 'next/image';
+import { FiUploadCloud } from 'react-icons/fi';
 import ImageCropperModal from '../../../components/common/ImageCropperModal';
 import { uploadFileToMinio } from '../../../lib/minioUploader';
 import 'react-image-crop/dist/ReactCrop.css';
-import toast from 'react-hot-toast'; // Added for toast notifications
+import toast from 'react-hot-toast';
+import GroupInviteManager from '../../../components/groups/GroupInviteManager'; // New Import
 
 interface CreateGroupFormValues {
   name: string;
@@ -36,14 +37,7 @@ export default function CreateGroupPage() {
   const [creationStep, setCreationStep] = useState<'details' | 'invite'>('details');
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
 
-  // State for the invite UI
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<UserBasicInfo[]>([]);
-  const [isActualSearchLoading, setIsActualSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
-  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]); // Track successfully invited users
-
+  // Removed old invite UI state: searchTerm, searchResults, isActualSearchLoading, searchError, invitingUserId, invitedUserIds
 
   // State for avatar upload and cropping
   const [newAvatarFile, setNewAvatarFile] = useState<File | null>(null);
@@ -64,9 +58,7 @@ export default function CreateGroupPage() {
   } = useForm<CreateGroupFormValues>();
 
   const { post: createGroupRequest, isLoading, error: apiError } = useRequest<Group>();
-  const { get: searchUsersRequestHook, error: searchApiHookError, isLoading: isSearchHookLoading } = useRequest<UserBasicInfo[]>();
-  const { post: sendInviteRequestHook, error: inviteApiHookError, isLoading: isInviteHookLoading } = useRequest<{ message: string }>();
-
+  // Removed searchUsersRequestHook and sendInviteRequestHook as GroupInviteManager handles its own requests
 
   useEffect(() => {
     if (apiError) {
@@ -74,73 +66,8 @@ export default function CreateGroupPage() {
     }
   }, [apiError]);
 
-  useEffect(() => {
-    setSearchError(searchApiHookError?.message || null);
-  }, [searchApiHookError]);
-  // Removed useEffect for inviteApiHookError as toasts are handled directly in handleSendInvite
-
-
-  const handleSearchUsers = async (term: string) => {
-    if (!term) {
-      setSearchResults([]);
-      setSearchError(null);
-      return;
-    }
-    setIsActualSearchLoading(true);
-    setSearchError(null);
-    try {
-      const results = await searchUsersRequestHook(`/api/users/search?q=${encodeURIComponent(term)}`);
-      if (results && user) {
-        // Filter out the current user from the search results
-        const filteredResults = results.filter(resultUser => resultUser.user_id !== user.id);
-        setSearchResults(filteredResults);
-      } else {
-        setSearchResults(results || []);
-      }
-    } catch (err) {
-      // Error handled by useEffect on searchApiHookError
-      setSearchResults([]);
-    } finally {
-      setIsActualSearchLoading(false);
-    }
-  };
-
-  const debouncedSearchUsers = debounce(handleSearchUsers, 500);
-
-  useEffect(() => {
-    // This effect should call the debounced function.
-    // The actual API call is inside handleSearchUsers.
-    if (searchTerm.trim()) {
-        debouncedSearchUsers(searchTerm);
-    } else {
-        setSearchResults([]); // Clear results if search term is empty
-        setIsActualSearchLoading(false); // Ensure loading is false
-    }
-
-    // Cleanup function to cancel the debounce on unmount or if searchTerm changes rapidly.
-    return () => {
-      debouncedSearchUsers.cancel();
-    };
-  }, [searchTerm]); // debouncedSearchUsers is stable and doesn't need to be a dependency
-
-
-  const handleSendInvite = async (userId: string) => {
-    if (!createdGroupId) {
-      toast.error("Group not created yet. Cannot send invites.");
-      return;
-    }
-    setInvitingUserId(userId);
-    try {
-      await sendInviteRequestHook(`/api/groups/${createdGroupId}/invitations`, { invitee_id: userId });
-      toast.success(`Invitation sent to user ${searchResults.find(u => u.user_id === userId)?.username || 'ID ' + userId}.`);
-      setInvitedUserIds(prev => [...prev, userId]);
-    } catch (err: any) {
-      const errorMessage = err?.message || (inviteApiHookError && inviteApiHookError.message) || 'Failed to send invitation. Please try again.';
-      toast.error(errorMessage);
-    } finally {
-      setInvitingUserId(null);
-    }
-  };
+  // Removed useEffects for searchApiHookError and inviteApiHookError
+  // Removed handleSearchUsers, debouncedSearchUsers, and handleSendInvite functions
 
   useEffect(() => {
     // Cleanup object URL for avatar preview
@@ -355,91 +282,32 @@ export default function CreateGroupPage() {
 
       {creationStep === 'invite' && (
         <div className="space-y-6 bg-gray-800 p-8 rounded-lg shadow-xl">
-          <Heading level={2} className="mb-4 text-center">Invite Users to Your New Group</Heading>
+          <Heading level={2} className="mb-6 text-center">Invite Users to Your New Group</Heading>
 
-          <div>
-            <label htmlFor="user-search" className="block text-sm font-medium text-gray-300 mb-1">
-              Search Users to Invite
-            </label>
-            <Input
-              id="user-search"
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              placeholder="Search by username or email"
+          {createdGroupId && user && (
+            <GroupInviteManager
+              groupId={createdGroupId}
+              currentUser={user ? { ...user, user_id: user.id } : null} // Map User to UserBasicInfo
+              // onInviteSent and onInviteError can be handled here if needed, e.g., for analytics
             />
-          </div>
-
-          {isActualSearchLoading && <Text className="text-center text-gray-400 py-2">Searching users...</Text>}
-          
-          {searchError && (
-            <Alert open={!!searchError} onClose={() => setSearchError(null)}>
-              <AlertTitle>Search Error</AlertTitle>
-              <AlertDescription>{searchError}</AlertDescription>
-            </Alert>
           )}
 
-          {searchResults.length > 0 && !isActualSearchLoading && (
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-2"> {/* Added pr-2 for scrollbar spacing, increased max-h */}
-              <Text className="text-sm text-gray-400">Found {searchResults.length} user(s):</Text>
-              {searchResults.map((userResult) => (
-                <div
-                  key={userResult.user_id}
-                  className="flex items-center justify-between bg-gray-700 p-3 rounded-md hover:bg-gray-600 transition-colors w-full" // Ensure full width
-                >
-                  <div className="flex items-center space-x-3 flex-grow min-w-0"> {/* Allow user info to shrink and truncate */}
-                    <div className="flex-shrink-0"> {/* Prevent avatar from shrinking */}
-                      <Avatar
-                        src={userResult.avatar_url || undefined}
-                        alt={userResult.username}
-                        initials={userResult.username.charAt(0).toUpperCase()}
-                        className="w-10 h-10 rounded-full" // Fixed size for avatar, ensure it's round
-                      />
-                    </div>
-                    <div className="min-w-0"> {/* Allow text to truncate */}
-                      <Text className="font-semibold truncate">{userResult.username}</Text>
-                      {/* Removed email display as it's not in UserBasicInfo and to save space */}
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0 ml-2"> {/* Prevent button from shrinking, add left margin */}
-                    <Button
-                      onClick={() => handleSendInvite(userResult.user_id)}
-                      disabled={invitedUserIds.includes(userResult.user_id) || invitingUserId === userResult.user_id || isInviteHookLoading}
-                      outline
-                      className="px-3 py-1 text-sm"
-                    >
-                      {invitedUserIds.includes(userResult.user_id)
-                        ? 'Invited'
-                        : invitingUserId === userResult.user_id
-                          ? 'Inviting...'
-                          : 'Invite'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {!isActualSearchLoading && searchTerm && searchResults.length === 0 && !searchError && (
-             <Text className="text-center text-gray-400 py-2">No users found matching your search.</Text>
-          )}
-          {/* Removed Alert components for inviteError and inviteSuccess as they are replaced by toasts */}
-          <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-6">
             <Button
               onClick={() => router.push(`/groups/${createdGroupId}`)}
-              disabled={!createdGroupId || isInviteHookLoading}
+              disabled={!createdGroupId} // isLoading from createGroupRequest can also be used here if needed
               className="w-full sm:w-auto"
+              color="indigo" // Example color
             >
               Finish & Go to Group
             </Button>
-             <Button
-              plain // Changed from variant="ghost"
+            <Button
+              plain
               onClick={() => router.push(`/groups/${createdGroupId}`)}
               disabled={!createdGroupId}
               className="w-full sm:w-auto"
             >
-              Skip Invites
+              Skip Invites & Finish
             </Button>
           </div>
         </div>
@@ -470,20 +338,27 @@ interface DebouncedFunction<T extends (...args: any[]) => void> {
   cancel: () => void;
 }
 
-// Update the debounce function to include a cancel method
-const debounce = <T extends (...args: any[]) => void>(func: T, delay: number): DebouncedFunction<T> => {
-  let timeoutId: NodeJS.Timeout;
+// Debounce function can be removed if not used elsewhere in this file after GroupInviteManager integration
+// If it's a utility, it might be better placed in a utils file.
+// For now, assuming GroupInviteManager handles its own debouncing.
+// interface DebouncedFunction<T extends (...args: any[]) => void> {
+//   (...args: Parameters<T>): void;
+//   cancel: () => void;
+// }
 
-  const debounced = ((...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      func.apply(null, args);
-    }, delay);
-  }) as DebouncedFunction<T>;
-
-  debounced.cancel = () => {
-    clearTimeout(timeoutId);
-  };
-
-  return debounced;
-};
+// const debounce = <T extends (...args: any[]) => void>(func: T, delay: number): DebouncedFunction<T> => {
+//   let timeoutId: NodeJS.Timeout;
+//
+//   const debounced = ((...args: Parameters<T>) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => {
+//       func.apply(null, args);
+//     }, delay);
+//   }) as DebouncedFunction<T>;
+//
+//   debounced.cancel = () => {
+//     clearTimeout(timeoutId);
+//   };
+//
+//   return debounced;
+// };

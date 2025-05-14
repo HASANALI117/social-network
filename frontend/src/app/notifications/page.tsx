@@ -9,6 +9,7 @@ import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { useRequest } from '../../hooks/useRequest';
 import { Heading } from '../../components/ui/heading';
 import { Text } from '../../components/ui/text';
+import { Avatar } from '../../components/ui/avatar';
 
 interface GroupInvitationsApiResponse {
   invitations: GroupInvitation[];
@@ -25,7 +26,7 @@ export default function NotificationsPage() {
   // Hooks
   const { user: currentUser } = useUserStore();
   const { get: fetchGroupInvitations, error: fetchInvitationsApiError, isLoading: apiIsFetchingInvitations } = useRequest<GroupInvitationsApiResponse>();
-  const { put: updateInvitationStatus, isLoading: isUpdatingInvitation, error: updateInvitationApiError } = useRequest<GroupInvitation>();
+  const { post: handleInvitationActionRequest, isLoading: isUpdatingInvitation, error: updateInvitationApiError } = useRequest<GroupInvitation>();
 
   // Fetch Invitations Function
   const loadGroupInvitations = useCallback(async () => {
@@ -38,7 +39,7 @@ export default function NotificationsPage() {
     setInvitationsError(null); // Clear previous custom error
     setActionFeedback(null);
 
-    const data = await fetchGroupInvitations(`/api/users/me/group-invitations?status=pending`);
+    const data = await fetchGroupInvitations(`/api/groups/invitations/pending`);
     if (data && data.invitations) {
       setGroupInvitations(data.invitations);
     }
@@ -68,10 +69,17 @@ export default function NotificationsPage() {
   // Handle Invitation Action Function
   const handleInvitationAction = async (invitationId: string, action: 'accept' | 'decline') => {
     setActionFeedback(null);
-    const updatedInvitation = await updateInvitationStatus(`/api/groups/invitations/${invitationId}/${action}`, {});
+    const endpointAction = action === 'accept' ? 'accept' : 'reject';
+    const apiUrl = `/api/groups/invitations/${invitationId}/${endpointAction}`;
+
+    const updatedInvitation = await handleInvitationActionRequest(
+      apiUrl,
+      {} // POST requests usually have a body, even if empty for these actions
+    );
 
     if (updatedInvitation && !updateInvitationApiError) { // Check hook's error state after call
-      setActionFeedback({ type: 'success', message: `Invitation ${action}ed successfully!` });
+      const successMessage = action === 'accept' ? 'Invitation accepted successfully!' : 'Invitation declined successfully!';
+      setActionFeedback({ type: 'success', message: successMessage });
       loadGroupInvitations(); // Or optimistically update the list
     } else {
       setActionFeedback({ type: 'error', message: updateInvitationApiError?.message || `Failed to ${action} invitation.` });
@@ -117,13 +125,25 @@ export default function NotificationsPage() {
               .filter(inv => inv.status === "pending") // Ensure we only show pending
               .map((invitation) => (
               <div key={invitation.id} className="p-4 bg-gray-800 rounded-lg shadow flex justify-between items-center">
-                <div>
-                  <Text className="font-semibold">
-                    Invitation to join group: {invitation.group_title || `Group ID ${invitation.group_id.substring(0,8)}...`}
-                  </Text>
-                  <Text className="text-sm text-gray-400">
-                    Invited by: {invitation.inviter_name || `User ID ${invitation.inviter_id.substring(0,8)}...`}
-                  </Text>
+                <div className="flex items-center"> {/* Wrapper for avatar + text */}
+                  {/* Group Avatar */}
+                  {invitation.group?.avatar_url && (
+                    <Avatar src={invitation.group.avatar_url} initials={(invitation.group_name || invitation.group.name)?.charAt(0) || 'G'} alt={invitation.group_name || invitation.group.name || 'Group'} className="h-10 w-10 mr-3" />
+                  )}
+                  <div>
+                    {/* Group Name */}
+                    <Text className="font-semibold">
+                      Invitation to join: <span className="text-blue-400">{invitation.group_name || invitation.group?.name || 'Unnamed Group'}</span>
+                    </Text>
+                    <div className="flex items-center text-sm text-gray-400 mt-1">
+                      {/* Inviter Avatar */}
+                      {invitation.inviter?.avatar_url && (
+                        <Avatar src={invitation.inviter.avatar_url} initials={(invitation.inviter.first_name || invitation.inviter.username)?.charAt(0) || 'U'} alt={(invitation.inviter.first_name && invitation.inviter.last_name ? `${invitation.inviter.first_name} ${invitation.inviter.last_name}` : invitation.inviter.username) || 'Inviter'} className="h-5 w-5 mr-1.5" />
+                      )}
+                      {/* Inviter Name */}
+                      Invited by: {(invitation.inviter?.first_name && invitation.inviter?.last_name ? `${invitation.inviter.first_name} ${invitation.inviter.last_name}` : invitation.inviter?.username) || 'A user'}
+                    </div>
+                  </div>
                 </div>
                 <div className="space-x-2">
                   <Button
