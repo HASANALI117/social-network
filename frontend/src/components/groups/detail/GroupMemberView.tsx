@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import Tabs from '../../common/Tabs';
-import { Text, Strong } from '../../ui/text';
+import { Text } from '../../ui/text';
 import { Button } from '../../ui/button';
-import { Avatar } from '../../ui/avatar';
-import GroupPostsTab from './GroupPostsTab';
+// import { Avatar } from '../../ui/avatar'; // No longer used directly
+// import GroupPostsTab from './GroupPostsTab'; // Replaced by summary tab
 import GroupMembersTab from './GroupMembersTab';
-import GroupEventsTab from './GroupEventsTab';
+// import GroupEventsTab from './GroupEventsTab'; // Replaced by summary tab
 import GroupInviteManager from '../GroupInviteManager';
-import GroupJoinRequestsTab from './GroupJoinRequestsTab'; // New import
+import GroupJoinRequestsTab from './GroupJoinRequestsTab';
+import GroupRecentPostsSummaryTab from './GroupRecentPostsSummaryTab'; // New Summary Tab
+import GroupEventsSummaryTab from './GroupEventsSummaryTab'; // New Summary Tab
 import { Group } from '../../../types/Group';
 import { UserBasicInfo } from '../../../types/User';
-// GroupJoinRequest, useRequest, toast are no longer needed here as they are handled by GroupJoinRequestsTab
 
 interface GroupMemberViewProps {
   group: Group;
@@ -24,7 +25,7 @@ export default function GroupMemberView({
   handleLeaveGroup,
 }: GroupMemberViewProps) {
 
-  const { id: groupId, members_count, posts_count, events_count, posts, members, events, creator_info, viewer_is_admin } = group;
+  const { id: groupId, members_count, posts_count, events_count, members /* posts, events no longer directly used here */ } = group;
 
   const handleInviteSent = (invitedUserId: string, successMessage: string) => {
     // Optionally, update UI or state here, e.g., refetch members
@@ -48,15 +49,33 @@ export default function GroupMemberView({
   );
 
   const tabs = [
-    { label: 'Posts', value: 'posts', content: <Tabs.Panel id="posts" className="py-4"><GroupPostsTab posts={posts} /></Tabs.Panel> },
-    { label: 'Members', value: 'members', content: <Tabs.Panel id="members" className="py-4"><GroupMembersTab members={members} /></Tabs.Panel> },
-    { label: 'Events', value: 'events', content: <Tabs.Panel id="events" className="py-4"><GroupEventsTab events={events} /></Tabs.Panel> },
-    { label: 'Invitations', value: 'invitations', content: invitationsTabContent }
+    {
+      label: 'Recent Posts',
+      value: 'recent-posts',
+      content: <Tabs.Panel id="recent-posts" className="py-4"><GroupRecentPostsSummaryTab groupId={groupId} /></Tabs.Panel>
+    },
+    {
+      label: 'Upcoming Events',
+      value: 'upcoming-events',
+      content: <Tabs.Panel id="upcoming-events" className="py-4"><GroupEventsSummaryTab groupId={groupId} /></Tabs.Panel>
+    },
+    {
+      label: 'Members',
+      value: 'members',
+      content: <Tabs.Panel id="members" className="py-4"><GroupMembersTab members={members} /></Tabs.Panel>
+    },
+    {
+      label: 'Invitations',
+      value: 'invitations',
+      content: invitationsTabContent
+    }
   ];
 
-  // Unconditionally add the Join Requests tab
-  // Ensure group.id is available and valid here
-  if (group?.id) {
+  // Conditionally add the Join Requests tab if the viewer is an admin or creator
+  // Assuming viewer_is_admin or similar logic determines if this tab should be shown.
+  const isGroupAdmin = group.viewer_is_admin || (currentUser && currentUser.user_id === group.creator_info.user_id);
+
+  if (group?.id && isGroupAdmin) { // Only show to admins/creator
     tabs.push({
         label: 'Join Requests',
         value: 'join-requests',
@@ -84,14 +103,14 @@ export default function GroupMemberView({
       <div className="mb-6 flex justify-end">
          <Button
           onClick={handleLeaveGroup}
-          outline // Secondary action style
-          className="text-sm" // Adjust size as needed
+          outline
+          className="text-sm"
         >
           Leave Group
         </Button>
       </div>
 
-      <Tabs tabs={tabs.map(tab => ({ label: tab.label, content: tab.content }))} />
+      <Tabs tabs={tabs.map(tab => ({ label: tab.label, value: tab.value, content: tab.content }))} />
       
     </div>
   );

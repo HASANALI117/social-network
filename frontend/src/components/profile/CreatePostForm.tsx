@@ -18,18 +18,19 @@ interface CreatePostFormValues {
   image_url: string | null;
   privacy: 'public' | 'semi_private' | 'private'; // Match Post type
   allowed_user_ids?: string[]; // Added for private posts
-  // group_id is not part of this form currently
+  group_id?: string; // Added for group posts
 }
 
 interface CreatePostFormProps {
   onSubmit?: (post: Post) => void;
+  groupId?: string; // Optional groupId
 }
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
+export default function CreatePostForm({ onSubmit, groupId }: CreatePostFormProps) {
   const { user } = useUserStore();
   const { post: createPostRequest, isLoading: isCreatingPost } = useRequest<Post>();
   // Dedicated useRequest instance for followers
@@ -57,9 +58,10 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
     defaultValues: {
       title: '',
       content: '',
-      privacy: 'public',
+      privacy: groupId ? 'public' : 'public', // Default to public if in group context
       image_url: null,
-      allowed_user_ids: []
+      allowed_user_ids: [],
+      group_id: groupId
     }
   });
 
@@ -76,14 +78,14 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
 
   // Effect to trigger follower fetch
   useEffect(() => {
-    if (privacyValue === 'private' && user?.id) {
+    if (!groupId && privacyValue === 'private' && user?.id) { // Only fetch followers if not in group context and privacy is private
       getFollowers(`/api/users/${user.id}/followers`); // Use getFollowers
     } else {
       setFollowers([]);
       setSelectedFollowerIds([]);
       setValue('allowed_user_ids', []);
     }
-  }, [privacyValue, user?.id, getFollowers, setValue]); // Dependency: getFollowers
+  }, [privacyValue, user?.id, getFollowers, setValue, groupId]); // Dependency: getFollowers, groupId
 
   // Effect to process fetched followers data
   useEffect(() => {
@@ -189,21 +191,24 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
       title: data.title,
       content: data.content,
       image_url: imageUrl,
-      privacy: data.privacy
+      privacy: groupId ? 'public' : data.privacy // If in group, force public (within group context)
     };
 
-    if (data.privacy === 'private') {
+    if (groupId) {
+      postData.group_id = groupId;
+      // For group posts, allowed_user_ids might not be relevant or handled differently by backend
+      // Assuming group posts are visible to all group members, so not setting allowed_user_ids
+      postData.allowed_user_ids = [];
+    } else if (data.privacy === 'private') {
       postData.allowed_user_ids = selectedFollowerIds;
     } else {
-      // Ensure allowed_user_ids is not sent or is empty for non-private posts
-      // Depending on backend, either omit or send empty array
       postData.allowed_user_ids = [];
     }
 
-
+    const endpoint = '/api/posts'; // Always use /api/posts
     const createPostToastId = toast.loading('Creating post...');
     try {
-      const result = await createPostRequest('/api/posts', postData);
+      const result = await createPostRequest(endpoint, postData);
       if (result) {
         toast.success('Post created successfully!', { id: createPostToastId });
         reset(); // Resets form to defaultValues
@@ -268,8 +273,8 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
         className="hidden"
         id="post-image-upload"
       />
-
-      {privacyValue === 'private' && (
+    
+      {!groupId && privacyValue === 'private' && ( // Only show follower selection if not in group context and privacy is private
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-100 mb-2">Select Allowed Followers:</h3>
           {isLoadingFollowersFromHook && <p className="text-gray-400">Loading followers...</p>}
@@ -298,7 +303,7 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
           )}
         </div>
       )}
-
+    
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           <button
@@ -310,19 +315,21 @@ export default function CreatePostForm({ onSubmit }: CreatePostFormProps) {
             <FiImage />
             {selectedPostImageFile ? 'Change Image' : 'Add Image'}
           </button>
-          <select
-            {...register('privacy')}
-            className="bg-gray-900 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            disabled={isLoading}
-          >
-            <option value="public">Public</option>
-            <option value="semi_private">Followers Only</option>
-            <option value="private">Private</option>
-          </select>
+          {!groupId && ( // Only show privacy dropdown if not in group context
+            <select
+              {...register('privacy')}
+              className="bg-gray-900 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              disabled={isLoading}
+            >
+              <option value="public">Public</option>
+              <option value="semi_private">Followers Only</option>
+              <option value="private">Private</option>
+            </select>
+          )}
         </div>
         <button
           type="submit"
-          disabled={!isValid || isLoading || !user || (privacyValue === 'private' && selectedFollowerIds.length === 0 && followers.length > 0) }
+          disabled={!isValid || isLoading || !user || (!groupId && privacyValue === 'private' && selectedFollowerIds.length === 0 && followers.length > 0) }
           className="bg-purple-700 text-gray-100 px-6 py-2 rounded-full hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isUploadingImage ? 'Uploading...' : isCreatingPost ? 'Posting...' : 'Post'}

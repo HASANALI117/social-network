@@ -2,26 +2,26 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image'; // For avatar
+// Image and UserCircleIcon are now in GroupCard
 import { useRequest } from '@/hooks/useRequest';
 import { Group } from '@/types/Group';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
-import { Input } from '@/components/ui/input'; // For search bar
-import { UserCircleIcon } from '@heroicons/react/24/solid'; // Placeholder icon
+import { Input } from '@/components/ui/input';
+import Tabs from '@/components/common/Tabs'; // Import Tabs
+import GroupCard from '@/components/groups/GroupCard'; // Import GroupCard
+import { useUserStore } from '@/store/useUserStore'; // Import useUserStore
 
 interface GroupsApiResponse {
   groups: Group[];
-  count?: number; // Optional, as per instructions
-  limit?: number; // Optional
-  offset?: number; // Optional
+  count?: number;
+  limit?: number;
+  offset?: number;
 }
 
-// Debounce function
 const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
-
   const debounced = (...args: Parameters<F>) => {
     if (timeout !== null) {
       clearTimeout(timeout);
@@ -29,136 +29,173 @@ const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) =
     }
     timeout = setTimeout(() => func(...args), waitFor);
   };
-
   return debounced as (...args: Parameters<F>) => ReturnType<F>;
 };
 
-export default function BrowseGroupsPage() {
-  const [groups, setGroups] = useState<Group[]>([]);
+type ActiveTab = 'explore' | 'my-groups';
+
+export default function GroupsPage() {
+  const [exploreGroups, setExploreGroups] = useState<Group[]>([]);
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTabKey, setActiveTabKey] = useState<ActiveTab>('explore'); // Renamed for clarity
 
+  const { user } = useUserStore();
   const { get: fetchGroupsRequest, error: fetchGroupsError } = useRequest<GroupsApiResponse>();
 
-  const loadGroups = useCallback(async (currentSearchTerm?: string) => {
+  const loadGroups = useCallback(async (currentSearchTerm?: string, tabKeyToLoad: ActiveTab = activeTabKey) => {
     setIsLoading(true);
     setError(null);
     let url = '/api/groups';
-    if (currentSearchTerm && currentSearchTerm.trim() !== '') {
-      url += `?search=${encodeURIComponent(currentSearchTerm.trim())}`;
+
+    if (tabKeyToLoad === 'explore') {
+      if (currentSearchTerm && currentSearchTerm.trim() !== '') {
+        url += `?search=${encodeURIComponent(currentSearchTerm.trim())}`;
+      }
+    } else if (tabKeyToLoad === 'my-groups') {
+      if (user?.id) {
+        url += `?member=true&userId=${user.id}`;
+      } else {
+        setIsLoading(false);
+        setMyGroups([]); // Clear my groups if user not available
+        return;
+      }
     }
+
     try {
       const data = await fetchGroupsRequest(url);
       if (data && data.groups) {
-        setGroups(data.groups);
+        if (tabKeyToLoad === 'explore') {
+          setExploreGroups(data.groups);
+        } else {
+          setMyGroups(data.groups);
+        }
       } else if (fetchGroupsError) {
         setError(fetchGroupsError);
+        if (tabKeyToLoad === 'explore') setExploreGroups([]); else setMyGroups([]);
       } else {
-        // If data.groups is not present but no explicit fetchGroupsError, it might be an empty successful response
-        // or an unexpected API response structure.
-        setGroups([]); // Assume no groups if not explicitly provided or error.
-        if (!data) setError(new Error('Failed to fetch groups: No data returned.'));
+        if (tabKeyToLoad === 'explore') setExploreGroups([]); else setMyGroups([]);
+        if (!data) setError(new Error(`Failed to fetch ${tabKeyToLoad === 'explore' ? 'explore' : 'my'} groups: No data returned.`));
       }
     } catch (err: any) {
       setError(err);
+      if (tabKeyToLoad === 'explore') setExploreGroups([]); else setMyGroups([]);
     } finally {
       setIsLoading(false);
     }
-  }, [fetchGroupsRequest, fetchGroupsError]);
+  }, [fetchGroupsRequest, fetchGroupsError, user?.id, activeTabKey]);
 
   const debouncedLoadGroups = useCallback(debounce(loadGroups, 400), [loadGroups]);
 
   useEffect(() => {
-    // Initial load or when search term changes (debounced)
-    debouncedLoadGroups(searchTerm);
-  }, [searchTerm, debouncedLoadGroups]);
-
+    if (activeTabKey === 'explore') {
+      debouncedLoadGroups(searchTerm, 'explore');
+    } else if (activeTabKey === 'my-groups') {
+      loadGroups(undefined, 'my-groups');
+    }
+  }, [searchTerm, activeTabKey, debouncedLoadGroups, loadGroups]);
 
   useEffect(() => {
-    // Handle direct fetch errors
     if (fetchGroupsError) {
       setError(fetchGroupsError);
-      setGroups([]); // Clear groups on error
+      // Clear appropriate group list based on current tab
+      if (activeTabKey === 'explore') setExploreGroups([]); else setMyGroups([]);
       setIsLoading(false);
     }
-  }, [fetchGroupsError]);
+  }, [fetchGroupsError, activeTabKey]);
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
-
-  const formatCreatorName = (creatorInfo: Group['creator_info']) => {
-    if (creatorInfo.first_name && creatorInfo.last_name) {
-      return `${creatorInfo.first_name} ${creatorInfo.last_name}`;
-    }
-    return creatorInfo.username;
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString(undefined, {
-        year: 'numeric', month: 'long', day: 'numeric'
-      });
-    } catch (e) {
-      return "Invalid date";
+  
+  // This function will be called by the Tabs component when a tab is clicked
+  // The Tabs component passes the index of the clicked tab.
+  const handleTabSelection = (index: number) => {
+    if (index === 0) {
+      setActiveTabKey('explore');
+    } else if (index === 1) {
+      setActiveTabKey('my-groups');
     }
   };
+
+  const renderGroupList = (groups: Group[], tabKey: ActiveTab) => {
+    const currentSearchTermForDisplay = tabKey === 'explore' ? searchTerm : '';
+    if (isLoading) return <Text className="text-center py-10">Loading groups...</Text>;
+    if (error) return <Text className="text-center text-red-500 py-10">Error: {error.message}</Text>;
+    if (groups.length === 0) {
+      return (
+        <Text className="text-center text-gray-400 py-10">
+          {tabKey === 'explore'
+            ? (currentSearchTermForDisplay ? `No groups found for "${currentSearchTermForDisplay}".` : "No groups found. Be the first to create one!")
+            : (user?.id ? "You are not a member of any groups yet, or no groups found." : "Please log in to see your groups.")
+          }
+        </Text>
+      );
+    }
+    return (
+      <div className="space-y-4 mt-4">
+        {groups.map((group) => (
+          <GroupCard key={group.id} group={group} />
+        ))}
+      </div>
+    );
+  };
+
+  const tabDefinitions = [
+    {
+      label: 'Explore',
+      content: renderGroupList(exploreGroups, 'explore'),
+    },
+    {
+      label: 'My Groups',
+      content: renderGroupList(myGroups, 'my-groups'),
+    },
+  ];
+  
+  // Determine initialTab index based on activeTabKey
+  const initialTabIndex = activeTabKey === 'explore' ? 0 : 1;
 
   return (
     <div className="container mx-auto p-4 text-white">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-        <Heading level={1} className="whitespace-nowrap">Browse Groups</Heading>
-        <Input
-          type="text"
-          placeholder="Search groups..."
-          value={searchTerm}
-          onChange={handleSearchChange}
-          className="w-full sm:w-auto bg-gray-700 border-gray-600 placeholder-gray-400 text-white"
-        />
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+        <Heading level={1} className="whitespace-nowrap">Groups</Heading>
+        {activeTabKey === 'explore' && (
+          <Input
+            type="text"
+            placeholder="Search groups..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="w-full sm:w-auto bg-gray-700 border-gray-600 placeholder-gray-400 text-white"
+          />
+        )}
         <Link href="/groups/create" passHref>
           <Button className="w-full sm:w-auto whitespace-nowrap">Create New Group</Button>
         </Link>
       </div>
 
-      {isLoading && <Text className="text-center py-10">Loading groups...</Text>}
-      {error && <Text className="text-center text-red-500 py-10">Error: {error.message}</Text>}
-      
-      {!isLoading && !error && groups.length === 0 && (
-        <Text className="text-center text-gray-400 py-10">
-          {searchTerm ? `No groups found for "${searchTerm}".` : "No groups found. Be the first to create one!"}
-        </Text>
-      )}
-
-      {!isLoading && !error && groups.length > 0 && (
-        <div className=""> {/* Changed from grid to vertical stack with space */}
-          {groups.map((group) => (
-            <Link key={group.id} href={`/groups/${group.id}`} passHref>
-              <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg hover:bg-gray-700 transition-colors cursor-pointer flex flex-col sm:flex-row gap-4 items-start mb-4">
-                {group.avatar_url ? (
-                  <Image src={group.avatar_url} alt={`${group.name} avatar`} width={80} height={80} className="rounded-md object-cover w-20 h-20 flex-shrink-0" />
-                ) : (
-                  <div className="w-20 h-20 bg-gray-700 rounded-md flex items-center justify-center flex-shrink-0">
-                    <UserCircleIcon className="h-12 w-12 text-gray-500" />
-                  </div>
-                )}
-                <div className="flex-grow">
-                  <Heading level={3} className="mb-1 truncate">{group.name}</Heading>
-                  <Text className="text-gray-400 text-sm line-clamp-3 mb-2">
-                    {group.description || 'No description provided.'}
-                  </Text>
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <Text>Created by: {formatCreatorName(group.creator_info)}</Text>
-                    <Text>Members: {group.members_count} | Posts: {group.posts_count} | Events: {group.events_count}</Text>
-                    <Text>Created: {formatDate(group.created_at)}</Text>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-      {/* Add pagination controls here later if needed */}
+      {/* The Tabs component now needs to be modified to call onTabChange with index */}
+      {/* For now, assuming Tabs component is updated or we adapt its usage.
+          The provided Tabs.tsx uses internal state and onClick on buttons.
+          To make this work with external state (activeTabKey), Tabs.tsx would need modification
+          to accept activeIndex and an onTabChange(index: number) prop.
+          Let's assume we modify Tabs.tsx to support this.
+          If not, we'd pass initialTab and let Tabs.tsx handle it internally,
+          but then GroupsPage wouldn't know the active tab index directly from Tabs.tsx's props.
+          
+          For this iteration, I will adapt the usage here to match the existing Tabs.tsx.
+          The `handleTabSelection` will be passed to a modified Tabs component.
+          The `Tabs` component itself will call `setActiveTab(index)` internally,
+          and if we want `GroupsPage` to react, `Tabs` needs an `onTabChange(index: number)` prop.
+          
+          Let's adjust the Tabs component props in common/Tabs.tsx to include onTabChange.
+          For now, I will proceed as if Tabs component is updated.
+          If Tabs component is NOT updated, the `content` for each tab is rendered by Tabs itself.
+      */}
+      <Tabs tabs={tabDefinitions} initialTab={initialTabIndex} />
+      {/* Content is now rendered by the Tabs component via tabDefinitions.content */}
+      {/* So, the explicit rendering block below is no longer needed here. */}
     </div>
   );
 }
