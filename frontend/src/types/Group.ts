@@ -10,4 +10,4 @@ export interface Group {
   creator_first_name?: string;
   creator_last_name?: string;
   member_count?: number;
-}
+ }

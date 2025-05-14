@@ -342,37 +342,32 @@ func (h *GroupHandler) createGroup(w http.ResponseWriter, r *http.Request, curre
 	return nil
 }
 
-// getGroupByID handles GET /api/groups/{id} - Now fetches full profile
-// @Summary Get group profile by ID
-// @Description Get detailed group profile information including members
+// getGroupByID handles GET /api/groups/{id}
+// @Summary Get group by ID
+// @Description Get group details by ID, conditionally showing more data for members.
 // @Tags groups
 // @Accept json
 // @Produce json
 // @Param id path string true "Group ID"
-// @Success 200 {object} services.GroupProfileResponse "Detailed group profile"
+// @Success 200 {object} types.GroupDetailResponse "Group details"
 // @Failure 400 {object} httperr.ErrorResponse "Group ID is required" // Implicit via routing
 // @Failure 404 {object} httperr.ErrorResponse "Group not found"
-// @Failure 403 {object} httperr.ErrorResponse "Forbidden (not a member)"
 // @Failure 405 {object} httperr.ErrorResponse "Method not allowed"
-// @Failure 500 {object} httperr.ErrorResponse "Failed to get group profile"
+// @Failure 500 {object} httperr.ErrorResponse "Failed to get group details"
 // @Router /groups/{id} [get]
 func (h *GroupHandler) getGroupByID(w http.ResponseWriter, r *http.Request, groupID string, currentUser *services.UserResponse) error {
-	// Call the new service method to get the full profile
-	groupProfileResponse, err := h.groupService.GetGroupProfile(groupID, currentUser.ID)
+	groupDetailResponse, err := h.groupService.GetByID(groupID, currentUser.ID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrGroupNotFound) {
 			return httperr.NewNotFound(err, "Group not found")
 		}
-		if errors.Is(err, services.ErrGroupMemberRequired) {
-			// Return 403 Forbidden if the user is not a member (as required by GetGroupProfile)
-			return httperr.NewForbidden(err, "Access denied: You must be a member to view this group profile")
-		}
-		// Handle other potential errors from GetGroupProfile or its dependencies
-		return httperr.NewInternalServerError(err, "Failed to get group profile")
+		// The service layer's GetByID now handles conditional logic and doesn't return ErrGroupMemberRequired as a primary error for this endpoint.
+		// It might return other errors if, for example, checking membership fails catastrophically.
+		return httperr.NewInternalServerError(err, "Failed to get group details")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(groupProfileResponse) // Encode the full profile response
+	json.NewEncoder(w).Encode(groupDetailResponse)
 	return nil
 }
 
@@ -409,17 +404,18 @@ func (h *GroupHandler) listGroups(w http.ResponseWriter, r *http.Request, curren
 	}
 
 	// Pass the search query to the service layer
-	groupsResponse, err := h.groupService.List(limit, offset, searchQuery, currentUser.ID)
+	// The service layer now returns []*types.GroupDetailResponse
+	groupDetailResponses, err := h.groupService.List(limit, offset, searchQuery, currentUser.ID)
 	if err != nil {
 		return httperr.NewInternalServerError(err, "Failed to list groups")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"groups": groupsResponse,
+		"groups": groupDetailResponses, // Use the new response type
 		"limit":  limit,
 		"offset": offset,
-		"count":  len(groupsResponse),
+		"count":  len(groupDetailResponses), // Count based on the new response type
 	})
 	return nil
 }

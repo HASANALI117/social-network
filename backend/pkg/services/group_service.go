@@ -7,6 +7,7 @@ import (
 
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/types" // Added import
 )
 
 // GroupResponse is the DTO for group data sent to clients
@@ -110,9 +111,9 @@ var (
 // GroupService defines the interface for group business logic
 type GroupService interface {
 	Create(request *GroupCreateRequest) (*GroupResponse, error)
-	GetByID(groupID string, requestingUserID string) (*GroupResponse, error)                       // Basic group info
-	GetGroupProfile(groupID string, requestingUserID string) (*GroupProfileResponse, error)        // Detailed profile view
-	List(limit, offset int, searchQuery string, requestingUserID string) ([]*GroupResponse, error) // List groups user can see/join, with search
+	GetByID(groupID string, requestingUserID string) (*types.GroupDetailResponse, error)                       // Updated return type
+	GetGroupProfile(groupID string, requestingUserID string) (*GroupProfileResponse, error)                    // Detailed profile view
+	List(limit, offset int, searchQuery string, requestingUserID string) ([]*types.GroupDetailResponse, error) // Updated return type
 	Update(groupID string, request *GroupUpdateRequest, requestingUserID string) (*GroupResponse, error)
 	Delete(groupID string, requestingUserID string) error
 
@@ -329,34 +330,93 @@ func (s *groupService) Create(request *GroupCreateRequest) (*GroupResponse, erro
 	return mapGroupToResponse(group), nil
 }
 
-func (s *groupService) GetByID(groupID string, requestingUserID string) (*GroupResponse, error) {
-	group, err := s.groupRepo.GetByID(groupID)
+func (s *groupService) GetByID(groupID string, requestingUserID string) (*types.GroupDetailResponse, error) {
+	groupDetail, err := s.groupRepo.GetGroupDetailsByID(groupID) // Use new method for detailed response
 	if err != nil {
 		if errors.Is(err, repositories.ErrGroupNotFound) {
 			return nil, err
 		}
-		return nil, fmt.Errorf("failed to get group from repository: %w", err)
+		return nil, fmt.Errorf("failed to get group details from repository: %w", err)
 	}
 
-	// TODO: Authorization Check - Can the requesting user view this group?
-	// For now, assume any logged-in user can get any group by ID.
-	// A better approach would be to check membership or if the group is public.
-	// isMember, _ := s.groupRepo.IsMember(groupID, requestingUserID)
-	// if !isMember {
-	//     return nil, ErrGroupMemberRequired // Or ErrGroupForbidden
-	// }
+	// Populate CreatorInfo
+	if groupDetail.CreatorInfo.UserID != "" {
+		creator, err := s.userRepo.GetByID(groupDetail.CreatorInfo.UserID)
+		if err != nil {
+			fmt.Printf("Warning: Failed to get creator (ID: %s) details for group %s: %v\n", groupDetail.CreatorInfo.UserID, groupDetail.ID, err)
+			groupDetail.CreatorInfo = types.UserBasicInfo{} // Clear if not found
+		} else if creator != nil {
+			groupDetail.CreatorInfo.FirstName = creator.FirstName
+			groupDetail.CreatorInfo.LastName = creator.LastName
+			groupDetail.CreatorInfo.Username = creator.Username
+			groupDetail.CreatorInfo.AvatarURL = creator.AvatarURL
+		}
+	}
 
-	return mapGroupToResponse(group), nil
+	isMember, err := s.IsMember(groupID, requestingUserID)
+	if err != nil {
+		// Log error but proceed, as non-members can still view basic info
+		fmt.Printf("Warning: Failed to check membership for group %s, user %s: %v\n", groupID, requestingUserID, err)
+		// Treat as non-member if error occurs during check, or decide if this should be a hard error
+		isMember = false
+	}
+
+	if isMember {
+		// User is a member, return full details
+		// Potentially, more details could be added here if GroupDetailResponse had member-specific fields
+		// that are not fetched by default by groupRepo.GetByID
+		return groupDetail, nil
+	} else {
+		// User is NOT a member, return limited information
+		// The groupDetail already contains the necessary counts and basic info from the repository
+		// We just need to ensure no sensitive member-only data is accidentally included if it were part of GroupDetailResponse
+		// For now, GroupDetailResponse is structured to be suitable for both, with service controlling population.
+		// If GroupDetailResponse had fields like "DetailedMemberActivity", we would explicitly nullify them here.
+		// The current structure of GroupDetailResponse (ID, Name, Description, ImageURL, CreatorInfo, Counts, Timestamps)
+		// is generally safe for non-members.
+		return &types.GroupDetailResponse{
+			ID:           groupDetail.ID,
+			Name:         groupDetail.Name,
+			Description:  groupDetail.Description,
+			AvatarURL:    groupDetail.AvatarURL,
+			CreatorInfo:  groupDetail.CreatorInfo, // Already populated
+			MembersCount: groupDetail.MembersCount,
+			PostsCount:   groupDetail.PostsCount,
+			EventsCount:  groupDetail.EventsCount,
+			CreatedAt:    groupDetail.CreatedAt,
+			UpdatedAt:    groupDetail.UpdatedAt,
+			// Any fields specific to members would be omitted here or set to nil/empty
+		}, nil
+	}
 }
 
-func (s *groupService) List(limit, offset int, searchQuery string, requestingUserID string) ([]*GroupResponse, error) {
+func (s *groupService) List(limit, offset int, searchQuery string, requestingUserID string) ([]*types.GroupDetailResponse, error) {
 	// TODO: Implement filtering based on user's memberships or public groups
-	// Pass the search query down to the repository layer
-	groups, err := s.groupRepo.List(limit, offset, searchQuery)
+	groupDetails, err := s.groupRepo.List(limit, offset, searchQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list groups from repository: %w", err)
 	}
-	return mapGroupsToResponse(groups), nil // Return unfiltered for now
+
+	// Populate CreatorInfo for each group
+	for _, groupDetail := range groupDetails {
+		if groupDetail.CreatorInfo.UserID != "" {
+			creator, err := s.userRepo.GetByID(groupDetail.CreatorInfo.UserID)
+			if err != nil {
+				// Log error but don't fail the entire list if a creator isn't found
+				// This could happen if a user account was deleted but groups remain
+				fmt.Printf("Warning: Failed to get creator (ID: %s) details for group %s: %v\n", groupDetail.CreatorInfo.UserID, groupDetail.ID, err)
+				// Optionally, clear or set a default for CreatorInfo
+				groupDetail.CreatorInfo = types.UserBasicInfo{} // Clear if not found
+			} else if creator != nil {
+				groupDetail.CreatorInfo.FirstName = creator.FirstName
+				groupDetail.CreatorInfo.LastName = creator.LastName
+				groupDetail.CreatorInfo.Username = creator.Username
+				groupDetail.CreatorInfo.AvatarURL = creator.AvatarURL
+			}
+		}
+	}
+
+	return groupDetails, nil
 }
 
 func (s *groupService) Update(groupID string, request *GroupUpdateRequest, requestingUserID string) (*GroupResponse, error) {
