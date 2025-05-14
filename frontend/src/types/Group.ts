@@ -36,6 +36,9 @@ export interface Group { // This represents GroupDetailResponse
   members_count: number;
   posts_count: number;
   events_count: number;
+  viewer_pending_request_id?: string;
+  viewer_pending_request_status?: 'pending' | 'accepted' | 'rejected' | null;
+viewer_is_admin?: boolean;
   // Member-specific fields (conditionally present)
   members?: UserBasicInfo[];
   posts?: PostSummary[];

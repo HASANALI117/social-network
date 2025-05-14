@@ -46,16 +46,19 @@ export default function GroupDetailPage() {
     setGroup(null);
     setIsMember(false);
     try {
-      const groupData = await fetchGroupRequest(`/api/groups/${id}`);
-      if (groupData) {
+      const apiResponseData = await fetchGroupRequest(`/api/groups/${id}`); // Renamed for clarity with new logs
+      if (apiResponseData) {
+        // Original logs from before this change, commented out but kept for reference if needed.
+        // console.log('Fetched group data in page.tsx:', apiResponseData);
+        // console.log('viewer_is_admin from fetched data in page.tsx:', apiResponseData?.viewer_is_admin);
         const processedGroupData = {
-          ...groupData,
-          posts: groupData.posts || [],
-          members: groupData.members || [],
-          events: groupData.events || [],
+          ...apiResponseData,
+          posts: apiResponseData.posts || [],
+          members: apiResponseData.members || [],
+          events: apiResponseData.events || [],
         };
         setGroup(processedGroupData);
-        if (groupData.members !== undefined && groupData.members !== null) {
+        if (apiResponseData.members !== undefined && apiResponseData.members !== null) {
           setIsMember(true);
         } else {
           setIsMember(false);
@@ -87,10 +90,7 @@ export default function GroupDetailPage() {
     }
   }, [groupApiError, isLoading, group]);
 
-  const handleRequestToJoin = () => {
-    console.log('Request to Join button clicked');
-    alert('Request to Join functionality will be implemented later.');
-  };
+  // Removed handleRequestToJoin as it's now handled within GroupNonMemberView
 
   // Removed debounce, toggleInviteUI, handleSearchUsers, debouncedSearchUsers, handleSendInvite, and related useEffects
   // as this logic is now encapsulated in GroupInviteManager.tsx or will be in GroupMemberView.tsx
@@ -137,18 +137,17 @@ export default function GroupDetailPage() {
         <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
           {!isMember ? (
             <GroupNonMemberView
-              members_count={members_count}
-              posts_count={posts_count}
-              events_count={events_count}
-              handleRequestToJoin={handleRequestToJoin}
+              group={group}
             />
           ) : (
-            <GroupMemberView
-              group={group}
-              currentUser={currentUser ? { ...currentUser, user_id: currentUser.id } : null}
+            <>
+              <GroupMemberView
+                group={group!} // group is checked before this render path
+                currentUser={currentUser ? { ...currentUser, user_id: currentUser.id } : null}
               handleLeaveGroup={handleLeaveGroup}
               // Old invite props removed
             />
+            </>
           )}
         </section>
       </div>

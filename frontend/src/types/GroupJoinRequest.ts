@@ -9,5 +9,5 @@ export interface GroupJoinRequest {
   status: GroupJoinRequestStatus;
   created_at: string;
   updated_at: string;
-  requester_info?: UserBasicInfo; 
+  requester?: UserBasicInfo; 
 }
