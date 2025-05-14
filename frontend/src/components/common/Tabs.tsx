@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+import { useState, ReactNode, FC } from 'react';
 
 interface Tab {
   label: string;
@@ -18,14 +18,16 @@ interface PanelProps {
   children: ReactNode;
 }
 
-const Panel: React.FC<PanelProps> = ({ children, ...props }) => {
+// Panel component remains the same
+const Panel: FC<PanelProps> = ({ children, ...props }) => {
   // The Panel component simply renders its children.
   // The id and className props are passed from GroupDetailPage,
   // and can be used here if needed for styling or accessibility.
   return <div {...props}>{children}</div>;
 };
 
-const Tabs: React.FC<TabsProps> = ({ tabs, initialTab = 0 }) => {
+// The main Tabs functional component
+const TabsFC: FC<TabsProps> = ({ tabs, initialTab = 0 }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
 
   return (
@@ -63,7 +65,15 @@ const Tabs: React.FC<TabsProps> = ({ tabs, initialTab = 0 }) => {
   );
 };
 
-// Assign Panel as a static property of Tabs
-(Tabs as any).Panel = Panel;
+// Create a type that represents the Tabs component with a static Panel property
+type TabsComponentType = FC<TabsProps> & {
+  Panel: FC<PanelProps>;
+};
+
+// Cast TabsFC to this new type and assign Panel
+const Tabs = TabsFC as TabsComponentType;
+// Explicitly assign Panel to the exported Tabs constant.
+// This ensures that Tabs.Panel is available and correctly typed.
+Tabs.Panel = Panel;
 
 export default Tabs;
