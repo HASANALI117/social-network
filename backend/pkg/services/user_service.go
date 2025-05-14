@@ -9,6 +9,7 @@ import (
 
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/HASANALI117/social-network/pkg/repositories"
+	"github.com/HASANALI117/social-network/pkg/types"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -30,14 +31,14 @@ type UserResponse struct {
 
 // UserProfileResponse defines the detailed user profile data including activity
 type UserProfileResponse struct {
-	UserResponse                                 // Embed basic user info
-	FollowersCount     int                       `json:"followers_count"`  // Added follower count
-	FollowingCount     int                       `json:"following_count"`  // Added following count
-	IsFollowed         bool                      `json:"is_followed"`
-	FollowRequestState string                    `json:"follow_request_state,omitempty"`
-	LatestPosts        []*PostResponse           `json:"latest_posts"`     // Changed to []*PostResponse
-	LatestFollowers    []models.User             `json:"latest_followers"` // Add followers
-	LatestFollowing    []models.User             `json:"latest_following"` // Add following
+	UserResponse                       // Embed basic user info
+	FollowersCount     int             `json:"followers_count"` // Added follower count
+	FollowingCount     int             `json:"following_count"` // Added following count
+	IsFollowed         bool            `json:"is_followed"`
+	FollowRequestState string          `json:"follow_request_state,omitempty"`
+	LatestPosts        []*PostResponse `json:"latest_posts"`     // Changed to []*PostResponse
+	LatestFollowers    []models.User   `json:"latest_followers"` // Add followers
+	LatestFollowing    []models.User   `json:"latest_following"` // Add following
 }
 
 // UserService defines the interface for user business logic
@@ -51,6 +52,7 @@ type UserService interface {
 	List(limit, offset int) ([]*UserResponse, error)
 	UpdatePrivacy(userID string, isPrivate bool) error                           // Added method
 	GetUserProfile(viewerID, profileUserID string) (*UserProfileResponse, error) // Added method
+	SearchUsers(query string) ([]types.UserSearchResultDTO, error)
 }
 
 // userService implements UserService interface
@@ -303,7 +305,7 @@ func (s *userService) GetUserProfile(viewerID, profileUserID string) (*UserProfi
 
 	// 2. Determine viewer's relationship with the profile user
 	isSelf := viewerID == profileUserID
-	isFollowedByViewer := false          // True if viewer has an "accepted" follow to profileUser
+	isFollowedByViewer := false       // True if viewer has an "accepted" follow to profileUser
 	effectiveFollowRequestState := "" // Will be "SENT" (viewer to profile), "RECEIVED" (profile to viewer), or ""
 
 	if viewerID != "" && !isSelf {
@@ -347,7 +349,7 @@ func (s *userService) GetUserProfile(viewerID, profileUserID string) (*UserProfi
 		if effectiveFollowRequestState == "SENT" {
 			minimalFollowRequestState = effectiveFollowRequestState
 		}
-		
+
 		return &UserProfileResponse{
 			UserResponse: UserResponse{
 				ID:        profileUser.ID,
@@ -426,4 +428,25 @@ func (s *userService) GetUserProfile(viewerID, profileUserID string) (*UserProfi
 		LatestFollowers:    followers,
 		LatestFollowing:    following,
 	}, nil
+}
+
+// SearchUsers searches for users based on a query string.
+func (s *userService) SearchUsers(query string) ([]types.UserSearchResultDTO, error) {
+	// Basic validation
+	if query == "" {
+		return []types.UserSearchResultDTO{}, nil // Return empty if query is empty, or an error
+	}
+
+	// Define a reasonable limit for search results
+	const searchLimit = 20 // This could be configurable
+
+	users, err := s.userRepo.SearchUsers(query, searchLimit)
+	if err != nil {
+		// Log the error for internal tracking
+		log.Printf("Error searching users with query '%s': %v", query, err)
+		// Return a generic error to the caller
+		return nil, fmt.Errorf("failed to search users")
+	}
+
+	return users, nil
 }

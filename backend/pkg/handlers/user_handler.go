@@ -55,6 +55,11 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 			default:
 				return httperr.NewMethodNotAllowed(nil, "")
 			}
+		} else if id == "search" { // Path is /api/users/search
+			if r.Method == http.MethodGet {
+				return h.SearchUsersHandler(w, r)
+			}
+			return httperr.NewMethodNotAllowed(nil, "Method GET required for search")
 		} else { // Path is /api/users/{id}
 			switch r.Method {
 			case http.MethodGet:
@@ -413,3 +418,32 @@ func (h *UserHandler) updatePrivacy(w http.ResponseWriter, r *http.Request, user
 // })
 // return nil
 // }
+
+// SearchUsersHandler handles GET /api/users/search?q=query
+func (h *UserHandler) SearchUsersHandler(w http.ResponseWriter, r *http.Request) error {
+	// Authentication check: Ensure user is logged in to search
+	_, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil {
+		if errors.Is(err, helpers.ErrInvalidSession) {
+			return httperr.NewUnauthorized(err, "Authentication required to search users")
+		}
+		log.Printf("Error getting user from session during search: %v", err)
+		return httperr.NewInternalServerError(err, "Failed to verify authentication")
+	}
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		return httperr.NewBadRequest(nil, "Search query parameter 'q' is required")
+	}
+
+	users, err := h.userService.SearchUsers(query)
+	if err != nil {
+		// The service layer logs specific errors, return a generic one here
+		return httperr.NewInternalServerError(err, "Failed to search users")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(users)
+	return nil
+}

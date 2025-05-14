@@ -24,6 +24,15 @@ export interface UserSummary {
   last_name: string;
 }
 
+// Basic user info for lists like group members
+export interface UserBasicInfo {
+  user_id: string; // Changed from id to user_id to match group.creator_info and typical API responses for nested user data
+  username: string;
+  first_name: string;
+  last_name: string;
+  avatar_url?: string;
+}
+
 export interface FollowRequest {
   id: string;
   requester: UserSummary;

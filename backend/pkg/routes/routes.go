@@ -43,7 +43,7 @@ func Setup(dbConn *sql.DB) http.Handler {
 
 	// User and Follower routes
 	// Register handler for both with and without trailing slash to handle all user routes
-	mux.Handle("/api/users", httperr.ErrorHandler(controllers.User.ServeHTTP))  // Handles /api/users/, /api/users/{id}, and /api/users/{id}/{action}
+	mux.Handle("/api/users", httperr.ErrorHandler(controllers.User.ServeHTTP))  // Handles /api/users/, /api/users/search, /api/users/{id}, and /api/users/{id}/{action}
 	mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Handles /api/users/{id} and /api/users/{id}/{action}
 	// Specific route for the current user's pending follow requests
 	mux.HandleFunc("/api/users/me/follow-requests", controllers.Follower.HandleListPending) // No ErrorHandler wrapper needed
