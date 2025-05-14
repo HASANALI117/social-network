@@ -11,26 +11,62 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Heading } from '../../../components/ui/heading';
 import { Text } from '../../../components/ui/text';
 import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/alert';
+import { Avatar } from '../../../components/ui/avatar';
 import { useUserStore } from '../../../store/useUserStore';
+import { UserBasicInfo } from '../../../types/User';
 import Link from 'next/link';
+import Image from 'next/image'; // Added for avatar preview
+import { FiUploadCloud } from 'react-icons/fi'; // Added for upload icon
+import ImageCropperModal from '../../../components/common/ImageCropperModal';
+import { uploadFileToMinio } from '../../../lib/minioUploader';
+import 'react-image-crop/dist/ReactCrop.css';
+import toast from 'react-hot-toast'; // Added for toast notifications
 
 interface CreateGroupFormValues {
-  title: string;
+  name: string;
   description: string;
+  avatar_url?: string;
 }
 
 export default function CreateGroupPage() {
   const router = useRouter();
   const { user } = useUserStore();
+
+  // State for the two-step process
+  const [creationStep, setCreationStep] = useState<'details' | 'invite'>('details');
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+
+  // State for the invite UI
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<UserBasicInfo[]>([]);
+  const [isActualSearchLoading, setIsActualSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
+  const [invitedUserIds, setInvitedUserIds] = useState<string[]>([]); // Track successfully invited users
+
+
+  // State for avatar upload and cropping
+  const [newAvatarFile, setNewAvatarFile] = useState<File | null>(null);
+  const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+  const [originalAvatarFileName, setOriginalAvatarFileName] = useState<string | null>(null);
+  const [originalAvatarFileType, setOriginalAvatarFileType] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors } 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors }
   } = useForm<CreateGroupFormValues>();
 
   const { post: createGroupRequest, isLoading, error: apiError } = useRequest<Group>();
+  const { get: searchUsersRequestHook, error: searchApiHookError, isLoading: isSearchHookLoading } = useRequest<UserBasicInfo[]>();
+  const { post: sendInviteRequestHook, error: inviteApiHookError, isLoading: isInviteHookLoading } = useRequest<{ message: string }>();
+
 
   useEffect(() => {
     if (apiError) {
@@ -38,26 +74,173 @@ export default function CreateGroupPage() {
     }
   }, [apiError]);
 
+  useEffect(() => {
+    setSearchError(searchApiHookError?.message || null);
+  }, [searchApiHookError]);
+  // Removed useEffect for inviteApiHookError as toasts are handled directly in handleSendInvite
+
+
+  const handleSearchUsers = async (term: string) => {
+    if (!term) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+    setIsActualSearchLoading(true);
+    setSearchError(null);
+    try {
+      const results = await searchUsersRequestHook(`/api/users/search?q=${encodeURIComponent(term)}`);
+      if (results && user) {
+        // Filter out the current user from the search results
+        const filteredResults = results.filter(resultUser => resultUser.user_id !== user.id);
+        setSearchResults(filteredResults);
+      } else {
+        setSearchResults(results || []);
+      }
+    } catch (err) {
+      // Error handled by useEffect on searchApiHookError
+      setSearchResults([]);
+    } finally {
+      setIsActualSearchLoading(false);
+    }
+  };
+
+  const debouncedSearchUsers = debounce(handleSearchUsers, 500);
+
+  useEffect(() => {
+    // This effect should call the debounced function.
+    // The actual API call is inside handleSearchUsers.
+    if (searchTerm.trim()) {
+        debouncedSearchUsers(searchTerm);
+    } else {
+        setSearchResults([]); // Clear results if search term is empty
+        setIsActualSearchLoading(false); // Ensure loading is false
+    }
+
+    // Cleanup function to cancel the debounce on unmount or if searchTerm changes rapidly.
+    return () => {
+      debouncedSearchUsers.cancel();
+    };
+  }, [searchTerm]); // debouncedSearchUsers is stable and doesn't need to be a dependency
+
+
+  const handleSendInvite = async (userId: string) => {
+    if (!createdGroupId) {
+      toast.error("Group not created yet. Cannot send invites.");
+      return;
+    }
+    setInvitingUserId(userId);
+    try {
+      await sendInviteRequestHook(`/api/groups/${createdGroupId}/invitations`, { invitee_id: userId });
+      toast.success(`Invitation sent to user ${searchResults.find(u => u.user_id === userId)?.username || 'ID ' + userId}.`);
+      setInvitedUserIds(prev => [...prev, userId]);
+    } catch (err: any) {
+      const errorMessage = err?.message || (inviteApiHookError && inviteApiHookError.message) || 'Failed to send invitation. Please try again.';
+      toast.error(errorMessage);
+    } finally {
+      setInvitingUserId(null);
+    }
+  };
+
+  useEffect(() => {
+    // Cleanup object URL for avatar preview
+    return () => {
+      if (newAvatarPreviewUrl) {
+        URL.revokeObjectURL(newAvatarPreviewUrl);
+      }
+    };
+  }, [newAvatarPreviewUrl]);
+
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setSubmissionError('Please select an image file for the avatar.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setSubmissionError('Avatar image size should be less than 5MB.');
+        return;
+      }
+      setSubmissionError(null);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCropperImageSrc(reader.result as string);
+        setOriginalAvatarFileName(file.name);
+        setOriginalAvatarFileType(file.type);
+        setIsCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
+      event.target.value = ''; // Allow selecting the same file again
+    }
+  };
+
+  const handleAvatarCropComplete = (croppedImageBlob: Blob) => {
+    if (newAvatarPreviewUrl) {
+      URL.revokeObjectURL(newAvatarPreviewUrl);
+    }
+    const fileName = originalAvatarFileName || `group-avatar-${Date.now()}.png`;
+    const fileType = originalAvatarFileType || croppedImageBlob.type || 'image/png';
+    const croppedFile = new File([croppedImageBlob], fileName, { type: fileType });
+
+    setNewAvatarFile(croppedFile);
+    setNewAvatarPreviewUrl(URL.createObjectURL(croppedFile));
+    setIsCropperOpen(false);
+    setCropperImageSrc(null);
+    setOriginalAvatarFileName(null);
+    setOriginalAvatarFileType(null);
+  };
+
+
   const onSubmit: SubmitHandler<CreateGroupFormValues> = async (formData) => {
     if (!user) {
       setSubmissionError("You must be logged in to create a group.");
-      // Optionally redirect to login: router.push('/login');
       return;
     }
     setSubmissionError(null);
+    setIsUploadingAvatar(false); // Reset upload status
+
+    let uploadedAvatarUrl: string | undefined = undefined;
+
+    if (newAvatarFile) {
+      setIsUploadingAvatar(true);
+      try {
+        uploadedAvatarUrl = await uploadFileToMinio(newAvatarFile);
+      } catch (uploadError) {
+        console.error('Failed to upload group avatar:', uploadError);
+        setSubmissionError('Failed to upload avatar. Please try again.');
+        setIsUploadingAvatar(false);
+        return; // Stop submission if avatar upload fails
+      }
+      setIsUploadingAvatar(false);
+    }
 
     try {
-      const newGroup = await createGroupRequest('/api/groups', formData);
+      const payload: { name: string; description: string; avatar_url?: string } = {
+        name: formData.name,
+        description: formData.description,
+      };
+      // Use the uploaded Minio URL if available, otherwise use the URL from the form (if any, though this field will be removed)
+      // Or, if we strictly use file upload, then only uploadedAvatarUrl matters.
+      if (uploadedAvatarUrl) {
+        payload.avatar_url = uploadedAvatarUrl;
+      } else if (formData.avatar_url && !newAvatarFile) { // Keep existing URL if no new file and URL was somehow pre-filled
+        payload.avatar_url = formData.avatar_url;
+      }
+
+
+      const newGroup = await createGroupRequest('/api/groups', payload);
       if (newGroup && newGroup.id) {
-        // Optionally: show success toast
-        router.push(`/groups/${newGroup.id}`);
-      } else if (!apiError) { // If newGroup is null/undefined but no apiError, set a generic error
+        setCreatedGroupId(newGroup.id);
+        setCreationStep('invite');
+      } else if (!apiError) {
         setSubmissionError('Failed to create group. Please try again.');
       }
     } catch (err) {
-      // This catch block might be redundant if useRequest handles errors and sets apiError
       console.error("Create group error:", err);
-      setSubmissionError('An unexpected error occurred during submission.');
+      if (!apiError) {
+        setSubmissionError('An unexpected error occurred during submission.');
+      }
     }
   };
 
@@ -73,57 +256,234 @@ export default function CreateGroupPage() {
   return (
     <div className="container mx-auto p-4 text-white max-w-2xl">
       <Heading level={1} className="mb-8 text-center">Create a New Group</Heading>
-      
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 bg-gray-800 p-8 rounded-lg shadow-xl">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-300 mb-1">
-            Group Title
-          </label>
-          <Input
-            id="title"
-            type="text"
-            {...register('title', { 
-              required: 'Title is required.',
-              minLength: { value: 3, message: 'Title must be at least 3 characters.' },
-              maxLength: { value: 100, message: 'Title cannot exceed 100 characters.' }
-            })}
-            className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-            placeholder="Enter group title"
-          />
-          {errors.title && <Text className="mt-1 text-sm text-red-400">{errors.title.message}</Text>}
-        </div>
 
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
-            Group Description
-          </label>
-          <Textarea
-            id="description"
-            {...register('description', { 
-              required: 'Description is required.',
-              minLength: { value: 10, message: 'Description must be at least 10 characters.' },
-              maxLength: { value: 500, message: 'Description cannot exceed 500 characters.' }
-            })}
-            rows={4}
-            className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-            placeholder="Tell us about your group"
-          />
-          {errors.description && <Text className="mt-1 text-sm text-red-400">{errors.description.message}</Text>}
-        </div>
+      {creationStep === 'details' && (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 bg-gray-800 p-8 rounded-lg shadow-xl">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+              Group Name
+            </label>
+            <Input
+              id="name"
+              type="text"
+              {...register('name', {
+                required: 'Name is required.',
+                minLength: { value: 3, message: 'Name must be at least 3 characters.' },
+                maxLength: { value: 100, message: 'Name cannot exceed 100 characters.' }
+              })}
+              className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              placeholder="Enter group name"
+            />
+            {errors.name && <Text className="mt-1 text-sm text-red-400">{errors.name.message}</Text>}
+          </div>
 
-        {submissionError && (
-          <Alert open={!!submissionError} onClose={() => setSubmissionError(null)}>
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{submissionError}</AlertDescription>
-          </Alert>
-        )}
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-300 mb-1">
+              Group Description
+            </label>
+            <Textarea
+              id="description"
+              {...register('description', {
+                required: 'Description is required.',
+                minLength: { value: 10, message: 'Description must be at least 10 characters.' },
+                maxLength: { value: 500, message: 'Description cannot exceed 500 characters.' }
+              })}
+              rows={4}
+              className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              placeholder="Tell us about your group"
+            />
+            {errors.description && <Text className="mt-1 text-sm text-red-400">{errors.description.message}</Text>}
+          </div>
 
-        <div>
-          <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? 'Creating Group...' : 'Create Group'}
-          </Button>
+          {/* Avatar Upload Section - Replaces URL input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Group Avatar (Optional)
+            </label>
+            <div className="flex items-center gap-4">
+              <div className="relative w-24 h-24 rounded-md overflow-hidden bg-gray-700 flex items-center justify-center">
+                {newAvatarPreviewUrl ? (
+                  <Image src={newAvatarPreviewUrl} alt="New Avatar Preview" fill style={{ objectFit: 'cover' }} />
+                ) : (
+                  <span className="text-gray-500 text-3xl">?</span> // Placeholder
+                )}
+              </div>
+              <div>
+                <input
+                  type="file"
+                  id="groupAvatarUpload"
+                  accept="image/*"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                  disabled={isLoading || isUploadingAvatar}
+                />
+                <label
+                  htmlFor="groupAvatarUpload"
+                  className={`cursor-pointer flex items-center gap-2 bg-gray-700 text-gray-100 px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors ${ (isLoading || isUploadingAvatar) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <FiUploadCloud />
+                  {newAvatarFile ? 'Change Image' : 'Upload Image'}
+                </label>
+                {newAvatarFile && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Selected: {newAvatarFile.name}
+                  </p>
+                )}
+                {isUploadingAvatar && <p className="text-sm text-purple-400 mt-1">Uploading avatar...</p>}
+                 {/* Hidden input to clear react-hook-form's avatar_url if a file is chosen, or to pass existing if needed */}
+                 <input type="hidden" {...register('avatar_url')} />
+              </div>
+            </div>
+            {errors.avatar_url && <Text className="mt-1 text-sm text-red-400">{errors.avatar_url.message}</Text>}
+          </div>
+          {/* End Avatar Upload Section */}
+
+          {submissionError && (
+            <Alert open={!!submissionError} onClose={() => setSubmissionError(null)}>
+              <AlertTitle>Error Creating Group</AlertTitle>
+              <AlertDescription>{submissionError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div>
+            <Button type="submit" disabled={isLoading || isUploadingAvatar} className="w-full">
+              {isLoading || isUploadingAvatar ? 'Processing...' : 'Next: Invite Users'}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {creationStep === 'invite' && (
+        <div className="space-y-6 bg-gray-800 p-8 rounded-lg shadow-xl">
+          <Heading level={2} className="mb-4 text-center">Invite Users to Your New Group</Heading>
+
+          <div>
+            <label htmlFor="user-search" className="block text-sm font-medium text-gray-300 mb-1">
+              Search Users to Invite
+            </label>
+            <Input
+              id="user-search"
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              placeholder="Search by username or email"
+            />
+          </div>
+
+          {isActualSearchLoading && <Text className="text-center text-gray-400 py-2">Searching users...</Text>}
+          
+          {searchError && (
+            <Alert open={!!searchError} onClose={() => setSearchError(null)}>
+              <AlertTitle>Search Error</AlertTitle>
+              <AlertDescription>{searchError}</AlertDescription>
+            </Alert>
+          )}
+
+          {searchResults.length > 0 && !isActualSearchLoading && (
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-2"> {/* Added pr-2 for scrollbar spacing, increased max-h */}
+              <Text className="text-sm text-gray-400">Found {searchResults.length} user(s):</Text>
+              {searchResults.map((userResult) => (
+                <div
+                  key={userResult.user_id}
+                  className="flex items-center justify-between bg-gray-700 p-3 rounded-md hover:bg-gray-600 transition-colors w-full" // Ensure full width
+                >
+                  <div className="flex items-center space-x-3 flex-grow min-w-0"> {/* Allow user info to shrink and truncate */}
+                    <div className="flex-shrink-0"> {/* Prevent avatar from shrinking */}
+                      <Avatar
+                        src={userResult.avatar_url || undefined}
+                        alt={userResult.username}
+                        initials={userResult.username.charAt(0).toUpperCase()}
+                        className="w-10 h-10 rounded-full" // Fixed size for avatar, ensure it's round
+                      />
+                    </div>
+                    <div className="min-w-0"> {/* Allow text to truncate */}
+                      <Text className="font-semibold truncate">{userResult.username}</Text>
+                      {/* Removed email display as it's not in UserBasicInfo and to save space */}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 ml-2"> {/* Prevent button from shrinking, add left margin */}
+                    <Button
+                      onClick={() => handleSendInvite(userResult.user_id)}
+                      disabled={invitedUserIds.includes(userResult.user_id) || invitingUserId === userResult.user_id || isInviteHookLoading}
+                      outline
+                      className="px-3 py-1 text-sm"
+                    >
+                      {invitedUserIds.includes(userResult.user_id)
+                        ? 'Invited'
+                        : invitingUserId === userResult.user_id
+                          ? 'Inviting...'
+                          : 'Invite'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {!isActualSearchLoading && searchTerm && searchResults.length === 0 && !searchError && (
+             <Text className="text-center text-gray-400 py-2">No users found matching your search.</Text>
+          )}
+          {/* Removed Alert components for inviteError and inviteSuccess as they are replaced by toasts */}
+          <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-4">
+            <Button
+              onClick={() => router.push(`/groups/${createdGroupId}`)}
+              disabled={!createdGroupId || isInviteHookLoading}
+              className="w-full sm:w-auto"
+            >
+              Finish & Go to Group
+            </Button>
+             <Button
+              plain // Changed from variant="ghost"
+              onClick={() => router.push(`/groups/${createdGroupId}`)}
+              disabled={!createdGroupId}
+              className="w-full sm:w-auto"
+            >
+              Skip Invites
+            </Button>
+          </div>
         </div>
-      </form>
+      )}
+
+      {cropperImageSrc && (
+        <ImageCropperModal
+          isOpen={isCropperOpen}
+          onClose={() => {
+            setIsCropperOpen(false);
+            setCropperImageSrc(null);
+            setOriginalAvatarFileName(null);
+            setOriginalAvatarFileType(null);
+          }}
+          imageSrc={cropperImageSrc}
+          onCropComplete={handleAvatarCropComplete}
+          aspect={1} // Square aspect ratio for avatars
+          circularCrop={false} // Or true, depending on desired avatar shape for groups
+        />
+      )}
     </div>
   );
 }
+
+// Add a cancel method to the debounced function type
+interface DebouncedFunction<T extends (...args: any[]) => void> {
+  (...args: Parameters<T>): void;
+  cancel: () => void;
+}
+
+// Update the debounce function to include a cancel method
+const debounce = <T extends (...args: any[]) => void>(func: T, delay: number): DebouncedFunction<T> => {
+  let timeoutId: NodeJS.Timeout;
+
+  const debounced = ((...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      func.apply(null, args);
+    }, delay);
+  }) as DebouncedFunction<T>;
+
+  debounced.cancel = () => {
+    clearTimeout(timeoutId);
+  };
+
+  return debounced;
+};
