@@ -18,7 +18,7 @@ type Services struct {
 func InitServices(repos *repositories.Repositories) *Services {
 	authService := NewAuthService(repos.User, repos.Session)
 	postService := NewPostService(repos.Post, repos.Follower, repos.Group, repos.User)
-	groupService := NewGroupService(repos.Group, repos.User)
+	groupService := NewGroupService(repos.Group, repos.User, repos.Post, repos.GroupEvent)
 	followerService := NewFollowerService(repos.Follower, repos.User)
 	commentService := NewCommentService(repos.Comment, postService, repos.Group, repos.User)
 	// Update NewGroupEventService to include GroupEventResponseRepository

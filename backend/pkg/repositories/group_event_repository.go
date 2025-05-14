@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/models"
+	"github.com/HASANALI117/social-network/pkg/types" // Added import
 )
 
 var (
@@ -23,6 +24,7 @@ type GroupEventRepository interface {
 	ListByGroupID(groupID string, limit, offset int) ([]*models.GroupEvent, error)
 	Update(event *models.GroupEvent) error
 	Delete(id string) error
+	GetEventsByGroupID(groupID string, upcomingOnly bool) ([]types.EventSummary, error) // New method
 }
 
 // groupEventRepository implements GroupEventRepository interface
@@ -195,4 +197,78 @@ func (r *groupEventRepository) Delete(id string) error {
 	}
 
 	return nil
+}
+
+// GetEventsByGroupID retrieves a list of event summaries for a specific group.
+// If upcomingOnly is true, it only returns events with event_time in the future.
+func (r *groupEventRepository) GetEventsByGroupID(groupID string, upcomingOnly bool) ([]types.EventSummary, error) {
+	baseQuery := `
+		SELECT
+			e.id AS event_id,
+			e.title,
+			SUBSTR(e.description, 1, 100) AS description_snippet, -- Adjust snippet length
+			e.event_time
+			-- e.location -- Removed as its existence in DB is uncertain, causes query to fail if column missing
+		FROM group_events e
+		WHERE e.group_id = ?
+	`
+	args := []interface{}{groupID}
+
+	if upcomingOnly {
+		baseQuery += " AND e.event_time >= ?"
+		args = append(args, time.Now().UTC())
+	}
+
+	baseQuery += " ORDER BY e.event_time ASC" // Or DESC for most recent upcoming
+
+	rows, err := r.db.Query(baseQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list event summaries by group ID %s: %w", groupID, err)
+	}
+	defer rows.Close()
+
+	summaries := make([]types.EventSummary, 0)
+	for rows.Next() {
+		var summary types.EventSummary
+		var eventTimeStr string
+		// var location sql.NullString // Removed
+		var descriptionSnippet sql.NullString
+
+		err := rows.Scan(
+			&summary.EventID,
+			&summary.Title,
+			&descriptionSnippet,
+			&eventTimeStr,
+			// &location, // Removed
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan event summary for group ID %s: %w", groupID, err)
+		}
+
+		if descriptionSnippet.Valid {
+			summary.DescriptionSnippet = descriptionSnippet.String
+		}
+		// if location.Valid { // Removed
+		// 	summary.Location = location.String // Removed
+		// }
+
+		summary.StartTime, err = time.Parse(time.RFC3339, eventTimeStr)
+		if err != nil {
+			// Attempt to parse with "YYYY-MM-DD HH:MM:SS" if RFC3339 fails, as SQLite might store it this way
+			parsedTime, errFallback := time.Parse("2006-01-02 15:04:05", eventTimeStr)
+			if errFallback != nil {
+				fmt.Printf("Warning: Failed to parse event_time timestamp '%s' for event summary %s (tried RFC3339 and YYYY-MM-DD HH:MM:SS): %v\n", eventTimeStr, summary.EventID, err) // Log original error
+				summary.StartTime = time.Time{}
+			} else {
+				summary.StartTime = parsedTime
+			}
+		}
+		summaries = append(summaries, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating event summary list for group ID %s rows: %w", groupID, err)
+	}
+
+	return summaries, nil
 }

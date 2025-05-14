@@ -78,17 +78,17 @@ type GroupJoinRequestResponse struct {
 
 // GroupProfileResponse is the comprehensive DTO for a group's profile page
 type GroupProfileResponse struct {
-	ID             string          `json:"id"`
-	Creator        *UserResponse   `json:"creator"` // Include creator details
-	Name           string          `json:"name"`
-	Description    string          `json:"description,omitempty"`
-	AvatarURL      string          `json:"avatar_url,omitempty"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at,omitempty"`
-	Members        []*UserResponse `json:"members"`          // List of members with basic details
-	MemberCount    int             `json:"member_count"`     // Total number of members
-	ViewerIsMember bool            `json:"viewer_is_member"` // Is the requesting user a member?
-	ViewerIsAdmin  bool            `json:"viewer_is_admin"`  // Is the requesting user an admin?
+	ID             string                `json:"id"`
+	Creator        *UserResponse         `json:"creator"` // Include creator details
+	Name           string                `json:"name"`
+	Description    string                `json:"description,omitempty"`
+	AvatarURL      string                `json:"avatar_url,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at,omitempty"`
+	Members        []types.UserBasicInfo `json:"members"`          // List of members with basic details
+	MemberCount    int                   `json:"member_count"`     // Total number of members
+	ViewerIsMember bool                  `json:"viewer_is_member"` // Is the requesting user a member?
+	ViewerIsAdmin  bool                  `json:"viewer_is_admin"`  // Is the requesting user an admin?
 	// TODO: Add pending request/invitation counts if needed
 }
 
@@ -147,13 +147,17 @@ type GroupService interface {
 type groupService struct {
 	groupRepo repositories.GroupRepository
 	userRepo  repositories.UserRepository // Needed for checking user existence
+	postRepo  repositories.PostRepository
+	eventRepo repositories.GroupEventRepository
 }
 
 // NewGroupService creates a new GroupService
-func NewGroupService(groupRepo repositories.GroupRepository, userRepo repositories.UserRepository) GroupService {
+func NewGroupService(groupRepo repositories.GroupRepository, userRepo repositories.UserRepository, postRepo repositories.PostRepository, eventRepo repositories.GroupEventRepository) GroupService {
 	return &groupService{
 		groupRepo: groupRepo,
 		userRepo:  userRepo,
+		postRepo:  postRepo,
+		eventRepo: eventRepo,
 	}
 }
 
@@ -362,30 +366,85 @@ func (s *groupService) GetByID(groupID string, requestingUserID string) (*types.
 	}
 
 	if isMember {
-		// User is a member, return full details
-		// Potentially, more details could be added here if GroupDetailResponse had member-specific fields
-		// that are not fetched by default by groupRepo.GetByID
+		// User is a member, populate additional details
+		members, err := s.groupRepo.GetMembersByGroupID(groupID) // Assumes this method returns []types.UserBasicInfo
+		if err != nil {
+			// Log error but don't fail the request, return what we have
+			fmt.Printf("Warning: Failed to get members for group %s: %v\n", groupID, err)
+		} else {
+			groupDetail.Members = members
+		}
+
+		// Fetch recent posts (e.g., 10 most recent)
+		// Fetch recent posts (e.g., 10 most recent)
+		modelPosts, err := s.postRepo.ListByGroupID(groupID, 10, 0) // Limit 10, offset 0
+		if err != nil {
+			return nil, fmt.Errorf("failed to get posts for group %s: %w", groupID, err)
+		}
+
+		var postSummaries []types.PostSummary
+		for _, post := range modelPosts {
+			creatorInfo := types.UserBasicInfo{}
+			if post.UserID != "" {
+				creator, err := s.userRepo.GetByID(post.UserID)
+				if err != nil {
+					fmt.Printf("Warning: Failed to get creator (ID: %s) details for post %s: %v\n", post.UserID, post.ID, err)
+					// Decide if we should skip this post or add with empty creator info
+				} else if creator != nil {
+					creatorInfo.UserID = creator.ID
+					creatorInfo.FirstName = creator.FirstName
+					creatorInfo.LastName = creator.LastName
+					creatorInfo.Username = creator.Username
+					creatorInfo.AvatarURL = creator.AvatarURL
+				}
+			}
+
+			// Basic mapping, assuming ContentSnippet can be derived from Content
+			// and CommentsCount needs to be handled (e.g. fetched separately or defaulted)
+			contentSnippet := post.Content
+			if len(contentSnippet) > 100 { // Example snippet length
+				contentSnippet = contentSnippet[:100] + "..."
+			}
+
+			postSummaries = append(postSummaries, types.PostSummary{
+				PostID:         post.ID,
+				Title:          post.Title, // Assuming Post model has Title
+				ContentSnippet: contentSnippet,
+				CreatorInfo:    creatorInfo,
+				CreatedAt:      post.CreatedAt,
+				CommentsCount:  0, // Placeholder -  LikesCount was removed, CommentsCount needs to be addressed
+			})
+		}
+		groupDetail.Posts = postSummaries
+
+		// Fetch upcoming events
+		// Assumes GetEventsByGroupID returns []types.EventSummary or similar
+		events, err := s.eventRepo.GetEventsByGroupID(groupID, true) // true for upcomingOnly
+		if err != nil {
+			// Return error instead of just logging a warning
+			return nil, fmt.Errorf("failed to get events for group %s: %w", groupID, err)
+		}
+		// Similar assumption as posts
+		groupDetail.Events = events
+
 		return groupDetail, nil
 	} else {
-		// User is NOT a member, return limited information
-		// The groupDetail already contains the necessary counts and basic info from the repository
-		// We just need to ensure no sensitive member-only data is accidentally included if it were part of GroupDetailResponse
-		// For now, GroupDetailResponse is structured to be suitable for both, with service controlling population.
-		// If GroupDetailResponse had fields like "DetailedMemberActivity", we would explicitly nullify them here.
-		// The current structure of GroupDetailResponse (ID, Name, Description, ImageURL, CreatorInfo, Counts, Timestamps)
-		// is generally safe for non-members.
+		// User is NOT a member, return limited information (already prepared in groupDetail by GetGroupDetailsByID)
+		// Ensure member-specific fields are not populated (they are omitempty)
+		// The current groupDetail from GetGroupDetailsByID should only have the basic fields.
+		// We construct a new response to be absolutely sure.
 		return &types.GroupDetailResponse{
 			ID:           groupDetail.ID,
 			Name:         groupDetail.Name,
 			Description:  groupDetail.Description,
 			AvatarURL:    groupDetail.AvatarURL,
-			CreatorInfo:  groupDetail.CreatorInfo, // Already populated
+			CreatorInfo:  groupDetail.CreatorInfo,
 			MembersCount: groupDetail.MembersCount,
 			PostsCount:   groupDetail.PostsCount,
 			EventsCount:  groupDetail.EventsCount,
 			CreatedAt:    groupDetail.CreatedAt,
 			UpdatedAt:    groupDetail.UpdatedAt,
-			// Any fields specific to members would be omitted here or set to nil/empty
+			// Members, Posts, Events will be empty/nil due to omitempty
 		}, nil
 	}
 }
@@ -512,11 +571,10 @@ func (s *groupService) GetGroupProfile(groupID string, requestingUserID string) 
 	}
 
 	// 4. Get Members List
-	members, err := s.groupRepo.ListMembers(groupID) // This returns []*models.User
+	membersBasicInfo, err := s.groupRepo.GetMembersByGroupID(groupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list members for profile: %w", err)
 	}
-	memberResponses := mapUsersToUserResponse(members) // Convert to []*UserResponse
 
 	// 5. Check if viewer is admin
 	isAdmin, err := s.groupRepo.IsAdmin(groupID, requestingUserID)
@@ -533,8 +591,8 @@ func (s *groupService) GetGroupProfile(groupID string, requestingUserID string) 
 		AvatarURL:      group.AvatarURL,
 		CreatedAt:      group.CreatedAt,
 		UpdatedAt:      group.UpdatedAt,
-		Members:        memberResponses,
-		MemberCount:    len(memberResponses),
+		Members:        membersBasicInfo,
+		MemberCount:    len(membersBasicInfo),
 		ViewerIsMember: isMember, // We already checked this
 		ViewerIsAdmin:  isAdmin,
 	}

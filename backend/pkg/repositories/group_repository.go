@@ -46,6 +46,7 @@ type GroupRepository interface {
 	IsMember(groupID, userID string) (bool, error)
 	IsAdmin(groupID, userID string) (bool, error)
 	ListGroupsByUser(userID string, limit, offset int) ([]*models.Group, error) // Added
+	GetMembersByGroupID(groupID string) ([]types.UserBasicInfo, error)          // New method
 
 	// Invitation Management
 	CreateInvitation(invitation *models.GroupInvitation) error
@@ -492,6 +493,48 @@ func (r *groupRepository) ListMembers(groupID string) ([]*models.User, error) {
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating member list rows: %w", err)
+	}
+
+	return members, nil
+}
+
+// GetMembersByGroupID retrieves basic info for all members of a group.
+func (r *groupRepository) GetMembersByGroupID(groupID string) ([]types.UserBasicInfo, error) {
+	query := `
+	       SELECT u.id, u.first_name, u.last_name, u.username, u.avatar_url
+	       FROM users u
+	       JOIN group_members gm ON u.id = gm.user_id
+	       WHERE gm.group_id = ?
+	       ORDER BY u.username ASC
+	   `
+	rows, err := r.db.Query(query, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list group members by groupID: %w", err)
+	}
+	defer rows.Close()
+
+	var members []types.UserBasicInfo
+	for rows.Next() {
+		var member types.UserBasicInfo
+		var avatarURL sql.NullString
+		err := rows.Scan(
+			&member.UserID,
+			&member.FirstName,
+			&member.LastName,
+			&member.Username,
+			&avatarURL,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan group member basic info: %w", err)
+		}
+		if avatarURL.Valid {
+			member.AvatarURL = avatarURL.String
+		}
+		members = append(members, member)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating group member basic info rows: %w", err)
 	}
 
 	return members, nil
