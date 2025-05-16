@@ -175,16 +175,12 @@ export default function UserProfilePage() {
         isPreview={false}
         isLoadingFollowAction={isLoadingFollowAction}
         pageType="dynamic"
+        is_followed={userProfile.is_followed}
+        // is_following_viewer={userProfile.is_following_viewer} // Pass this when available
       />
       {followError && !isLoadingFollowAction && <p className="text-red-500 mt-2 text-center">Error: {followError.message}</p>}
 
-      {!isOwnProfile && userProfile && (
-        <div className="mt-4 flex justify-center"> {/* Or other appropriate placement */}
-          <Link href={`/chat/${userProfile.id}`} passHref>
-            <Button outline>Chat with {userProfile.first_name}</Button>
-          </Link>
-        </div>
-      )}
+      {/* The chat button has been moved to ProfileHeader */}
 
       {isRestrictedView ? (
         <div className="text-center py-10">

@@ -2,8 +2,7 @@
 import { useState, FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// For emoji picker, consider a library like 'emoji-picker-react'
-// import Picker, { EmojiClickData } from 'emoji-picker-react';
+import Picker, { EmojiClickData, Theme } from 'emoji-picker-react';
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void;
@@ -13,12 +12,13 @@ interface MessageInputProps {
 
 export default function MessageInput({ onSendMessage, isSending, canSendMessage }: MessageInputProps) {
   const [message, setMessage] = useState('');
-  // const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // const onEmojiClick = (emojiData: EmojiClickData, event: MouseEvent) => {
-  //   setMessage(prevMessage => prevMessage + emojiData.emoji);
-  //   setShowEmojiPicker(false);
-  // };
+  const onEmojiClick = (emojiData: EmojiClickData) => {
+    setMessage(prevMessage => prevMessage + emojiData.emoji);
+    // Optionally hide the picker after selection, or let user close it manually
+    // setShowEmojiPicker(false);
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -29,22 +29,23 @@ export default function MessageInput({ onSendMessage, isSending, canSendMessage 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t border-gray-700 bg-gray-800 rounded-b-md">
-      {/* {showEmojiPicker && (
-        <div style={{ position: 'absolute', bottom: '70px', right: '20px', zIndex: 10 }}>
-          <Picker onEmojiClick={onEmojiClick} />
+    <form onSubmit={handleSubmit} className="p-4 border-t border-gray-700 bg-gray-800 rounded-b-md relative">
+      {showEmojiPicker && (
+        <div style={{ position: 'absolute', bottom: '60px', right: '10px', zIndex: 10 }}>
+          <Picker onEmojiClick={onEmojiClick} theme={Theme.DARK} />
         </div>
-      )} */}
+      )}
       <div className="flex items-center space-x-2">
-        {/* <Button
+        <Button
           type="button"
-          variant="ghost"
-          size="icon"
+          plain={true}
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
           disabled={!canSendMessage}
+          aria-label="Toggle emoji picker"
+          className="p-2" // Added padding for better appearance as size="icon" is not available
         >
-          😊 {/* Placeholder for emoji icon */}
-        {/* </Button> */}
+          😀
+        </Button>
         <Input
           type="text"
           value={message}

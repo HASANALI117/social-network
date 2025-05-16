@@ -1,6 +1,8 @@
 import { FiEdit, FiUsers, FiLock, FiUnlock, FiUserPlus, FiUserMinus, FiUserCheck, FiUserX, FiClock } from 'react-icons/fi';
 import { User, UserProfile } from '@/types/User';
 import { Button } from '@/components/ui/button'; // Assuming you have a Button component
+import Link from 'next/link'; // Import Link
+import { FiMessageSquare } from 'react-icons/fi'; // Import an icon for the chat button
 
 interface ProfileHeaderProps {
   user: UserProfile | User;
@@ -11,6 +13,9 @@ interface ProfileHeaderProps {
   isPreview?: boolean;
   isLoadingFollowAction?: boolean;
   pageType?: 'own-static' | 'dynamic';
+  // Add is_followed for chat button logic, and is_following_viewer for the ideal scenario
+  is_followed?: boolean;
+  is_following_viewer?: boolean; // Ideal field, not currently available
 }
 
 export default function ProfileHeader({
@@ -22,9 +27,22 @@ export default function ProfileHeader({
   isPreview = false,
   isLoadingFollowAction = false,
   pageType = 'dynamic',
+  is_followed, // Destructure new prop
+  is_following_viewer, // Destructure new prop (ideal)
 }: ProfileHeaderProps) {
   const isOwnProfile = user.id === currentUserId;
   const profileUser = user as UserProfile;
+
+  // Use the passed is_followed prop, or fallback to profileUser.is_followed if not passed
+  // This ensures compatibility if the prop isn't passed from all call sites immediately,
+  // though for this specific task, UserProfilePage will pass it.
+  const viewerIsFollowingTarget = typeof is_followed === 'boolean' ? is_followed : profileUser.is_followed;
+
+  // Ideal condition:
+  // const canChat = !isOwnProfile && (viewerIsFollowingTarget || is_following_viewer);
+  // Current condition due to missing is_following_viewer:
+  const canChat = !isOwnProfile && viewerIsFollowingTarget;
+
 
   const getFollowButton = () => {
     if (pageType === 'own-static') {
@@ -124,6 +142,19 @@ export default function ProfileHeader({
             </div>
             <div className="flex items-center gap-4">
               {getFollowButton()}
+              {/* Chat Button */}
+              {canChat && (
+                <Link href={`/chat/${user.id}`} passHref>
+                  <Button outline className="flex items-center gap-2">
+                    <FiMessageSquare className="text-lg" />
+                    Message
+                  </Button>
+                </Link>
+              )}
+              {/* TODO: Add a comment here if is_following_viewer is not available:
+                   "Ideally, chat is also enabled if userProfile.is_following_viewer is true."
+                   This is now handled by the canChat logic and comments above.
+              */}
               {!isPreview && onEdit && !isOwnProfile && ( // Edit button should not show on own profile if follow buttons are present
                 <button
                   onClick={onEdit}
