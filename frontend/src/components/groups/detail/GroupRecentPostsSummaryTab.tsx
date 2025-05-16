@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRequest } from '../../../hooks/useRequest';
 import { Post } from '../../../types/Post';
@@ -10,12 +10,24 @@ interface GroupRecentPostsSummaryTabProps {
   groupId: string;
 }
 
+interface PostResponse {
+  posts: Post[];
+}
+
 const GroupRecentPostsSummaryTab: React.FC<GroupRecentPostsSummaryTabProps> = ({ groupId }) => {
-  const { data: posts, isLoading, error, get } = useRequest<Post[]>();
+  const { data, isLoading, error, get } = useRequest<PostResponse>();
+  const [posts, setPosts] = useState<Post[]>([]);
 
   useEffect(() => {
     get(`/api/groups/${groupId}/posts?limit=3&sort=recent`);
   }, [get, groupId]);
+
+  useEffect(() => {
+    if (data) {
+      setPosts(data.posts);
+    }
+  }, [data]);
+    
 
   if (isLoading) {
     return <Text>Loading recent posts...</Text>;

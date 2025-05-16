@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRequest } from '../../../hooks/useRequest';
 import { GroupEvent } from '../../../types/GroupEvent';
@@ -10,12 +10,23 @@ interface GroupEventsSummaryTabProps {
   groupId: string;
 }
 
-const GroupEventsSummaryTab: React.FC<GroupEventsSummaryTabProps> = ({ groupId }) => {
-  const { data: events, isLoading, error, get } = useRequest<GroupEvent[]>();
+interface GroupEventResponse {
+  events: GroupEvent[];
+}
 
+const GroupEventsSummaryTab: React.FC<GroupEventsSummaryTabProps> = ({ groupId }) => {
+  const { data, isLoading, error, get } = useRequest<GroupEventResponse>();
+  const [events, setEvents] = useState<GroupEvent[]>([]);
+  
   useEffect(() => {
     get(`/api/groups/${groupId}/events?limit=3&sort=upcoming`);
   }, [get, groupId]);
+
+  useEffect(() => {
+    if (data) {
+      setEvents(data.events);
+    }
+  }, [data]);
 
   if (isLoading) {
     return <Text>Loading upcoming events...</Text>;

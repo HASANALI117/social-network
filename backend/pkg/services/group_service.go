@@ -408,11 +408,11 @@ func (s *groupService) GetByID(groupID string, requestingUserID string) (*types.
 
 			postSummaries = append(postSummaries, types.PostSummary{
 				PostID:         post.ID,
-				Title:          post.Title, // Assuming Post model has Title
+				Title:          post.Title,
 				ContentSnippet: contentSnippet,
 				CreatorInfo:    creatorInfo,
 				CreatedAt:      post.CreatedAt,
-				CommentsCount:  0, // Placeholder -  LikesCount was removed, CommentsCount needs to be addressed
+				CommentsCount:  0,
 			})
 		}
 		groupDetail.Posts = postSummaries
