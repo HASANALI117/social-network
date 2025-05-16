@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/models"
+	"github.com/HASANALI117/social-network/pkg/types"
 	"github.com/mattn/go-sqlite3" // Import sqlite3 driver for error checking
 )
 
@@ -26,6 +27,7 @@ type UserRepository interface {
 	Delete(id string) error
 	List(limit, offset int) ([]*models.User, error)
 	UpdatePrivacy(userID string, isPrivate bool) error // Added method
+	SearchUsers(query string, limit int) ([]types.UserSearchResultDTO, error)
 }
 
 // userRepository implements UserRepository interface
@@ -325,4 +327,42 @@ WHERE id = ?
 	}
 
 	return nil
+}
+
+// SearchUsers searches for users by username, first name, or last name.
+func (r *userRepository) SearchUsers(query string, limit int) ([]types.UserSearchResultDTO, error) {
+	sqlQuery := `
+SELECT id, username, first_name, last_name, avatar_url
+FROM users
+WHERE username LIKE ? OR first_name LIKE ? OR last_name LIKE ?
+LIMIT ?
+`
+	searchTerm := "%" + query + "%"
+	rows, err := r.db.Query(sqlQuery, searchTerm, searchTerm, searchTerm, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []types.UserSearchResultDTO
+	for rows.Next() {
+		var user types.UserSearchResultDTO
+		err := rows.Scan(
+			&user.UserID,
+			&user.Username,
+			&user.FirstName,
+			&user.LastName,
+			&user.AvatarURL,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user during search: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating user search results: %w", err)
+	}
+
+	return users, nil
 }

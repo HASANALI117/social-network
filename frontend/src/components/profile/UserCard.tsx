@@ -3,13 +3,17 @@ import { User } from '@/types/User';
 
 interface UserCardProps {
   user: User;
+  className?: string; // Add className as an optional prop
 }
 
-export default function UserCard({ user }: UserCardProps) {
+export default function UserCard({ user, className }: UserCardProps) {
+  // Combine default classes with any provided className
+  const combinedClassName = `flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors ${className || ''}`;
+
   return (
-    <Link 
+    <Link
       href={`/profile/${user.id}`}
-      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors"
+      className={combinedClassName.trim()} // Apply combined classes
     >
       <img
         src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`}

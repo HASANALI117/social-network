@@ -43,7 +43,7 @@ func Setup(dbConn *sql.DB) http.Handler {
 
 	// User and Follower routes
 	// Register handler for both with and without trailing slash to handle all user routes
-	mux.Handle("/api/users", httperr.ErrorHandler(controllers.User.ServeHTTP))  // Handles /api/users/, /api/users/{id}, and /api/users/{id}/{action}
+	mux.Handle("/api/users", httperr.ErrorHandler(controllers.User.ServeHTTP))  // Handles /api/users/, /api/users/search, /api/users/{id}, and /api/users/{id}/{action}
 	mux.Handle("/api/users/", httperr.ErrorHandler(controllers.User.ServeHTTP)) // Handles /api/users/{id} and /api/users/{id}/{action}
 	// Specific route for the current user's pending follow requests
 	mux.HandleFunc("/api/users/me/follow-requests", controllers.Follower.HandleListPending) // No ErrorHandler wrapper needed
@@ -54,25 +54,17 @@ func Setup(dbConn *sql.DB) http.Handler {
 
 	// Message routes - Use the initialized MessageHandler
 	mux.HandleFunc("/api/messages", httperr.ErrorHandler(controllers.Message.GetMessages))
+	mux.HandleFunc("/api/messages/", httperr.ErrorHandler(controllers.Message.GetMessages)) // Handles /api/messages/{id}
 
 	// Group routes - Use the consolidated GroupHandler with prefix matching
 	mux.Handle("/api/groups", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
+	mux.Handle("/api/groups/", httperr.ErrorHandler(controllers.Group.ServeHTTP))
 
 	// Comment routes - Use the CommentHandler with prefix matching
 	// Handles POST /api/posts/{postId}/comments and GET /api/posts/{postId}/comments via PostHandler's prefix
 	// Handles DELETE /api/comments/{commentId}
-	mux.Handle("/api/comments", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
-
-	// Note: The CommentHandler's ServeHTTP needs to correctly parse postID from /api/posts/{postId}/comments
-	// The current PostHandler already handles /api/posts/, so we need to adjust routing or handler logic.
-	// Let's assume for now the CommentHandler can parse the full path passed to it.
-	// A more robust solution might involve a more sophisticated router like gorilla/mux or chi.
-
-	// Remove old separate group member/message routes as they are handled by GroupHandler now
-	// mux.HandleFunc("/api/groups/members/add", httperr.ErrorHandler(controllers.GroupMember.AddGroupMember))
-	// mux.HandleFunc("/api/groups/members/remove", httperr.ErrorHandler(controllers.GroupMember.RemoveGroupMember))
-	// mux.HandleFunc("/api/groups/members", httperr.ErrorHandler(controllers.GroupMember.ListGroupMembers))
-	// mux.HandleFunc("/api/groups/messages", httperr.ErrorHandler(controllers.GroupMessage.GetGroupMessages))
+	mux.Handle("/api/comments", httperr.ErrorHandler(controllers.Comment.ServeHTTP))  // Handles /api/comments/{commentId}
+	mux.Handle("/api/comments/", httperr.ErrorHandler(controllers.Comment.ServeHTTP)) // Handles /api/comments/{commentId}
 
 	return mux
 }

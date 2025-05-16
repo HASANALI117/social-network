@@ -18,14 +18,14 @@ type Services struct {
 func InitServices(repos *repositories.Repositories) *Services {
 	authService := NewAuthService(repos.User, repos.Session)
 	postService := NewPostService(repos.Post, repos.Follower, repos.Group, repos.User)
-	groupService := NewGroupService(repos.Group, repos.User)
+	groupService := NewGroupService(repos.Group, repos.User, repos.Post, repos.GroupEvent)
 	followerService := NewFollowerService(repos.Follower, repos.User)
 	commentService := NewCommentService(repos.Comment, postService, repos.Group, repos.User)
 	// Update NewGroupEventService to include GroupEventResponseRepository
 	groupEventService := NewGroupEventService(repos.GroupEvent, repos.Group, repos.User, repos.GroupEventResponse)
-	userService := NewUserService(repos.User, postService, followerService)
+	userService := NewUserService(repos.User, postService, followerService, repos.Group) // Pass GroupRepository
 	messageService := NewMessageService(repos.ChatMessage, repos.Group) // Initialize MessageService
-
+	
 	return &Services{
 		Auth:       authService,
 		User:       userService,
