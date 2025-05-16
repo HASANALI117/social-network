@@ -299,13 +299,15 @@ export default function ChatPage() {
     <div className="flex flex-col h-screen max-w-2xl mx-auto bg-gray-900 text-white">
       <ChatHeader targetUser={targetUser} />
       {error && <div className="p-2 text-center text-red-400 bg-red-900">{error}</div>}
-      <MessageList
-        messages={messages}
-        currentUserId={currentUserId!} // currentUserId is checked by isAuthenticated logic path
-        onLoadMore={handleLoadMore}
-        hasMoreMessages={hasMoreMessages}
-        isLoadingMore={isLoadingMore || (messagesRequest.isLoading && offset > 0)}
-      />
+      <div className="flex-grow overflow-y-auto">
+        <MessageList
+          messages={messages}
+          currentUserId={currentUserId!} // currentUserId is checked by isAuthenticated logic path
+          onLoadMore={handleLoadMore}
+          hasMoreMessages={hasMoreMessages}
+          isLoadingMore={isLoadingMore || (messagesRequest.isLoading && offset > 0)}
+        />
+      </div>
       {(isLoadingHistory && messages.length === 0) &&
         <div className="text-center py-4 text-gray-400">Loading messages...</div>
       }

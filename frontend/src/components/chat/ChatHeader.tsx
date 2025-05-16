@@ -10,7 +10,7 @@ interface ChatHeaderProps {
 export default function ChatHeader({ targetUser }: ChatHeaderProps) {
   if (!targetUser) {
     return (
-      <div className="p-4 border-b border-gray-700 bg-gray-800 text-white text-center">
+      <div className="sticky top-0 z-10 p-4 border-b border-gray-700 bg-gray-900 text-white text-center">
         Loading user...
       </div>
     );
@@ -19,7 +19,7 @@ export default function ChatHeader({ targetUser }: ChatHeaderProps) {
   const displayName = `${targetUser.first_name} ${targetUser.last_name}`;
 
   return (
-    <div className="p-3 border-b border-gray-700 bg-gray-800 flex items-center space-x-3">
+    <div className="sticky top-0 z-10 bg-gray-900 p-4 flex items-center border-b border-gray-700 space-x-3">
       <Avatar
         className="w-10 h-10"
         src={targetUser.avatar_url}

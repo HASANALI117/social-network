@@ -31,7 +31,7 @@ export default function MessageList({
   }, [messages.length]); // Scroll to bottom when new messages are added
 
   return (
-    <div ref={messagesContainerRef} className="flex-grow overflow-y-auto p-4 space-y-2 bg-gray-800 rounded-t-md">
+    <div ref={messagesContainerRef} className="flex-grow p-4 space-y-2 bg-gray-800 rounded-t-md">
       {hasMoreMessages && (
         <div className="text-center mb-4">
           <Button onClick={onLoadMore} disabled={isLoadingMore} outline>
