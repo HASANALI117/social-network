@@ -53,8 +53,9 @@ func Setup(dbConn *sql.DB) http.Handler {
 	mux.Handle("/api/posts/", httperr.ErrorHandler(controllers.Post.ServeHTTP))
 
 	// Message routes - Use the initialized MessageHandler
+	// Message routes - register specific routes before general ones
+	mux.HandleFunc("/api/messages/conversations", httperr.ErrorHandler(controllers.Message.GetChatConversations))
 	mux.HandleFunc("/api/messages", httperr.ErrorHandler(controllers.Message.GetMessages))
-	mux.HandleFunc("/api/messages/", httperr.ErrorHandler(controllers.Message.GetMessages)) // Handles /api/messages/{id}
 
 	// Group routes - Use the consolidated GroupHandler with prefix matching
 	mux.Handle("/api/groups", httperr.ErrorHandler(controllers.Group.ServeHTTP)) // Note the trailing slash
