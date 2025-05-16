@@ -137,7 +137,7 @@ export default function GroupEventDetailPage() { // Removed params from props
     username: responseItem.username,
     first_name: responseItem.first_name || '', // Provide default if optional
     last_name: responseItem.last_name || '',   // Provide default if optional
-    avatar_url: responseItem.avatar_url,
+    avatar_url: responseItem.avatar_url || undefined,
     // Add dummy values for other required User fields if necessary
     email: '',
     birth_date: '',

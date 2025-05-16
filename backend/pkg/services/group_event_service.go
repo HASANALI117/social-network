@@ -52,7 +52,10 @@ type GroupEventResponseRequest struct {
 // GroupEventResponseDetails is the DTO for listing event responses with user info
 type GroupEventResponseDetails struct {
 	UserID    string    `json:"user_id"`
-	Username  string    `json:"username"` // Or maybe FirstName/LastName? Let's start with username.
+	Username  string    `json:"username"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	AvatarURL string    `json:"avatar_url"`
 	Response  string    `json:"response"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -178,18 +181,18 @@ func (s *groupEventService) Create(request *GroupEventCreateRequest) (*GroupEven
 }
 
 // GetByID retrieves detailed group event information including responses and counts
-func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*GroupEventDetailsResponse, error) { // Corrected return type here
-	// 1. Get basic event from repository
-	event, err := s.groupEventRepo.GetByID(eventID)
+func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*GroupEventDetailsResponse, error) {
+	// 1. Get event with enriched responses from repository
+	eventAPI, err := s.groupEventRepo.GetEventWithResponsesByID(eventID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrEventNotFound) {
 			return nil, repositories.ErrEventNotFound
 		}
-		return nil, fmt.Errorf("failed to get event: %w", err)
+		return nil, fmt.Errorf("failed to get event with responses: %w", err)
 	}
 
 	// Check if requesting user is a member of the group
-	isMember, err := s.groupRepo.IsMember(event.GroupID, requestingUserID)
+	isMember, err := s.groupRepo.IsMember(eventAPI.GroupID, requestingUserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check group membership: %w", err)
 	}
@@ -197,11 +200,11 @@ func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*G
 		return nil, ErrGroupMemberRequired
 	}
 
-	// 3. Create base response DTO
-	baseResponse := mapGroupEventToResponse(event)
+	// 2. Create base response DTO from eventAPI.GroupEvent
+	baseResponse := mapGroupEventToResponse(&eventAPI.GroupEvent)
 
 	// Add creator name if possible
-	creator, err := s.userRepo.GetByID(event.CreatorID)
+	creator, err := s.userRepo.GetByID(eventAPI.CreatorID)
 	if err == nil {
 		baseResponse.CreatorName = creator.FirstName + " " + creator.LastName
 	} else {
@@ -209,24 +212,50 @@ func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*G
 	}
 
 	// Add group name if possible
-	group, err := s.groupRepo.GetByID(event.GroupID)
+	group, err := s.groupRepo.GetByID(eventAPI.GroupID)
 	if err == nil {
 		baseResponse.GroupName = group.Name
 	} else {
 		fmt.Printf("Warning: Failed to get group details for event %s: %v\n", eventID, err)
 	}
 
-	// 4. Fetch responses
-	// Use ListEventResponses, handle errors locally
-	responses, err := s.ListEventResponses(eventID, requestingUserID)
-	if err != nil {
-		// Log the error but don't fail the whole request, return empty responses
-		fmt.Printf("Warning: Failed to get event responses for event %s: %v\n", eventID, err)
-		responses = []*GroupEventResponseDetails{} // Ensure it's not nil
+	// 3. Map []models.EventResponseAPI to []*GroupEventResponseDetails
+	mappedResponses := make([]*GroupEventResponseDetails, len(eventAPI.Responses))
+	for i, repoResp := range eventAPI.Responses {
+		var updatedAt time.Time
+		// Attempt to parse the UpdatedAt string. Similar to repository logic for event_time.
+		// Assuming RFC3339 or a common SQLite format.
+		parsedTime, errParse := time.Parse(time.RFC3339, repoResp.UpdatedAt)
+		if errParse != nil {
+			parsedTimeFallback, errFallback := time.Parse("2006-01-02 15:04:05", repoResp.UpdatedAt) // Common SQLite format
+			if errFallback != nil {
+				// Further fallback for "YYYY-MM-DD HH:MM:SSZ" or other timezone variants if necessary
+				parsedTimeTZ, errTZ := time.Parse("2006-01-02 15:04:05Z07:00", repoResp.UpdatedAt)
+				if errTZ != nil {
+					fmt.Printf("Warning: Failed to parse UpdatedAt timestamp '%s' for response by user %s (event %s): %v, %v, %v\n", repoResp.UpdatedAt, repoResp.UserID, eventID, errParse, errFallback, errTZ)
+					updatedAt = time.Time{} // Default to zero time if parsing fails
+				} else {
+					updatedAt = parsedTimeTZ
+				}
+			} else {
+				updatedAt = parsedTimeFallback
+			}
+		} else {
+			updatedAt = parsedTime
+		}
+
+		mappedResponses[i] = &GroupEventResponseDetails{
+			UserID:    repoResp.UserID,
+			Username:  repoResp.Username,
+			FirstName: repoResp.FirstName,
+			LastName:  repoResp.LastName,
+			AvatarURL: repoResp.AvatarURL,
+			Response:  repoResp.Response,
+			UpdatedAt: updatedAt,
+		}
 	}
 
-	// 5. Fetch response counts
-	// Use GetEventResponseCounts, handle errors locally
+	// 4. Fetch response counts
 	counts, err := s.GetEventResponseCounts(eventID, requestingUserID)
 	if err != nil {
 		// Log the error but don't fail the whole request, return nil counts
@@ -237,11 +266,11 @@ func (s *groupEventService) GetByID(eventID string, requestingUserID string) (*G
 	// 6. Assemble the detailed response
 	detailedResponse := &GroupEventDetailsResponse{
 		GroupEventResponse: baseResponse,
-		Responses:          responses,
+		Responses:          mappedResponses,
 		ResponseCounts:     counts,
 	}
 
-	return detailedResponse, nil // Correctly return the detailed response
+	return detailedResponse, nil
 }
 
 // ListByGroupID lists all events for a group

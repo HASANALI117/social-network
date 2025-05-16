@@ -24,7 +24,8 @@ type GroupEventRepository interface {
 	ListByGroupID(groupID string, limit, offset int) ([]*models.GroupEvent, error)
 	Update(event *models.GroupEvent) error
 	Delete(id string) error
-	GetEventsByGroupID(groupID string, upcomingOnly bool) ([]types.EventSummary, error) // New method
+	GetEventsByGroupID(groupID string, upcomingOnly bool) ([]types.EventSummary, error)
+	GetEventWithResponsesByID(eventID string) (*models.GroupEventAPI, error) // New method
 }
 
 // groupEventRepository implements GroupEventRepository interface
@@ -271,4 +272,101 @@ func (r *groupEventRepository) GetEventsByGroupID(groupID string, upcomingOnly b
 	}
 
 	return summaries, nil
+}
+
+// GetEventWithResponsesByID retrieves a group event by its ID, along with its responses enriched with user details.
+func (r *groupEventRepository) GetEventWithResponsesByID(eventID string) (*models.GroupEventAPI, error) {
+	// 1. Fetch the main event details
+	eventQuery := `
+	       SELECT id, group_id, creator_id, title, description, event_time, created_at, updated_at
+	       FROM group_events
+	       WHERE id = ?
+	   `
+	var event models.GroupEvent
+	err := r.db.QueryRow(eventQuery, eventID).Scan(
+		&event.ID,
+		&event.GroupID,
+		&event.CreatorID,
+		&event.Title,
+		&event.Description,
+		&event.EventTime,
+		&event.CreatedAt,
+		&event.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrEventNotFound
+		}
+		return nil, fmt.Errorf("failed to get event by ID for GetEventWithResponsesByID: %w", err)
+	}
+
+	eventAPI := &models.GroupEventAPI{
+		GroupEvent: event,
+		Responses:  []models.EventResponseAPI{}, // Initialize as empty slice
+	}
+
+	// 2. Fetch the event responses with user details
+	responsesQuery := `
+	       SELECT
+	           ger.user_id,
+	           u.username,
+	           u.first_name,
+	           u.last_name,
+	           u.avatar_url,
+	           ger.response,
+	           ger.updated_at
+	       FROM group_event_responses ger
+	       JOIN users u ON ger.user_id = u.id
+	       WHERE ger.event_id = ?
+	       ORDER BY ger.updated_at DESC
+	   `
+	rows, err := r.db.Query(responsesQuery, eventID)
+	if err != nil {
+		// If error is sql.ErrNoRows, it means no responses, which is fine.
+		// For other errors, return the error.
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("failed to query event responses for GetEventWithResponsesByID: %w", err)
+		}
+		// No responses found, return event with empty responses list
+		return eventAPI, nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var resp models.EventResponseAPI
+		var firstName, lastName, avatarURL sql.NullString // Handle nullable fields
+		var updatedAtStr string                          // Assuming updated_at from DB is string
+
+		err := rows.Scan(
+			&resp.UserID,
+			&resp.Username,
+			&firstName,
+			&lastName,
+			&avatarURL,
+			&resp.Response,
+			&updatedAtStr, // Scan as string first
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan event response for GetEventWithResponsesByID: %w", err)
+		}
+
+		if firstName.Valid {
+			resp.FirstName = firstName.String
+		}
+		if lastName.Valid {
+			resp.LastName = lastName.String
+		}
+		if avatarURL.Valid {
+			resp.AvatarURL = avatarURL.String
+		}
+		resp.UpdatedAt = updatedAtStr // Assign string directly as per model
+
+		eventAPI.Responses = append(eventAPI.Responses, resp)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating event response rows for GetEventWithResponsesByID: %w", err)
+	}
+
+	return eventAPI, nil
 }
