@@ -1,8 +1,11 @@
+'use client';
+
 import { FiEdit, FiUsers, FiLock, FiUnlock, FiUserPlus, FiUserMinus, FiUserCheck, FiUserX, FiClock } from 'react-icons/fi';
 import { User, UserProfile } from '@/types/User';
 import { Button } from '@/components/ui/button'; // Assuming you have a Button component
 import Link from 'next/link'; // Import Link
 import { FiMessageSquare } from 'react-icons/fi'; // Import an icon for the chat button
+import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext';
 
 interface ProfileHeaderProps {
   user: UserProfile | User;
@@ -30,6 +33,7 @@ export default function ProfileHeader({
   is_followed, // Destructure new prop
   is_following_viewer, // Destructure new prop (ideal)
 }: ProfileHeaderProps) {
+  const { onlineUserIds } = useGlobalWebSocket();
   const isOwnProfile = user.id === currentUserId;
   const profileUser = user as UserProfile;
 
@@ -124,14 +128,19 @@ export default function ProfileHeader({
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
       <div className="flex items-start gap-6">
-        <img
-          src={
-            user.avatar_url ||
-            `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`
-          }
-          alt="Avatar"
-          className="w-32 h-32 rounded-full border-4 border-purple-100"
-        />
+        <div className="relative">
+          <img
+            src={
+              user.avatar_url ||
+              `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`
+            }
+            alt="Avatar"
+            className="w-32 h-32 rounded-full border-4 border-purple-100"
+          />
+          {user.id && onlineUserIds.includes(user.id) && (
+            <span className="absolute bottom-1 right-1 block h-4 w-4 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-800" />
+          )}
+        </div>
         <div className="flex-1">
           <div className="flex items-center justify-between mb-4">
             <div>

@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { FiShare } from 'react-icons/fi';
 import { Post } from '@/types/Post';
@@ -23,6 +25,7 @@ export default function PostCard({ post }: PostCardProps) {
             src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${post.user_first_name}+${post.user_last_name}&background=3b82f6&color=fff&bold=true`}
             alt={`${post.user_first_name || 'Anonymous'} ${post.user_last_name || 'User'}`}
             className="w-12 h-12 border-2 border-gray-700"
+            userId={post.user_id}
           />
           <div>
             <h3 className="font-semibold text-gray-100">

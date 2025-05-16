@@ -1,8 +1,11 @@
+'use client';
+
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import React, { forwardRef } from 'react'
 import { TouchTarget } from './button'
 import { Link } from './link'
+import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext';
 
 type AvatarProps = {
   src?: string | null
@@ -10,6 +13,7 @@ type AvatarProps = {
   initials?: string
   alt?: string
   className?: string
+  userId?: string;
 }
 
 export function Avatar({
@@ -18,35 +22,42 @@ export function Avatar({
   initials,
   alt = '',
   className,
+  userId,
   ...props
 }: AvatarProps & React.ComponentPropsWithoutRef<'span'>) {
+  const { onlineUserIds } = useGlobalWebSocket();
   return (
-    <span
-      data-slot="avatar"
-      {...props}
-      className={clsx(
-        className,
-        // Basic layout
-        'inline-grid shrink-0 align-middle [--avatar-radius:20%] [--ring-opacity:20%] *:col-start-1 *:row-start-1',
-        'outline -outline-offset-1 outline-black/(--ring-opacity) dark:outline-white/(--ring-opacity)',
-        // Add the correct border radius
-        square ? 'rounded-(--avatar-radius) *:rounded-(--avatar-radius)' : 'rounded-full *:rounded-full'
+    <div className="relative">
+      <span
+        data-slot="avatar"
+        {...props}
+        className={clsx(
+          className,
+          // Basic layout
+          'inline-grid shrink-0 align-middle [--avatar-radius:20%] [--ring-opacity:20%] *:col-start-1 *:row-start-1',
+          'outline -outline-offset-1 outline-black/(--ring-opacity) dark:outline-white/(--ring-opacity)',
+          // Add the correct border radius
+          square ? 'rounded-(--avatar-radius) *:rounded-(--avatar-radius)' : 'rounded-full *:rounded-full'
+        )}
+      >
+        {initials && (
+          <svg
+            className="size-full fill-current p-[5%] text-[48px] font-medium uppercase select-none"
+            viewBox="0 0 100 100"
+            aria-hidden={alt ? undefined : 'true'}
+          >
+            {alt && <title>{alt}</title>}
+            <text x="50%" y="50%" alignmentBaseline="middle" dominantBaseline="middle" textAnchor="middle" dy=".125em">
+              {initials}
+            </text>
+          </svg>
+        )}
+        {src && <img className="size-full" src={src} alt={alt} />}
+      </span>
+      {userId && onlineUserIds.includes(userId) && (
+        <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-800" />
       )}
-    >
-      {initials && (
-        <svg
-          className="size-full fill-current p-[5%] text-[48px] font-medium uppercase select-none"
-          viewBox="0 0 100 100"
-          aria-hidden={alt ? undefined : 'true'}
-        >
-          {alt && <title>{alt}</title>}
-          <text x="50%" y="50%" alignmentBaseline="middle" dominantBaseline="middle" textAnchor="middle" dy=".125em">
-            {initials}
-          </text>
-        </svg>
-      )}
-      {src && <img className="size-full" src={src} alt={alt} />}
-    </span>
+    </div>
   )
 }
 
@@ -57,6 +68,7 @@ export const AvatarButton = forwardRef(function AvatarButton(
     initials,
     alt,
     className,
+    userId, // Add userId here
     ...props
   }: AvatarProps &
     (Omit<Headless.ButtonProps, 'as' | 'className'> | Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>),
@@ -71,13 +83,13 @@ export const AvatarButton = forwardRef(function AvatarButton(
   return 'href' in props ? (
     <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
       <TouchTarget>
-        <Avatar src={src} square={square} initials={initials} alt={alt} />
+        <Avatar src={src} square={square} initials={initials} alt={alt} userId={userId} />
       </TouchTarget>
     </Link>
   ) : (
     <Headless.Button {...props} className={classes} ref={ref}>
       <TouchTarget>
-        <Avatar src={src} square={square} initials={initials} alt={alt} />
+        <Avatar src={src} square={square} initials={initials} alt={alt} userId={userId} />
       </TouchTarget>
     </Headless.Button>
   )
