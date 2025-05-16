@@ -27,7 +27,7 @@ export default function MessageItem({ message, isCurrentUserSender }: MessageIte
         {!isCurrentUserSender && (
           <p className="text-xs text-gray-400 mb-1">{senderName}</p>
         )}
-        <p className="text-sm">{message.content}</p>
+        <p className="text-lg">{message.content}</p>
         <p className={`text-xs mt-1 ${isCurrentUserSender ? 'text-blue-200' : 'text-gray-400'} text-right`}>
           {format(new Date(message.created_at), 'p')}
         </p>
