@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 // GroupEvent represents a group event with details like title, description, and scheduled time
 type GroupEvent struct {
@@ -10,8 +13,9 @@ type GroupEvent struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	EventTime   time.Time `json:"event_time"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	GroupAvatarURL sql.NullString `json:"-"` // JSON tag handled by DTO
 }
 
 // EventResponseAPI represents the enriched response data for an event attendee

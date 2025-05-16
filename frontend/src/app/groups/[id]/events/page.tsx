@@ -61,11 +61,10 @@ export default function GroupEventsPage() {
 
   const handleEventCreated = (newEvent: GroupEvent) => {
     // Ensure newEvent.options is an array, defaulting to an empty array if not.
-    const eventWithOptions = {
-      ...newEvent,
-      options: Array.isArray(newEvent.options) ? newEvent.options : [],
-    };
-    setEvents((prevEvents) => [eventWithOptions, ...prevEvents]);
+    // newEvent is of type GroupEvent, which doesn't have an 'options' property.
+    // If 'options' were intended here, the GroupEvent type or the type of newEvent
+    // would need to be adjusted. Assuming newEvent is a standard GroupEvent.
+    setEvents((prevEvents) => [newEvent, ...prevEvents]);
   };
 
   const handleEventUpdated = (updatedEvent: GroupEvent) => {
@@ -74,29 +73,47 @@ export default function GroupEventsPage() {
     );
   };
 
-  if (groupLoading) return <Text>Loading group details...</Text>;
-  if (groupError) return <Text className="text-red-500">Error loading group: {groupError.message}</Text>;
+  if (groupLoading) return (
+    <div className="flex justify-center items-center h-64 min-h-screen bg-gray-900">
+      <Text className="text-xl text-gray-400">Loading group details...</Text>
+    </div>
+  );
+  if (groupError) return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 py-8 flex justify-center items-start">
+      <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div className="bg-red-800 border border-red-700 text-red-200 px-4 py-3 rounded-lg shadow-md" role="alert">
+          <Text className="font-bold">Error loading group:</Text>
+          <Text className="block sm:inline"> {groupError.message}</Text>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="container mx-auto p-4">
-      <Heading level={1} className="mb-6">
-        Events for {group ? `"${group.name}"` : 'Group'}
-      </Heading>
+    <div className="min-h-screen bg-gray-900 text-gray-100 py-8">
+      <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-8">
+        <Heading level={1} className="text-3xl sm:text-4xl font-bold text-white text-center sm:text-left">
+          Events for {group ? `"${group.name}"` : 'Group'}
+        </Heading>
 
-      {groupId && (
-        <div className="mb-6">
-          <CreateGroupEventForm groupId={groupId} onEventCreated={handleEventCreated} />
-        </div>
-      )}
+        {groupId && (
+          <div className="p-6 bg-gray-800 rounded-lg shadow-xl">
+            <Heading level={2} className="text-2xl font-semibold text-white mb-4">
+              Create New Event
+            </Heading>
+            <CreateGroupEventForm groupId={groupId} onEventCreated={handleEventCreated} />
+          </div>
+        )}
 
-      <GroupEventList
-        events={events}
-        groupId={groupId}
-        onEventUpdated={handleEventUpdated}
-        isLoading={eventsLoading}
-        error={eventsError}
-      />
-      {/* Optional: Add a refresh button or pagination controls here */}
+        <GroupEventList
+          events={events}
+          groupId={groupId}
+          onEventUpdated={handleEventUpdated}
+          isLoading={eventsLoading}
+          error={eventsError}
+        />
+        {/* Optional: Add a refresh button or pagination controls here */}
+      </div>
     </div>
   );
 }

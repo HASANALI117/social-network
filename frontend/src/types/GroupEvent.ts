@@ -39,6 +39,7 @@ export interface GroupEventDetail { // New detailed view type
   creator_name?: string;
   creator_info?: UserBasicInfo;
   group_name?: string;
+  group_avatar_url?: string;
   responses: IndividualEventResponse[];
   response_counts: { [key: string]: number }; // e.g., { "going": 0, "not_going": 0 }
   current_user_response_option_id?: string;

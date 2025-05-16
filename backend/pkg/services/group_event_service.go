@@ -22,8 +22,9 @@ type GroupEventResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	// Optional related data
-	CreatorName string `json:"creator_name,omitempty"`
-	GroupName   string `json:"group_name,omitempty"`
+	CreatorName    string `json:"creator_name,omitempty"`
+	GroupName      string `json:"group_name,omitempty"`
+	GroupAvatarURL string `json:"group_avatar_url,omitempty"`
 }
 
 // GroupEventCreateRequest is the DTO for creating a new group event
@@ -117,7 +118,7 @@ func mapGroupEventToResponse(event *models.GroupEvent) *GroupEventResponse {
 	if event == nil {
 		return nil
 	}
-	return &GroupEventResponse{
+	response := &GroupEventResponse{
 		ID:          event.ID,
 		GroupID:     event.GroupID,
 		CreatorID:   event.CreatorID,
@@ -127,6 +128,10 @@ func mapGroupEventToResponse(event *models.GroupEvent) *GroupEventResponse {
 		CreatedAt:   event.CreatedAt,
 		UpdatedAt:   event.UpdatedAt,
 	}
+	if event.GroupAvatarURL.Valid {
+		response.GroupAvatarURL = event.GroupAvatarURL.String
+	}
+	return response
 }
 
 // mapGroupEventsToResponse converts a slice of models.GroupEvent to a slice of GroupEventResponse

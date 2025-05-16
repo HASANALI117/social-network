@@ -278,10 +278,13 @@ func (r *groupEventRepository) GetEventsByGroupID(groupID string, upcomingOnly b
 func (r *groupEventRepository) GetEventWithResponsesByID(eventID string) (*models.GroupEventAPI, error) {
 	// 1. Fetch the main event details
 	eventQuery := `
-	       SELECT id, group_id, creator_id, title, description, event_time, created_at, updated_at
-	       FROM group_events
-	       WHERE id = ?
-	   `
+		SELECT
+			e.id, e.group_id, e.creator_id, e.title, e.description, e.event_time, e.created_at, e.updated_at,
+			g.avatar_url AS group_avatar_url
+		FROM group_events e
+		JOIN groups g ON e.group_id = g.id
+		WHERE e.id = ?
+	`
 	var event models.GroupEvent
 	err := r.db.QueryRow(eventQuery, eventID).Scan(
 		&event.ID,
@@ -292,6 +295,7 @@ func (r *groupEventRepository) GetEventWithResponsesByID(eventID string) (*model
 		&event.EventTime,
 		&event.CreatedAt,
 		&event.UpdatedAt,
+		&event.GroupAvatarURL,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

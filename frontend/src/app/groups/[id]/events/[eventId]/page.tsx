@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import Link from 'next/link'; // Added Link import
 import { useRequest } from '@/hooks/useRequest';
 import { GroupEventDetail, IndividualEventResponse } from '@/types/GroupEvent';
 import UserCard from '@/components/profile/UserCard'; // Default import
@@ -161,6 +162,25 @@ export default function GroupEventDetailPage() { // Removed params from props
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 py-8">
       <div className="container mx-auto max-w-3xl p-4 space-y-8">
+        {/* Group Header */}
+        {optimisticEvent && optimisticEvent.group_name && (
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg shadow flex items-center space-x-3">
+            {optimisticEvent.group_avatar_url ? (
+              <img src={optimisticEvent.group_avatar_url} alt={`${optimisticEvent.group_name} avatar`} className="h-12 w-12 rounded-full object-cover" />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center text-gray-400">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path></svg>
+              </div>
+            )}
+            <div>
+              <Text className="text-sm text-gray-400">Event in group:</Text>
+              <Link href={`/groups/${groupId}`} className="text-xl font-semibold text-indigo-400 hover:text-indigo-300">
+                {optimisticEvent.group_name}
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Event Info Card */}
         <div className="bg-gray-800 shadow-xl rounded-lg p-6 space-y-4">
           <Heading level={1} className="text-3xl sm:text-4xl font-bold text-white mb-2">{title}</Heading>
