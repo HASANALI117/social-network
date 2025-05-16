@@ -35,6 +35,9 @@ export default function ChatPage() {
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const webSocketRef = useRef<WebSocket | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3; // Max number of retry attempts
+  const RETRY_DELAY = 3000; // Initial delay in ms, increases with each retry
 
   // For checking if chat is allowed (simplified frontend check, backend enforces)
   const [canChat, setCanChat] = useState(true); // Assume true initially, update based on targetUser profile
@@ -129,75 +132,112 @@ export default function ChatPage() {
 
   // WebSocket connection
   useEffect(() => {
-    if (!targetUserId || !currentUser?.id || !hydrated || !isAuthenticated) return;
+    // Ensure all dependencies for connection are met
+    if (!currentUser?.id || !targetUserId || !hydrated || !isAuthenticated) {
+      console.log('WebSocket connection prerequisites not met (currentUser, targetUserId, hydrated, or isAuthenticated missing).');
+      // If there's an existing WebSocket connection, close it as prerequisites are no longer met.
+      if (webSocketRef.current) {
+        console.log('Closing existing WebSocket due to unmet prerequisites.');
+        webSocketRef.current.onclose = null; // Prevent onclose handler from firing during this cleanup
+        webSocketRef.current.onerror = null; // Prevent onerror handler from firing
+        webSocketRef.current.close();
+        webSocketRef.current = null;
+        setIsWsConnected(false); // Update connection status
+      }
+      return; // Do not attempt to connect
+    }
 
-    // Construct WebSocket URL. Adjust if your backend URL is different.
-    // Ensure `NEXT_PUBLIC_API_BASE_URL` or similar is configured for WebSocket.
-    // For local dev, it might be 'ws://localhost:8080/ws?id='
-    const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host);
-    const wsUrl = `${wsScheme}//${wsHost}/ws?id=${currentUser.id}`;
+    // Function to setup WebSocket connection
+    const setupWebSocket = () => {
+      const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host);
+      const wsUrl = `${wsScheme}//${wsHost}/ws?id=${currentUser.id}`;
 
+      console.log(`Attempting to connect to WebSocket: ${wsUrl} (Attempt: ${retryCount + 1}/${MAX_RETRIES + 1})`);
+      const ws = new WebSocket(wsUrl);
+      webSocketRef.current = ws;
 
-    webSocketRef.current = new WebSocket(wsUrl);
-    console.log(`Attempting to connect to WebSocket: ${wsUrl}`);
+      ws.onopen = () => {
+        console.log('WebSocket connected successfully.');
+        setIsWsConnected(true);
+        setRetryCount(0); // Reset retry count on successful connection
+        toast.success('Chat connected!');
+      };
 
+      ws.onmessage = (event) => {
+        try {
+          const rawMessageData = JSON.parse(event.data as string) as Message;
+          console.log('WebSocket message received:', rawMessageData);
 
-    webSocketRef.current.onopen = () => {
-      console.log('WebSocket connected');
-      setIsWsConnected(true);
-      toast.success('Chat connected');
-    };
-
-    webSocketRef.current.onmessage = (event) => {
-      try {
-        const rawMessageData = JSON.parse(event.data as string) as Message;
-        console.log('WebSocket message received:', rawMessageData);
-
-        // Ensure it's a direct message and relevant to this chat
-        if (rawMessageData.type === 'direct' &&
-            ((rawMessageData.sender_id === currentUser.id && rawMessageData.receiver_id === targetUserId) ||
-             (rawMessageData.sender_id === targetUserId && rawMessageData.receiver_id === currentUser.id))) {
-          
-          const messageWithAvatar: Message = {
-            ...rawMessageData,
-            sender_avatar_url: rawMessageData.sender_id === currentUser.id
-              ? currentUser.avatar_url
-              : rawMessageData.sender_id === targetUserId
-                ? targetUser?.avatar_url // targetUser might not be loaded yet, though unlikely for WS message
-                : undefined, // Or a default avatar
-          };
-          // New messages are appended to the end (bottom of the screen)
-          setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
+          if (rawMessageData.type === 'direct' &&
+              ((rawMessageData.sender_id === currentUser.id && rawMessageData.receiver_id === targetUserId) ||
+               (rawMessageData.sender_id === targetUserId && rawMessageData.receiver_id === currentUser.id))) {
+            
+            const messageWithAvatar: Message = {
+              ...rawMessageData,
+              sender_avatar_url: rawMessageData.sender_id === currentUser.id
+                ? currentUser.avatar_url
+                : rawMessageData.sender_id === targetUserId
+                  ? targetUser?.avatar_url
+                  : undefined,
+            };
+            setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
+          }
+        } catch (e) {
+          console.error('Error processing WebSocket message:', e);
         }
-      } catch (e) {
-        console.error('Error processing WebSocket message:', e);
-      }
+      };
+
+      ws.onerror = (errorEvent) => {
+        console.error('WebSocket error event. Check browser console for more details. Event:', errorEvent);
+        setIsWsConnected(false);
+        
+        if (retryCount < MAX_RETRIES) {
+          const delay = RETRY_DELAY * (retryCount + 1);
+          console.log(`WebSocket connection error. Retrying in ${delay / 1000}s... (Attempt ${retryCount + 1})`);
+          toast.error(`Chat connection error. Retrying (attempt ${retryCount + 1})...`);
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, delay);
+        } else {
+          console.error('WebSocket connection failed after max retries.');
+          setError('Failed to connect to chat server after multiple attempts. Real-time updates disabled.');
+          toast.error('Failed to connect to chat after multiple retries.');
+        }
+      };
+
+      ws.onclose = (closeEvent) => {
+        console.log(`WebSocket disconnected. Code: ${closeEvent.code}, Reason: "${closeEvent.reason}", Clean: ${closeEvent.wasClean}`);
+        setIsWsConnected(false);
+        // Note: Retries for initial connection failures are handled in onerror.
+        // This onclose might indicate an established connection was lost.
+        // If !closeEvent.wasClean and webSocketRef.current === ws (meaning it's not an old, cleaned-up instance),
+        // one might consider further retry logic here, but it can get complex.
+        // For now, we rely on onerror for connection retries.
+        if (!closeEvent.wasClean && webSocketRef.current === ws) {
+             // toast.error('Chat disconnected unexpectedly.'); // Optional: notify user
+        }
+      };
     };
 
-    webSocketRef.current.onerror = (errorEvent) => {
-      console.error('WebSocket error event. Check browser console for more details. Event:', errorEvent);
-      setError('WebSocket connection error. Real-time updates may not work.');
-      toast.error('Chat connection error.');
-      setIsWsConnected(false);
-    };
+    // Attempt to setup WebSocket
+    setupWebSocket();
 
-    webSocketRef.current.onclose = (closeEvent) => {
-      console.log('WebSocket disconnected:', closeEvent.reason, closeEvent.code);
-      setIsWsConnected(false);
-      if (!closeEvent.wasClean) {
-        // toast.error('Chat disconnected. Attempting to reconnect...');
-        // Implement reconnection logic if desired
-      }
-    };
-
+    // Cleanup function: This runs when dependencies change or component unmounts.
     return () => {
       if (webSocketRef.current) {
-        console.log('Closing WebSocket connection');
+        console.log('Cleaning up WebSocket connection (useEffect cleanup).');
+        // Remove event listeners to prevent them from firing after cleanup
+        webSocketRef.current.onopen = null;
+        webSocketRef.current.onmessage = null;
+        webSocketRef.current.onerror = null;
+        webSocketRef.current.onclose = null;
+        
         webSocketRef.current.close();
+        webSocketRef.current = null; // Ensure the ref is cleared
       }
     };
-  }, [targetUserId, currentUser, hydrated, isAuthenticated, targetUser]); // Dependencies for WS connection and message handling
+  }, [currentUser, targetUserId, hydrated, isAuthenticated, targetUser, retryCount]); // Added retryCount to dependencies
 
   const handleSendMessage = (content: string) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
