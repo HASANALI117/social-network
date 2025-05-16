@@ -3,19 +3,8 @@
 import { Heading } from '@/components/ui/heading';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { useRequest } from '@/hooks/useRequest';
-import { useEffect } from 'react';
-import { User } from '@/types/User';
 
 export default function HomePage() {
-  const { isLoading, data, error, get } = useRequest<User>();
-
-  useEffect(() => {
-    get('/api/users', (data) => {
-      console.log(data);
-    });
-  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

@@ -20,7 +20,9 @@ export default function ChatPage() {
   const router = useRouter();
   const targetUserId = params.id as string;
 
-  const currentUser = useUserStore((state) => state.user);
+  const currentUserId = useUserStore((state) => state.user?.id);
+  const currentUserAvatarUrl = useUserStore((state) => state.user?.avatar_url);
+  const currentUserUsername = useUserStore((state) => state.user?.username);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const hydrated = useUserStore((state) => state.hydrated);
 
@@ -59,7 +61,7 @@ export default function ChatPage() {
           setTargetUser(data);
           // Simplified frontend check for chat restrictions
           // Backend will ultimately enforce this.
-          if (data.is_private && !data.is_followed && data.id !== currentUser?.id) {
+          if (data.is_private && !data.is_followed && data.id !== currentUserId) {
             // More complex logic might be needed if "followed_by_target_user" is available
             // For now, if private and not followed by current user, assume restricted.
             // setCanChat(false); // This might be too restrictive, rely on backend errors for now
@@ -68,7 +70,7 @@ export default function ChatPage() {
       };
       fetchUserProfile();
     }
-  }, [targetUserId, profileRequest.get, hydrated, isAuthenticated, currentUser?.id]);
+  }, [targetUserId, profileRequest.get, hydrated, isAuthenticated, currentUserId]);
 
   // Effect to handle profile loading errors
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function ChatPage() {
 
 
   const fetchMessageHistory = useCallback(async (currentOffset: number, loadMore = false) => {
-    if (!targetUserId || !currentUser?.id) return;
+    if (!targetUserId || !currentUserId) return;
     if (loadMore) setIsLoadingMore(true);
     else setIsLoadingHistory(true);
 
@@ -89,8 +91,8 @@ export default function ChatPage() {
       const rawMessages: Message[] = (data as any)?.messages || [];
       const messagesWithAvatars = rawMessages.map(msg => ({
         ...msg,
-        sender_avatar_url: msg.sender_id === currentUser?.id
-          ? currentUser?.avatar_url
+        sender_avatar_url: msg.sender_id === currentUserId
+          ? currentUserAvatarUrl
           : msg.sender_id === targetUser?.id
             ? targetUser?.avatar_url
             : undefined, // Or a default avatar
@@ -110,7 +112,7 @@ export default function ChatPage() {
     }
     if (loadMore) setIsLoadingMore(false);
     else setIsLoadingHistory(false);
-  }, [targetUserId, currentUser, targetUser, messagesRequest.get]);
+  }, [targetUserId, currentUserId, currentUserAvatarUrl, targetUser, messagesRequest.get]);
 
   // Effect to handle messages loading errors
   useEffect(() => {
@@ -122,18 +124,18 @@ export default function ChatPage() {
 
   // Initial message load
   useEffect(() => {
-    if (targetUserId && currentUser?.id && hydrated) {
+    if (targetUserId && currentUserId && hydrated) {
       setMessages([]); // Clear previous messages if targetUserId changes
       setOffset(0);
       setHasMoreMessages(true);
       fetchMessageHistory(0);
     }
-  }, [targetUserId, currentUser?.id, fetchMessageHistory, hydrated]); // fetchMessageHistory depends on messagesRequest.get
+  }, [targetUserId, currentUserId, fetchMessageHistory, hydrated]); // fetchMessageHistory depends on messagesRequest.get
 
   // WebSocket connection
   useEffect(() => {
     // Ensure all dependencies for connection are met
-    if (!currentUser?.id || !targetUserId || !hydrated || !isAuthenticated) {
+    if (!currentUserId || !targetUserId || !hydrated || !isAuthenticated) {
       console.log('WebSocket connection prerequisites not met (currentUser, targetUserId, hydrated, or isAuthenticated missing).');
       // If there's an existing WebSocket connection, close it as prerequisites are no longer met.
       if (webSocketRef.current) {
@@ -151,7 +153,7 @@ export default function ChatPage() {
     const setupWebSocket = () => {
       const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host);
-      const wsUrl = `${wsScheme}//${wsHost}/ws?id=${currentUser.id}`;
+      const wsUrl = `${wsScheme}//${wsHost}/ws?id=${currentUserId}`;
 
       console.log(`Attempting to connect to WebSocket: ${wsUrl} (Attempt: ${retryCount + 1}/${MAX_RETRIES + 1})`);
       const ws = new WebSocket(wsUrl);
@@ -170,13 +172,13 @@ export default function ChatPage() {
           console.log('WebSocket message received:', rawMessageData);
 
           if (rawMessageData.type === 'direct' &&
-              ((rawMessageData.sender_id === currentUser.id && rawMessageData.receiver_id === targetUserId) ||
-               (rawMessageData.sender_id === targetUserId && rawMessageData.receiver_id === currentUser.id))) {
+              ((rawMessageData.sender_id === currentUserId && rawMessageData.receiver_id === targetUserId) ||
+               (rawMessageData.sender_id === targetUserId && rawMessageData.receiver_id === currentUserId))) {
             
             const messageWithAvatar: Message = {
               ...rawMessageData,
-              sender_avatar_url: rawMessageData.sender_id === currentUser.id
-                ? currentUser.avatar_url
+              sender_avatar_url: rawMessageData.sender_id === currentUserId
+                ? currentUserAvatarUrl
                 : rawMessageData.sender_id === targetUserId
                   ? targetUser?.avatar_url
                   : undefined,
@@ -237,14 +239,14 @@ export default function ChatPage() {
         webSocketRef.current = null; // Ensure the ref is cleared
       }
     };
-  }, [currentUser, targetUserId, hydrated, isAuthenticated, targetUser, retryCount]); // Added retryCount to dependencies
+  }, [currentUserId, currentUserAvatarUrl, targetUserId, hydrated, isAuthenticated, targetUser, retryCount]); // Added retryCount and other currentUser properties
 
   const handleSendMessage = (content: string) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
       toast.error('Not connected to chat server. Please wait or try refreshing.');
       return;
     }
-    if (!currentUser?.id || !targetUserId) {
+    if (!currentUserId || !targetUserId) {
       toast.error('User information missing.');
       return;
     }
@@ -252,14 +254,14 @@ export default function ChatPage() {
     setIsSendingMessage(true);
     const message: Message = {
       type: 'direct',
-      sender_id: currentUser.id,
+      sender_id: currentUserId!, // currentUserId is checked above
       receiver_id: targetUserId,
       content: content,
       created_at: new Date().toISOString(),
       // Optional: Add sender_username and sender_avatar_url if available client-side
       // Or rely on backend to populate these if needed for the receiver
-      sender_username: currentUser.username,
-      sender_avatar_url: currentUser.avatar_url
+      sender_username: currentUserUsername!, // Assuming username is also guaranteed if id is present
+      sender_avatar_url: currentUserAvatarUrl // Can be null/undefined if user has no avatar
     };
 
     try {
@@ -299,7 +301,7 @@ export default function ChatPage() {
       {error && <div className="p-2 text-center text-red-400 bg-red-900">{error}</div>}
       <MessageList
         messages={messages}
-        currentUserId={currentUser!.id} // currentUser is checked by isAuthenticated
+        currentUserId={currentUserId!} // currentUserId is checked by isAuthenticated logic path
         onLoadMore={handleLoadMore}
         hasMoreMessages={hasMoreMessages}
         isLoadingMore={isLoadingMore || (messagesRequest.isLoading && offset > 0)}

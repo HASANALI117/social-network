@@ -9,6 +9,7 @@ import { AppNavbar } from '@/components/layout/navbar';
 import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
+import { GlobalWebSocketProvider } from '@/contexts/GlobalWebSocketContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -38,19 +39,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SidebarLayout navbar={<AppNavbar />} sidebar={<AppSidebar />}>
-          {children}
-        </SidebarLayout>
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#333',
-              color: '#fff',
-            },
-          }}
-        />
+        <GlobalWebSocketProvider>
+          <SidebarLayout navbar={<AppNavbar />} sidebar={<AppSidebar />}>
+            {children}
+          </SidebarLayout>
+          <Toaster position="bottom-right" />
+        </GlobalWebSocketProvider>
       </body>
     </html>
   );
