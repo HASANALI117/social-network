@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useRequest } from '@/hooks/useRequest';
-import { GroupEvent, GroupEventResponseOption } from '@/types/GroupEvent';
+import { GroupEventDetail, IndividualEventResponse } from '@/types/GroupEvent';
 import UserCard from '@/components/profile/UserCard'; // Default import
 import UserList from '@/components/profile/UserList'; // Default import
 import { Heading } from '@/components/ui/heading';
@@ -10,21 +10,24 @@ import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 // Using Text for simpler inline errors instead of modal Alert for now
 // import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react'; // Removed use
 import { useUserStore } from '@/store/useUserStore';
 import { User, UserBasicInfo } from '@/types/User';
 
-interface GroupEventDetailPageProps {
-  params: {
+// GroupEventDetailPageProps removed as params are now from useParams() via React.use()
+export default function GroupEventDetailPage() { // Removed params from props
+  // Define expected params structure
+  interface PageRouteParams {
     id: string;
     eventId: string;
-  };
-}
-
-export default function GroupEventDetailPage({ params }: GroupEventDetailPageProps) {
-  const { id: groupId, eventId } = params;
+    [key: string]: string; // Add index signature
+  }
+  // Get params directly from useParams with the defined structure
+  const params = useParams<PageRouteParams>();
+  const groupId = params.id; // Now correctly typed from PageRouteParams
+  const eventId = params.eventId; // Now correctly typed from PageRouteParams
   const { user } = useUserStore();
-  const [optimisticEvent, setOptimisticEvent] = useState<GroupEvent | null>(null);
+  const [optimisticEvent, setOptimisticEvent] = useState<GroupEventDetail | null>(null);
 
   // useRequest for fetching event details
   const {
@@ -32,19 +35,25 @@ export default function GroupEventDetailPage({ params }: GroupEventDetailPagePro
     data: eventData,
     error: fetchError,
     isLoading: isLoadingEvent
-  } = useRequest<GroupEvent>();
+  } = useRequest<GroupEventDetail>();
 
   // useRequest for submitting response
   const {
     post: postResponse,
     error: responseError,
     isLoading: isResponding
-  } = useRequest<GroupEvent>();
+  } = useRequest<GroupEventDetail>();
 
   const loadEventDetails = useCallback(async () => {
     if (groupId && eventId) {
       const fetchedEvent = await fetchEvent(`/api/groups/${groupId}/events/${eventId}`);
       if (fetchedEvent) {
+        // Ensure responses is an array
+        fetchedEvent.responses = Array.isArray(fetchedEvent.responses) ? fetchedEvent.responses : [];
+        // Initialize response_counts if not present or not an object
+        fetchedEvent.response_counts = typeof fetchedEvent.response_counts === 'object' && fetchedEvent.response_counts !== null
+            ? fetchedEvent.response_counts
+            : { going: 0, not_going: 0 }; // Default if not provided
         setOptimisticEvent(fetchedEvent);
       }
     }
@@ -61,73 +70,80 @@ export default function GroupEventDetailPage({ params }: GroupEventDetailPagePro
     }
   }, [eventData]);
 
-  const handleResponse = async (optionId: string) => {
+  const handleResponse = async (newOptionKey: 'going' | 'not_going') => {
     if (!user || !optimisticEvent) return;
 
-    const originalEvent = JSON.parse(JSON.stringify(optimisticEvent)) as GroupEvent; // For rollback
-    let tempEvent = JSON.parse(JSON.stringify(optimisticEvent)) as GroupEvent;
+    const originalEvent = JSON.parse(JSON.stringify(optimisticEvent)) as GroupEventDetail; // For rollback
+    let tempEvent = JSON.parse(JSON.stringify(optimisticEvent)) as GroupEventDetail; // For optimistic update
 
-    const currentOptionId = tempEvent.current_user_response_id;
-    
-    // Update counts and user lists optimistically
-    tempEvent.options = tempEvent.options.map(opt => {
-      let newUsers = opt.users ? [...opt.users] : [];
-      let newCount = opt.count;
+    const oldOptionKey = tempEvent.current_user_response_option_id;
 
-      if (opt.id === currentOptionId) { // User is changing from this option
-        newCount = Math.max(0, newCount - 1);
-        newUsers = newUsers.filter(u => u.user_id !== user.id);
-      }
-      if (opt.id === optionId) { // User is choosing this new option
-        if (currentOptionId !== optionId) { // Only add if not already part of it (or if it's a new response)
-            newCount += 1;
-            // Ensure user is not duplicated if somehow already in list
-            if (!newUsers.find(u => u.user_id === user.id)) {
-                 newUsers.push({ user_id: user.id, username: user.username, first_name: user.first_name, last_name: user.last_name, avatar_url: user.avatar_url });
-            }
-        }
-      }
-      return { ...opt, count: newCount, users: newUsers };
-    });
+    // If user clicks the same option they already selected, do nothing
+    if (oldOptionKey === newOptionKey) {
+        return;
+    }
+
+    // Optimistically update response_counts
+    if (oldOptionKey) {
+        tempEvent.response_counts[oldOptionKey] = Math.max(0, (tempEvent.response_counts[oldOptionKey] || 0) - 1);
+    }
+    tempEvent.response_counts[newOptionKey] = (tempEvent.response_counts[newOptionKey] || 0) + 1;
+
+    // Optimistically update responses array
+    const newUserResponse: IndividualEventResponse = {
+        user_id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        avatar_url: user.avatar_url,
+        response: newOptionKey,
+        updated_at: new Date().toISOString(),
+    };
+    tempEvent.responses = tempEvent.responses.filter(resp => resp.user_id !== user.id);
+    tempEvent.responses.push(newUserResponse);
+
+    // Optimistically update current user's response
+    tempEvent.current_user_response_option_id = newOptionKey;
     
-    tempEvent.current_user_response_id = optionId;
-    setOptimisticEvent(tempEvent);
+    setOptimisticEvent(tempEvent); // Apply optimistic update to UI
 
     try {
-      const updatedDataFromServer = await postResponse(
+      // Submit the response to the server
+      const submissionResult = await postResponse(
         `/api/groups/${groupId}/events/${eventId}/responses`,
-        { option_id: optionId }
+        { response: newOptionKey }
       );
-      if (updatedDataFromServer) {
-        setOptimisticEvent(updatedDataFromServer); // Sync with server state
-      } else if (responseError) { // Explicitly check for error from postResponse
-        setOptimisticEvent(originalEvent); // Rollback on error
-        console.error("Failed to submit response:", responseError);
+
+      if (submissionResult) {
+        // If submission is successful, reload event details to get the canonical state from server
+        // This ensures UI consistency if the POST response itself is minimal or doesn't return the full event detail.
+        await loadEventDetails();
+      } else if (responseError) {
+        // If postResponse hook indicates an error (e.g., network issue before server responds, or non-2xx status handled by hook)
+        console.error("Failed to submit response (hook error), rolling back:", responseError);
+        setOptimisticEvent(originalEvent);
       }
-    } catch (err) { // Catch any other errors during post
-      setOptimisticEvent(originalEvent); // Rollback
-      console.error("Failed to submit response:", err);
+      // Note: If postResponse throws an error (e.g. network failure), it will be caught by the catch block.
+    } catch (err) {
+      // Catch any error during submission or subsequent loadEventDetails
+      console.error("Error during response submission or re-fetch, rolling back:", err);
+      setOptimisticEvent(originalEvent);
     }
   };
   
-  // Helper to map UserBasicInfo to User for UserCard/UserList
-  // UserCard/UserList expect `id` not `user_id`.
-  // User type has more fields, but UserCard primarily uses these.
-  const mapBasicInfoToUser = (basicInfo: UserBasicInfo): User => ({
-    id: basicInfo.user_id, // Map user_id to id
-    username: basicInfo.username,
-    first_name: basicInfo.first_name,
-    last_name: basicInfo.last_name,
-    avatar_url: basicInfo.avatar_url,
-    // Add dummy values for other required User fields if necessary for UserCard/UserList
-    // UserCard primarily uses id, username, first_name, last_name, avatar_url
+  // Helper to map IndividualEventResponse (which now contains direct user fields) to User for UserCard/UserList
+  const mapIndividualResponseToUser = (responseItem: IndividualEventResponse): User => ({
+    id: responseItem.user_id, // Map user_id to id
+    username: responseItem.username,
+    first_name: responseItem.first_name || '', // Provide default if optional
+    last_name: responseItem.last_name || '',   // Provide default if optional
+    avatar_url: responseItem.avatar_url,
+    // Add dummy values for other required User fields if necessary
     email: '',
     birth_date: '',
     is_private: false,
-    created_at: '',
-    updated_at: '',
-    // followers_count and following_count are not on the base User type
-    // and not strictly needed by UserCard as per its implementation.
+    created_at: '', // This could be responseItem.updated_at if relevant
+    updated_at: responseItem.updated_at,
   });
 
 
@@ -135,7 +151,12 @@ export default function GroupEventDetailPage({ params }: GroupEventDetailPagePro
   if (fetchError) return <Text className="text-red-500">Error loading event: {fetchError.message}</Text>;
   if (!optimisticEvent) return <Text>Event not found.</Text>;
 
-  const { title, description, event_time, creator_info, options } = optimisticEvent;
+  const { title, description, event_time, creator_info, creator_name, responses = [], response_counts = {}, current_user_response_option_id } = optimisticEvent;
+
+  const EVENT_RESPONSE_OPTIONS = [
+    { id: 'going' as const, text: 'Going' },
+    { id: 'not_going' as const, text: 'Not Going' },
+  ];
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -148,21 +169,26 @@ export default function GroupEventDetailPage({ params }: GroupEventDetailPagePro
         </Text>
         <div className="mb-4">
           <Text className="font-semibold mb-1">Created by:</Text>
-          {creator_info && <UserCard user={mapBasicInfoToUser(creator_info)} />}
+          {creator_info ? <UserCard user={mapIndividualResponseToUser(creator_info as unknown as IndividualEventResponse)} /> : <Text>{creator_name || optimisticEvent.creator_id || 'Unknown Creator'}</Text>}
         </div>
       </div>
 
       <div className="space-y-2">
         <Text className="font-semibold">Your Response:</Text>
         <div className="flex space-x-2">
-          {options.map(option => {
-            const isSelected = optimisticEvent.current_user_response_id === option.id;
+          {EVENT_RESPONSE_OPTIONS.map(option => {
+            const isSelected = current_user_response_option_id === option.id;
+            // Construct button props, excluding the key for spreading
+            const buttonDisplayProps = {
+              ...(isSelected ? { color: 'blue' as const } : { outline: true as const }),
+            };
+
             return (
               <Button
-                key={option.id}
-                onClick={() => handleResponse(option.id)}
-                {...(isSelected ? { color: 'blue' as const } : { outline: true as const })}
+                key={option.id} // Pass key directly
+                onClick={() => handleResponse(option.id as 'going' | 'not_going')}
                 disabled={isResponding || isLoadingEvent}
+                {...buttonDisplayProps} // Spread other props
               >
                 {option.text}
               </Button>
@@ -173,16 +199,22 @@ export default function GroupEventDetailPage({ params }: GroupEventDetailPagePro
       </div>
 
       <div className="space-y-4">
-        {options.map(option => (
-          <div key={option.id} className="bg-gray-50 p-4 rounded-lg">
-            <Heading level={3} className="mb-2 text-xl font-semibold">{option.text} ({option.count})</Heading>
-            {option.users && option.users.length > 0 ? (
-              <UserList users={option.users.map(mapBasicInfoToUser)} />
-            ) : (
-              <Text className="text-sm text-gray-500">No one has responded with '{option.text}' yet.</Text>
-            )}
-          </div>
-        ))}
+        {EVENT_RESPONSE_OPTIONS.map(displayOption => {
+          const optionKey = displayOption.id;
+          const count = response_counts[optionKey] || 0;
+          const usersForOption = responses.filter(r => r.response === optionKey);
+          
+          return (
+            <div key={optionKey} className="bg-gray-50 p-4 rounded-lg">
+              <Heading level={3} className="mb-2 text-xl font-semibold">{displayOption.text} ({count})</Heading>
+              {usersForOption.length > 0 ? (
+                <UserList users={usersForOption.map(r => mapIndividualResponseToUser(r))} />
+              ) : (
+                <Text className="text-sm text-gray-500">No one has responded with '{displayOption.text}' yet.</Text>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
