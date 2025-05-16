@@ -107,7 +107,7 @@ export default function ChatPage() {
     }
     if (loadMore) setIsLoadingMore(false);
     else setIsLoadingHistory(false);
-  }, [targetUserId, currentUser?.id, messagesRequest.get]);
+  }, [targetUserId, currentUser, targetUser, messagesRequest.get]);
 
   // Effect to handle messages loading errors
   useEffect(() => {
@@ -197,7 +197,7 @@ export default function ChatPage() {
         webSocketRef.current.close();
       }
     };
-  }, [targetUserId, currentUser?.id, hydrated, isAuthenticated]); // currentUser.id ensures it reconnects if user changes
+  }, [targetUserId, currentUser, hydrated, isAuthenticated, targetUser]); // Dependencies for WS connection and message handling
 
   const handleSendMessage = (content: string) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
@@ -227,7 +227,6 @@ export default function ChatPage() {
       // Optimistically add to UI. New messages are appended to the end.
       // The message object already includes sender_avatar_url from currentUser.
       // This will be displayed at the bottom.
-      setMessages(prevMessages => [...prevMessages, message]);
     } catch (e) {
       console.error('Failed to send message via WebSocket:', e);
       toast.error('Failed to send message.');
