@@ -10,6 +10,8 @@ import ProfileHeader from '@/components/profile/ProfileHeader';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import PostList from '@/components/common/PostList';
 import UserList from '@/components/profile/UserList';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function UserProfilePage() {
   const params = useParams();
@@ -175,6 +177,14 @@ export default function UserProfilePage() {
         pageType="dynamic"
       />
       {followError && !isLoadingFollowAction && <p className="text-red-500 mt-2 text-center">Error: {followError.message}</p>}
+
+      {!isOwnProfile && userProfile && (
+        <div className="mt-4 flex justify-center"> {/* Or other appropriate placement */}
+          <Link href={`/chat/${userProfile.id}`} passHref>
+            <Button outline>Chat with {userProfile.first_name}</Button>
+          </Link>
+        </div>
+      )}
 
       {isRestrictedView ? (
         <div className="text-center py-10">
