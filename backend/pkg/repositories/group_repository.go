@@ -64,7 +64,8 @@ type GroupRepository interface {
 	UpdateJoinRequestStatus(requestID, status string) error
 	ListPendingJoinRequestsForGroup(groupID string) ([]*models.GroupJoinRequest, error) // List requests for a group (for creator/admins)
 	DeleteJoinRequest(requestID string) error
-
+	GetGroupsByUserIDWithCounts(userID string) ([]*types.GroupDetailResponse, error) // New method
+	
 	// TODO: Add methods for group messages if needed here, or in a separate repo
 }
 
@@ -1070,4 +1071,86 @@ func (r *groupRepository) DeleteJoinRequest(requestID string) error {
 		return ErrJoinRequestNotFound
 	}
 	return nil
+}
+// GetGroupsByUserIDWithCounts retrieves groups a user is a member of, with member and post counts.
+func (r *groupRepository) GetGroupsByUserIDWithCounts(userID string) ([]*types.GroupDetailResponse, error) {
+	fmt.Printf("GetGroupsByUserIDWithCounts: userID: %s\n", userID) // Logging userID
+	query := `
+		SELECT
+			g.id,
+			g.name,
+			g.description,
+			g.creator_id, 
+			g.created_at,
+			g.updated_at,
+			g.avatar_url,
+			(SELECT COUNT(*) FROM group_members gm_count WHERE gm_count.group_id = g.id) as member_count,
+			(SELECT COUNT(*) FROM posts p WHERE p.group_id = g.id) as post_count,
+			(SELECT COUNT(*) FROM group_events e WHERE e.group_id = g.id) as event_count
+		FROM groups g
+		JOIN group_members gm ON g.id = gm.group_id
+		WHERE gm.user_id = ?
+		ORDER BY g.name;
+	`
+	fmt.Printf("GetGroupsByUserIDWithCounts: SQL Query: %s\n", query) // Logging SQL query
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		fmt.Printf("Error executing query for userID %s: %v\n", userID, err) // Logging query error
+		return nil, fmt.Errorf("failed to query groups for user %s: %w", userID, err)
+	}
+	defer rows.Close()
+
+	var groups []*types.GroupDetailResponse
+	for rows.Next() {
+		var group types.GroupDetailResponse
+		var creatorID string
+		var createdAt, updatedAt, avatarURL sql.NullString
+
+		err := rows.Scan(
+			&group.ID,
+			&group.Name,
+			&group.Description,
+			&creatorID, // Scan creator_id
+			&createdAt,
+			&updatedAt,
+			&avatarURL,
+			&group.MembersCount,
+			&group.PostsCount,
+			&group.EventsCount,
+		)
+		if err != nil {
+			fmt.Printf("Error scanning row for userID %s: %v\n", userID, err) // Logging scan error
+			return nil, fmt.Errorf("failed to scan group row for user %s: %w", userID, err)
+		}
+
+		// Handle nullable fields
+		if avatarURL.Valid {
+			group.AvatarURL = avatarURL.String
+		}
+		// CreatorInfo is intentionally left empty/zeroed as per decision.
+		// group.CreatorInfo.UserID = creatorID; // If we were to set just the ID
+
+		parseTime := func(s sql.NullString, target *time.Time) {
+			if s.Valid {
+				parsedTime, parseErr := time.Parse(time.RFC3339, s.String)
+				if parseErr == nil {
+					*target = parsedTime
+				} else {
+					// Consider logging this warning more formally if a logger is available
+					// log.Printf("Warning: Failed to parse time string '%s': %v", s.String, parseErr)
+					fmt.Printf("Warning: Failed to parse time string '%s': %v\n", s.String, parseErr) // Keep fmt.Printf if no logger
+				}
+			}
+		}
+		parseTime(createdAt, &group.CreatedAt)
+		parseTime(updatedAt, &group.UpdatedAt)
+		
+		groups = append(groups, &group)
+	}
+
+	if err = rows.Err(); err != nil {
+		fmt.Printf("Error after iterating rows for userID %s: %v\n", userID, err) // Logging rows.Err()
+		return nil, fmt.Errorf("error after iterating group rows for user %s: %w", userID, err)
+	}
+	return groups, nil
 }

@@ -56,7 +56,7 @@ export default function GroupsPage() {
       }
     } else if (tabKeyToLoad === 'my-groups') {
       if (user?.id) {
-        url += `?member=true&userId=${user.id}`;
+        url = '/api/users/me/groups';
       } else {
         setIsLoading(false);
         setMyGroups([]); // Clear my groups if user not available
@@ -193,7 +193,7 @@ export default function GroupsPage() {
           For now, I will proceed as if Tabs component is updated.
           If Tabs component is NOT updated, the `content` for each tab is rendered by Tabs itself.
       */}
-      <Tabs tabs={tabDefinitions} initialTab={initialTabIndex} />
+      <Tabs tabs={tabDefinitions} initialTab={initialTabIndex} onTabChange={handleTabSelection} />
       {/* Content is now rendered by the Tabs component via tabDefinitions.content */}
       {/* So, the explicit rendering block below is no longer needed here. */}
     </div>

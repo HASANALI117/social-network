@@ -44,7 +44,29 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	log.Printf("UserHandler: Method=%s, Path=%s, Parts=%v\n", r.Method, r.URL.Path, parts)
 
 	// Route based on the number of path parts after /api/users/
-	if len(parts) == 1 {
+	// parts[0] can be a user ID, "me", "search", or empty if path is just /api/users/
+	if len(parts) >= 1 && parts[0] == "me" { // Handle /api/users/me/* routes
+		if len(parts) >= 2 {
+			action := parts[1]
+			switch action {
+			case "groups":
+				if r.Method == http.MethodGet {
+					return h.ListMyGroups(w, r) // New method
+				}
+				return httperr.NewMethodNotAllowed(nil, "Method GET required for /users/me/groups")
+			// case "follow-requests": // Example if handled here, though it's likely separate
+			// if h.followRequestHandler != nil { // Assuming a separate handler for this
+			// return h.followRequestHandler.ServeHTTP(w, r)
+			// }
+			// return httperr.NewInternalServerError(nil, "Follow request handler not configured")
+			default:
+				return httperr.NewNotFound(nil, "Unknown action for /users/me/: "+action)
+			}
+		} else {
+			// Path is just /api/users/me which is not a valid endpoint
+			return httperr.NewNotFound(nil, "Invalid path /api/users/me")
+		}
+	} else if len(parts) == 1 {
 		id := parts[0]
 		if id == "" { // Path is /api/users/
 			switch r.Method {
@@ -446,4 +468,30 @@ func (h *UserHandler) SearchUsersHandler(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(users)
 	return nil
+}
+
+// ListMyGroups handles GET /api/users/me/groups
+func (h *UserHandler) ListMyGroups(w http.ResponseWriter, r *http.Request) error {
+	currentUser, err := helpers.GetUserFromSession(r, h.authService)
+	if err != nil {
+		if errors.Is(err, helpers.ErrInvalidSession) {
+			return httperr.NewUnauthorized(err, "Invalid session")
+		}
+		log.Printf("Error getting current user from session for ListMyGroups: %v", err)
+		return httperr.NewInternalServerError(err, "Failed to get current user from session")
+	}
+
+	groups, err := h.userService.ListUserGroups(currentUser.ID)
+	if err != nil {
+		// The service layer logs specific errors and returns a generic one.
+		log.Printf("Error retrieving user groups for user %s in handler: %v", currentUser.ID, err)
+		return httperr.NewInternalServerError(err, "Failed to retrieve user groups")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Return wrapped array as confirmed in the plan
+	return json.NewEncoder(w).Encode(map[string]interface{}{
+		"groups": groups,
+	})
 }

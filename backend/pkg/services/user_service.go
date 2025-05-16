@@ -53,6 +53,7 @@ type UserService interface {
 	UpdatePrivacy(userID string, isPrivate bool) error                           // Added method
 	GetUserProfile(viewerID, profileUserID string) (*UserProfileResponse, error) // Added method
 	SearchUsers(query string) ([]types.UserSearchResultDTO, error)
+	ListUserGroups(userID string) ([]*types.GroupDetailResponse, error) // New method
 }
 
 // userService implements UserService interface
@@ -60,14 +61,16 @@ type userService struct {
 	userRepo        repositories.UserRepository
 	postService     PostService     // Added PostService dependency
 	followerService FollowerService // Added FollowerService dependency
+	groupRepo       repositories.GroupRepository // New dependency
 }
 
 // NewUserService creates a new UserService
-func NewUserService(userRepo repositories.UserRepository, postService PostService, followerService FollowerService) UserService {
+func NewUserService(userRepo repositories.UserRepository, postService PostService, followerService FollowerService, groupRepo repositories.GroupRepository) UserService {
 	return &userService{
 		userRepo:        userRepo,
 		postService:     postService,
 		followerService: followerService,
+		groupRepo:       groupRepo, // Initialize new dependency
 	}
 }
 
@@ -449,4 +452,18 @@ func (s *userService) SearchUsers(query string) ([]types.UserSearchResultDTO, er
 	}
 
 	return users, nil
+}
+
+// ListUserGroups retrieves the groups a user is a member of.
+func (s *userService) ListUserGroups(userID string) ([]*types.GroupDetailResponse, error) {
+	groups, err := s.groupRepo.GetGroupsByUserIDWithCounts(userID)
+	if err != nil {
+		// Log the error internally
+		log.Printf("Error fetching groups for user %s from repository: %v", userID, err)
+		// Return a generic error or map specific repository errors if needed
+		return nil, fmt.Errorf("could not retrieve groups for user")
+	}
+	// CreatorInfo will be empty as per decision in the plan.
+	// If it needed population, this service method would iterate groups and fetch/assign CreatorInfo.
+	return groups, nil
 }

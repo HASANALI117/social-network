@@ -10,6 +10,7 @@ interface Tab {
 interface TabsProps {
   tabs: Tab[];
   initialTab?: number;
+  onTabChange?: (index: number) => void; // Add onTabChange prop
 }
 
 interface PanelProps {
@@ -27,8 +28,15 @@ const Panel: FC<PanelProps> = ({ children, ...props }) => {
 };
 
 // The main Tabs functional component
-const TabsFC: FC<TabsProps> = ({ tabs, initialTab = 0 }) => {
+const TabsFC: FC<TabsProps> = ({ tabs, initialTab = 0, onTabChange }) => { // Destructure onTabChange
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  const handleTabClick = (index: number) => {
+    setActiveTab(index);
+    if (onTabChange) {
+      onTabChange(index);
+    }
+  };
 
   return (
     <div>
@@ -37,7 +45,7 @@ const TabsFC: FC<TabsProps> = ({ tabs, initialTab = 0 }) => {
           {tabs.map((tab, index) => (
             <button
               key={tab.label}
-              onClick={() => setActiveTab(index)}
+              onClick={() => handleTabClick(index)} // Call new handler
               className={`
                 ${index === activeTab
                   ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-300'
