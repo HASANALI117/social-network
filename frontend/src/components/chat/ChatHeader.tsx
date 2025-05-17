@@ -1,42 +1,70 @@
 // frontend/src/components/chat/ChatHeader.tsx
-import { UserProfile } from '@/types/User'; // Assuming UserProfile contains necessary details
+import { UserProfile } from '@/types/User';
+import { Group } from '@/types/Group';
 import { Avatar } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext';
+import { UsersIcon } from '@heroicons/react/24/outline';
 
 interface ChatHeaderProps {
-  targetUser: UserProfile | null; // Or a simpler User type if full profile isn't needed
+  type: 'direct' | 'group';
+  target: UserProfile | Group | null;
 }
 
-export default function ChatHeader({ targetUser }: ChatHeaderProps) {
+export default function ChatHeader({ type, target }: ChatHeaderProps) {
   const { onlineUserIds } = useGlobalWebSocket();
-  if (!targetUser) {
+  
+  if (!target) {
     return (
       <div className="sticky top-0 z-10 p-4 border-b border-gray-700 bg-gray-900 text-white text-center">
-        Loading user...
+        Loading {type === 'group' ? 'group' : 'user'}...
       </div>
     );
   }
 
-  const displayName = `${targetUser.first_name} ${targetUser.last_name}`;
+  const isGroup = type === 'group';
+  const group = isGroup ? target as Group : null;
+  const user = !isGroup ? target as UserProfile : null;
+
+  const displayName = isGroup
+    ? group?.name || 'Unnamed Group'
+    : user ? `${user.first_name} ${user.last_name}` : 'Unknown User';
+
+  const getInitials = () => {
+    if (isGroup) {
+      return (group?.name || '').charAt(0).toUpperCase();
+    }
+    return user ? `${user.first_name?.[0]?.toUpperCase() ?? ''}${user.last_name?.[0]?.toUpperCase() ?? ''}` : '';
+  };
 
   return (
     <div className="sticky top-0 z-10 bg-gray-900 p-4 flex items-center border-b border-gray-700 space-x-3">
       <Avatar
         className="w-10 h-10"
-        src={targetUser.avatar_url}
+        src={isGroup ? group?.avatar_url : user?.avatar_url}
         alt={displayName}
-        initials={`${targetUser.first_name?.[0]?.toUpperCase() ?? ''}${targetUser.last_name?.[0]?.toUpperCase() ?? ''}`}
+        initials={getInitials()}
       />
-      <div>
-        <div className="flex items-center">
-          <Link href={`/profile/${targetUser.id}`} className="hover:underline">
-            <h2 className="font-semibold text-lg text-white">{displayName}</h2>
-          </Link>
-          {targetUser && onlineUserIds.includes(targetUser.id) && (
-            <div className="flex items-center ml-2">
-              <span className="h-2.5 w-2.5 bg-green-500 rounded-full mr-1.5 flex-shrink-0"></span>
-              <span className="text-xs text-green-400">Online</span>
+      <div className="flex-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Link
+              href={isGroup ? `/groups/${group?.id}` : `/profile/${user?.id}`}
+              className="hover:underline"
+            >
+              <h2 className="font-semibold text-lg text-white">{displayName}</h2>
+            </Link>
+            {!isGroup && user?.id && onlineUserIds.includes(user.id) && (
+              <div className="flex items-center">
+                <span className="h-2.5 w-2.5 bg-green-500 rounded-full mr-1.5 flex-shrink-0"></span>
+                <span className="text-xs text-green-400">Online</span>
+              </div>
+            )}
+          </div>
+          {isGroup && group?.members_count && (
+            <div className="flex items-center text-gray-400">
+              <UsersIcon className="w-5 h-5 mr-1" />
+              <span className="text-sm">{group.members_count} members</span>
             </div>
           )}
         </div>

@@ -11,6 +11,8 @@ interface GroupDetailHeaderProps {
   avatar_url: string | null | undefined;
   creator_info: UserBasicInfo;
   created_at: string | Date | undefined;
+  groupId: string;
+  isMember: boolean;
 }
 
 export default function GroupDetailHeader({
@@ -19,6 +21,8 @@ export default function GroupDetailHeader({
   avatar_url,
   creator_info,
   created_at,
+  groupId,
+  isMember,
 }: GroupDetailHeaderProps) {
   const creatorFullName = `${creator_info.first_name} ${creator_info.last_name}`;
   const creatorUsername = creator_info.username;
@@ -49,7 +53,7 @@ export default function GroupDetailHeader({
           alt={`${name} avatar`}
           className="h-24 w-24 md:h-32 md:w-32 rounded-full mr-0 sm:mr-6 mb-4 sm:mb-0 border-2 border-purple-500"
         />
-        <div className="text-center sm:text-left">
+        <div className="text-center sm:text-left flex-grow">
           <Heading level={1} className="text-3xl md:text-4xl font-bold text-purple-400 mb-2">
             {name}
           </Heading>
@@ -71,6 +75,16 @@ export default function GroupDetailHeader({
             <Text>Created on: {formatDate(created_at)}</Text>
           </div>
         </div>
+        {isMember && (
+          <div className="mt-4 sm:mt-0 sm:ml-4">
+            <Link
+              href={`/groups/${groupId}/chat`}
+              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors"
+            >
+              Chat
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );
