@@ -6,6 +6,7 @@ import { useUserStore } from '@/store/useUserStore';
 import { useRequest } from '@/hooks/useRequest';
 import { Message } from '@/types/Message';
 import { Group } from '@/types/Group';
+import { UserBasicInfo } from '@/types/User';
 
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
@@ -13,6 +14,21 @@ import MessageInput from '@/components/chat/MessageInput';
 import toast from 'react-hot-toast';
 
 const MESSAGES_PER_PAGE = 20;
+
+// Interface for the actual API response for group members
+interface ApiMember {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  avatar_url?: string;
+  // Add other fields if necessary, based on actual API response
+}
+
+interface ApiGroupMembersResponse {
+  members: ApiMember[];
+  count?: number;
+}
 
 export default function GroupChatPage() {
   const params = useParams();
@@ -32,6 +48,8 @@ export default function GroupChatPage() {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [groupMembers, setGroupMembers] = useState<Map<string, UserBasicInfo>>(new Map());
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -42,6 +60,7 @@ export default function GroupChatPage() {
 
   const messagesRequest = useRequest<Message[]>();
   const groupRequest = useRequest<Group>();
+  const membersRequest = useRequest<ApiGroupMembersResponse>(); // Use the new interface
 
   useEffect(() => {
     useUserStore.persist.rehydrate();
@@ -60,6 +79,36 @@ export default function GroupChatPage() {
     }
   }, [groupId, groupRequest.get, hydrated, isAuthenticated]);
 
+  // Fetch group members
+  useEffect(() => {
+    if (groupId && hydrated && isAuthenticated) {
+      const fetchGroupMembers = async () => {
+        setIsLoadingMembers(true);
+        const data = await membersRequest.get(`/api/groups/${groupId}/members`);
+        console.log('Group members API response:', data); // Log API response
+        if (data && data.members) {
+          const membersMap = new Map<string, UserBasicInfo>();
+          data.members.forEach(apiMember => {
+            const userBasic: UserBasicInfo = {
+              user_id: apiMember.id, // Map API's id to UserBasicInfo's user_id
+              username: apiMember.username,
+              first_name: apiMember.first_name,
+              last_name: apiMember.last_name,
+              avatar_url: apiMember.avatar_url,
+            };
+            membersMap.set(apiMember.id, userBasic); // Key the map with the API's id
+          });
+          console.log('Populated groupMembers map:', membersMap); // Log populated map
+          setGroupMembers(membersMap);
+        } else if (membersRequest.error) {
+          toast.error(`Failed to load group members: ${membersRequest.error.message}`);
+        }
+        setIsLoadingMembers(false);
+      };
+      fetchGroupMembers();
+    }
+  }, [groupId, membersRequest.get, hydrated, isAuthenticated]);
+
   // Effect to handle group loading errors
   useEffect(() => {
     if (groupRequest.isLoading === false && !group && groupRequest.error) {
@@ -69,19 +118,24 @@ export default function GroupChatPage() {
   }, [groupRequest.isLoading, group, groupRequest.error]);
 
   const fetchMessageHistory = useCallback(async (currentOffset: number, loadMore = false) => {
-    if (!groupId || !currentUserId) return;
+    if (!groupId || !currentUserId || groupMembers.size === 0 && !isLoadingMembers) return; // Wait for members if not loading
     if (loadMore) setIsLoadingMore(true);
     else setIsLoadingHistory(true);
 
     const data = await messagesRequest.get(`/api/groups/${groupId}/messages?limit=${MESSAGES_PER_PAGE}&offset=${currentOffset}`);
     if (data) {
       const rawMessages: Message[] = (data as any)?.messages || [];
-      const messagesWithAvatars = rawMessages.map(msg => ({
-        ...msg,
-        sender_avatar_url: msg.sender_id === currentUserId
-          ? currentUserAvatarUrl
-          : undefined // Will be populated from backend
-      }));
+      const messagesWithAvatars = rawMessages.map(msg => {
+        const senderInfo = groupMembers.get(msg.sender_id);
+        console.log('[History] Looking up sender_id:', msg.sender_id, 'Found info:', senderInfo); // Log historical message enrichment
+        return {
+          ...msg,
+          sender_username: msg.sender_id === currentUserId ? currentUserUsername : senderInfo?.username,
+          sender_avatar_url: msg.sender_id === currentUserId
+            ? currentUserAvatarUrl
+            : senderInfo?.avatar_url
+        };
+      });
 
       if (loadMore) {
         setMessages(prev => [...messagesWithAvatars.reverse(), ...prev]);
@@ -95,7 +149,7 @@ export default function GroupChatPage() {
     }
     if (loadMore) setIsLoadingMore(false);
     else setIsLoadingHistory(false);
-  }, [groupId, currentUserId, currentUserAvatarUrl, messagesRequest.get]);
+  }, [groupId, currentUserId, currentUserAvatarUrl, currentUserUsername, messagesRequest.get, groupMembers, isLoadingMembers]);
 
   // Effect to handle messages loading errors
   useEffect(() => {
@@ -113,7 +167,7 @@ export default function GroupChatPage() {
       setHasMoreMessages(true);
       fetchMessageHistory(0);
     }
-  }, [groupId, currentUserId, fetchMessageHistory, hydrated]);
+  }, [groupId, currentUserId, fetchMessageHistory, hydrated, groupMembers]); // Added groupMembers dependency
 
   // WebSocket connection
   useEffect(() => {
@@ -151,11 +205,14 @@ export default function GroupChatPage() {
           console.log('WebSocket message received:', rawMessageData);
 
           if (rawMessageData.type === 'group' && rawMessageData.receiver_id === groupId) {
+            const senderInfo = groupMembers.get(rawMessageData.sender_id);
+            console.log('[WebSocket] Looking up sender_id:', rawMessageData.sender_id, 'Found info:', senderInfo); // Log WebSocket message enrichment
             const messageWithAvatar: Message = {
               ...rawMessageData,
+              sender_username: rawMessageData.sender_id === currentUserId ? currentUserUsername : senderInfo?.username,
               sender_avatar_url: rawMessageData.sender_id === currentUserId
                 ? currentUserAvatarUrl
-                : undefined // Will be populated from backend
+                : senderInfo?.avatar_url
             };
             setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
           }
@@ -204,7 +261,7 @@ export default function GroupChatPage() {
         webSocketRef.current = null;
       }
     };
-  }, [currentUserId, groupId, hydrated, isAuthenticated, currentUserAvatarUrl, retryCount]);
+  }, [currentUserId, groupId, hydrated, isAuthenticated, currentUserAvatarUrl, currentUserUsername, retryCount, groupMembers]);
 
   const handleSendMessage = (content: string) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
@@ -252,6 +309,9 @@ export default function GroupChatPage() {
   }
   if (groupRequest.isLoading && !group) {
     return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Loading group...</div>;
+  }
+  if (isLoadingMembers && groupMembers.size === 0) {
+    return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Loading members...</div>;
   }
 
   return (
