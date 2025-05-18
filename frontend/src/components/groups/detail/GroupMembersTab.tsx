@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import { Avatar } from '../../ui/avatar';
@@ -22,6 +24,7 @@ export default function GroupMembersTab({ members }: GroupMembersTabProps) {
             initials={!member.avatar_url && member.first_name && member.last_name ? `${member.first_name.substring(0, 1)}${member.last_name.substring(0, 1)}`.toUpperCase() : undefined}
             alt={`${member.first_name} ${member.last_name}`}
             className="h-10 w-10 mr-3 rounded-full"
+            userId={member.user_id}
           />
           <div>
             <Link href={`/profile/${member.user_id}`} className="text-purple-300 hover:underline font-semibold">

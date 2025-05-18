@@ -13,7 +13,8 @@ type ChatMessageRepository interface {
 	SaveGroupMessage(message *models.GroupMessage) error
 	// GetDirectMessagesBetweenUsers retrieves paginated direct messages between two users and the total count.
 	GetDirectMessagesBetweenUsers(user1ID, user2ID string, limit, offset int) ([]models.Message, int64, error)
-	GetGroupMessages(groupID string, limit, offset int) ([]*models.GroupMessage, error)
+	GetGroupMessages(groupID string, limit int, offset int, currentUserID string) ([]*models.GroupMessage, error)
+	GetChatPartners(currentUserID string) ([]models.ChatPartner, error) // Added method
 }
 
 // chatMessageRepository implements the ChatMessageRepository interface.
@@ -107,7 +108,12 @@ func (r *chatMessageRepository) GetDirectMessagesBetweenUsers(user1ID, user2ID s
 }
 
 // GetGroupMessages retrieves messages for a group with pagination.
-func (r *chatMessageRepository) GetGroupMessages(groupID string, limit, offset int) ([]*models.GroupMessage, error) {
+func (r *chatMessageRepository) GetGroupMessages(groupID string, limit int, offset int, currentUserID string) ([]*models.GroupMessage, error) {
+	// TODO: Implement actual logic for fetching group messages for ChatMessageRepository if needed
+	// This is a stub to satisfy the interface.
+	// The primary implementation is likely in sqlite_message_repository.go
+	// log.Printf("ChatMessageRepository: GetGroupMessages called with groupID: %s, limit: %d, offset: %d, currentUserID: %s (STUB)", groupID, limit, offset, currentUserID)
+	// return []*models.GroupMessage{}, nil
 	query := `
 	       SELECT id, group_id, sender_id, content, created_at
 	       FROM group_messages
@@ -153,4 +159,76 @@ func (r *chatMessageRepository) GetGroupMessages(groupID string, limit, offset i
 	}
 
 	return messages, nil
+}
+
+// GetChatPartners is a stub implementation to satisfy the ChatMessageRepository interface
+// which now aligns with MessageRepository.
+// TODO: This method is fully implemented in sqliteMessageRepository.
+// If chatMessageRepository is intended to be the primary message repository,
+// this stub should be replaced with a proper implementation or delegate to
+// the one in sqliteMessageRepository if appropriate.
+func (r *chatMessageRepository) GetChatPartners(currentUserID string) ([]models.ChatPartner, error) {
+    query := `
+        WITH LastMessages AS (
+            SELECT
+                CASE
+                    WHEN sender_id = ? THEN receiver_id
+                    ELSE sender_id
+                END AS partner_id,
+                content as last_message,
+                created_at as last_message_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY
+                        CASE
+                            WHEN sender_id = ? THEN receiver_id
+                            ELSE sender_id
+                        END
+                    ORDER BY created_at DESC
+                ) as rn
+            FROM messages
+            WHERE sender_id = ? OR receiver_id = ?
+        )
+        SELECT
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.username,
+            u.avatar_url,
+            lm.last_message,
+            lm.last_message_at
+        FROM LastMessages lm
+        JOIN users u ON u.id = lm.partner_id
+        WHERE lm.rn = 1
+        ORDER BY lm.last_message_at DESC;
+    `
+
+    rows, err := r.db.Query(query, currentUserID, currentUserID, currentUserID, currentUserID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get chat partners: %w", err)
+    }
+    defer rows.Close()
+
+    var partners []models.ChatPartner
+    for rows.Next() {
+        var partner models.ChatPartner
+        err := rows.Scan(
+            &partner.ID,
+            &partner.FirstName,
+            &partner.LastName,
+            &partner.Username,
+            &partner.AvatarURL,
+            &partner.LastMessage,
+            &partner.LastMessageAt,
+        )
+        if err != nil {
+            return nil, fmt.Errorf("failed to scan chat partner: %w", err)
+        }
+        partners = append(partners, partner)
+    }
+
+    if err = rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating chat partners: %w", err)
+    }
+
+    return partners, nil
 }

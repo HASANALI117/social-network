@@ -15,18 +15,20 @@ type MessageService interface {
 	// It returns the list of messages, the total count of messages between them, and an error if any.
 	GetDirectMessagesBetweenUsers(user1ID, user2ID string, limit, offset int) ([]models.Message, int64, error)
 	GetGroupMessages(groupID string, limit, offset int, requestingUserID string) ([]*models.GroupMessage, error)
+	// GetChatPartners retrieves a list of users with whom the current user has a chat history.
+	GetChatPartners(currentUserID string) ([]models.ChatPartner, error)
 	// TODO: Add methods for sending messages if needed (currently handled by websocket)
 }
 
 // messageService implements MessageService interface.
 type messageService struct {
-	messageRepo repositories.ChatMessageRepository
+	messageRepo repositories.MessageRepository // Updated to use the new MessageRepository
 	groupRepo   repositories.GroupRepository // Needed for authorization (e.g., checking group membership)
 	// Add other dependencies like userRepo if needed
 }
 
 // NewMessageService creates a new MessageService.
-func NewMessageService(messageRepo repositories.ChatMessageRepository, groupRepo repositories.GroupRepository) MessageService {
+func NewMessageService(messageRepo repositories.MessageRepository, groupRepo repositories.GroupRepository) MessageService { // Updated parameter type
 	return &messageService{
 		messageRepo: messageRepo,
 		groupRepo:   groupRepo,
@@ -61,7 +63,7 @@ func (s *messageService) GetGroupMessages(groupID string, limit, offset int, req
 		return nil, ErrGroupMemberRequired // Assuming ErrGroupMemberRequired is defined elsewhere
 	}
 
-	messages, err := s.messageRepo.GetGroupMessages(groupID, limit, offset)
+	messages, err := s.messageRepo.GetGroupMessages(groupID, limit, offset, requestingUserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group messages from repository: %w", err)
 	}
@@ -71,3 +73,14 @@ func (s *messageService) GetGroupMessages(groupID string, limit, offset int, req
 }
 
 // Note: ErrGroupMemberRequired is likely defined in group_service.go or a shared errors package
+
+// GetChatPartners retrieves a list of users with whom the current user has a chat history,
+// sorted by the most recent message.
+func (s *messageService) GetChatPartners(currentUserID string) ([]models.ChatPartner, error) {
+	partners, err := s.messageRepo.GetChatPartners(currentUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chat partners from repository: %w", err)
+	}
+	// TODO: Further transformations or checks if needed
+	return partners, nil
+}

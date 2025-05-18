@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-// import Link from 'next/link'; // No longer directly used here
+import Link from 'next/link';
 // import { useForm, SubmitHandler } from 'react-hook-form'; // Removed for Phase 1
 import { useRequest } from '../../../hooks/useRequest';
 import { Group, PostSummary, EventSummary } from '../../../types/Group'; // PostSummary, EventSummary might not be directly needed here anymore
@@ -16,7 +16,7 @@ import { Heading } from '../../../components/ui/heading';
 import { Text } from '../../../components/ui/text';
 // import { Textarea } from '../../../components/ui/textarea';
 // import { Avatar } from '../../../components/ui/avatar'; // No longer directly used here
-// import { Button } from '../../../components/ui/button'; // No longer directly used here
+import { Button } from '../../../components/ui/button';
 // import { Input } from '../../../components/ui/input'; // No longer directly used here
 // import { Alert, AlertTitle, AlertDescription, AlertBody, AlertActions } from '../../../components/ui/alert'; // No longer directly used here
 // import { format } from 'date-fns'; // No longer directly used here
@@ -132,6 +132,8 @@ export default function GroupDetailPage() {
           avatar_url={avatar_url}
           creator_info={creator_info}
           created_at={created_at}
+          groupId={groupId}
+          isMember={isMember}
         />
 
         <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
@@ -144,9 +146,16 @@ export default function GroupDetailPage() {
               <GroupMemberView
                 group={group!} // group is checked before this render path
                 currentUser={currentUser ? { ...currentUser, user_id: currentUser.id } : null}
-              handleLeaveGroup={handleLeaveGroup}
+                handleLeaveGroup={handleLeaveGroup}
               // Old invite props removed
-            />
+              />
+              <div className="mt-4"> {/* Added margin for spacing */}
+                <Link href={`/groups/${groupId}/chat`} passHref>
+                  <Button color="blue"> {/* Example styling, adjust as needed */}
+                    Chat
+                  </Button>
+                </Link>
+              </div>
             </>
           )}
         </section>

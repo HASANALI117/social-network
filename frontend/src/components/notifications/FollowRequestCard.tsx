@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { UserSummary } from '@/types/User';
 import { Button } from '@/components/ui/button';
@@ -59,6 +61,7 @@ const FollowRequestCard: React.FC<FollowRequestCardProps> = ({
           initials={`${user.first_name?.[0]?.toUpperCase() ?? ''}${user.last_name?.[0]?.toUpperCase() ?? ''}`}
           alt={`${user.first_name} ${user.last_name}'s avatar`}
           className="h-12 w-12 group-hover:opacity-80 transition-opacity"
+          userId={user.id}
         />
         <div>
           <p className="font-semibold text-gray-100 group-hover:text-purple-300 transition-colors">

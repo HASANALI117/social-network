@@ -10,6 +10,8 @@ import ProfileHeader from '@/components/profile/ProfileHeader';
 import TabSwitcher from '@/components/profile/TabSwitcher';
 import PostList from '@/components/common/PostList';
 import UserList from '@/components/profile/UserList';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function UserProfilePage() {
   const params = useParams();
@@ -173,8 +175,12 @@ export default function UserProfilePage() {
         isPreview={false}
         isLoadingFollowAction={isLoadingFollowAction}
         pageType="dynamic"
+        is_followed={userProfile.is_followed}
+        // is_following_viewer={userProfile.is_following_viewer} // Pass this when available
       />
       {followError && !isLoadingFollowAction && <p className="text-red-500 mt-2 text-center">Error: {followError.message}</p>}
+
+      {/* The chat button has been moved to ProfileHeader */}
 
       {isRestrictedView ? (
         <div className="text-center py-10">

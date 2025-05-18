@@ -8,6 +8,10 @@ const nextConfig = {
         port: '9000', // As per the error message
         pathname: '/images/uploads/**',
       },
+      {
+        protocol: 'http',
+        hostname: 'example.com',
+      },
     ],
   },
   async rewrites() {
