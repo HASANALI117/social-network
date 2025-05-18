@@ -56,16 +56,21 @@ export default function ChatPage() {
   useEffect(() => {
     if (targetUserId && hydrated && isAuthenticated) {
       const fetchUserProfile = async () => {
-        const data = await profileRequest.get(`/api/users/${targetUserId}`);
-        if (data) {
-          setTargetUser(data);
-          // Simplified frontend check for chat restrictions
-          // Backend will ultimately enforce this.
-          if (data.is_private && !data.is_followed && data.id !== currentUserId) {
-            // More complex logic might be needed if "followed_by_target_user" is available
-            // For now, if private and not followed by current user, assume restricted.
-            // setCanChat(false); // This might be too restrictive, rely on backend errors for now
+        try {
+          const data = await profileRequest.get(`/api/users/${targetUserId}`);
+          if (data) {
+            setTargetUser(data);
+            // Simplified frontend check for chat restrictions
+            // Backend will ultimately enforce this.
+            if (data.is_private && !data.is_followed && data.id !== currentUserId) {
+              // More complex logic might be needed if "followed_by_target_user" is available
+              // For now, if private and not followed by current user, assume restricted.
+              // setCanChat(false); // This might be too restrictive, rely on backend errors for now
+            }
           }
+        } catch (error) {
+          // Error is handled by the useEffect hook watching profileRequest.error
+          console.error('[ChatPage] Error fetching user profile:', error); // Keep one log for actual errors
         }
       };
       fetchUserProfile();
@@ -297,7 +302,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen max-w-2xl mx-auto bg-gray-900 text-white">
-      <ChatHeader targetUser={targetUser} />
+      <ChatHeader type="direct" target={targetUser} />
       {error && <div className="p-2 text-center text-red-400 bg-red-900">{error}</div>}
       <div className="flex-grow overflow-y-auto">
         <MessageList
