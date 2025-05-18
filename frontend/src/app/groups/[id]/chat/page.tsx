@@ -8,6 +8,7 @@ import { Message } from '@/types/Message';
 import { Group } from '@/types/Group';
 import { UserBasicInfo } from '@/types/User';
 
+import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext';
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
 import MessageInput from '@/components/chat/MessageInput';
@@ -50,6 +51,8 @@ export default function GroupChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [groupMembers, setGroupMembers] = useState<Map<string, UserBasicInfo>>(new Map());
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [onlineMemberCount, setOnlineMemberCount] = useState<number | undefined>(undefined);
+  const [totalMemberCount, setTotalMemberCount] = useState<number | undefined>(undefined);
 
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -61,6 +64,7 @@ export default function GroupChatPage() {
   const messagesRequest = useRequest<Message[]>();
   const groupRequest = useRequest<Group>();
   const membersRequest = useRequest<ApiGroupMembersResponse>(); // Use the new interface
+  const { onlineUserIds } = useGlobalWebSocket();
 
   useEffect(() => {
     useUserStore.persist.rehydrate();
@@ -108,6 +112,25 @@ export default function GroupChatPage() {
       fetchGroupMembers();
     }
   }, [groupId, membersRequest.get, hydrated, isAuthenticated]);
+
+  // Effect to calculate online and total member counts
+  useEffect(() => {
+    if (groupMembers.size > 0) {
+      const total = groupMembers.size;
+      setTotalMemberCount(total);
+
+      let onlineCount = 0;
+      groupMembers.forEach(member => {
+        if (onlineUserIds.includes(member.user_id)) {
+          onlineCount++;
+        }
+      });
+      setOnlineMemberCount(onlineCount);
+    } else {
+      setTotalMemberCount(undefined);
+      setOnlineMemberCount(undefined);
+    }
+  }, [groupMembers, onlineUserIds]);
 
   // Effect to handle group loading errors
   useEffect(() => {
@@ -319,6 +342,8 @@ export default function GroupChatPage() {
       <ChatHeader
         type="group"
         target={group}
+        onlineMemberCount={onlineMemberCount}
+        totalMemberCount={totalMemberCount}
       />
       {error && <div className="p-2 text-center text-red-400 bg-red-900">{error}</div>}
       <div className="flex-grow overflow-y-auto">

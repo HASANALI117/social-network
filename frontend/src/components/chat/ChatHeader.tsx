@@ -9,9 +9,11 @@ import { UsersIcon } from '@heroicons/react/24/outline';
 interface ChatHeaderProps {
   type: 'direct' | 'group';
   target: UserProfile | Group | null;
+  onlineMemberCount?: number;
+  totalMemberCount?: number;
 }
 
-export default function ChatHeader({ type, target }: ChatHeaderProps) {
+export default function ChatHeader({ type, target, onlineMemberCount, totalMemberCount }: ChatHeaderProps) {
   const { onlineUserIds } = useGlobalWebSocket();
   
   if (!target) {
@@ -61,12 +63,20 @@ export default function ChatHeader({ type, target }: ChatHeaderProps) {
               </div>
             )}
           </div>
-          {isGroup && group?.members_count && (
-            <div className="flex items-center text-gray-400">
-              <UsersIcon className="w-5 h-5 mr-1" />
-              <span className="text-sm">{group.members_count} members</span>
-            </div>
-          )}
+          <div className="flex items-center space-x-3">
+            {isGroup && typeof onlineMemberCount === 'number' && typeof totalMemberCount === 'number' && (
+              <div className="flex items-center text-gray-400">
+                <span className="h-2.5 w-2.5 bg-green-500 rounded-full mr-1.5 flex-shrink-0"></span>
+                <span className="text-sm">Online: {onlineMemberCount}/{totalMemberCount}</span>
+              </div>
+            )}
+            {isGroup && group?.members_count && typeof onlineMemberCount !== 'number' && ( // Show total members if online count is not available
+              <div className="flex items-center text-gray-400">
+                <UsersIcon className="w-5 h-5 mr-1" />
+                <span className="text-sm">{group.members_count} members</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
