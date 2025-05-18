@@ -13,6 +13,7 @@ type Handlers struct {
 	Message      *MessageHandler      // Added MessageHandler
 	GroupMessage *GroupMessageHandler // Added GroupMessageHandler
 	GroupMember  *GroupMemberHandler  // Added GroupMemberHandler
+	Notification *NotificationHandler // Added NotificationHandler
 	// TODO: Add handlers for GroupInvite, GroupJoinReq, GroupEvent, GroupEventRes later
 }
 
@@ -28,6 +29,7 @@ func InitHandlers(svc *services.Services) *Handlers {
 	messageHandler := NewMessageHandler(svc.Message, svc.Auth)                                  // Initialize MessageHandler
 	groupMessageHandler := NewGroupMessageHandler(svc.Message, svc.Group, svc.Auth)             // Initialize GroupMessageHandler
 	groupMemberHandler := NewGroupMemberHandler(svc.Group, svc.Auth)                            // Initialize GroupMemberHandler
+	notificationHandler := NewNotificationHandler(svc.Notification, svc.Auth)                   // Initialize NotificationHandler
 
 	return &Handlers{
 		User:         userHandler,
@@ -39,5 +41,6 @@ func InitHandlers(svc *services.Services) *Handlers {
 		Message:      messageHandler,      // Assign initialized MessageHandler
 		GroupMessage: groupMessageHandler, // Assign initialized GroupMessageHandler
 		GroupMember:  groupMemberHandler,  // Assign initialized GroupMemberHandler
+		Notification: notificationHandler, // Assign initialized NotificationHandler
 	}
 }

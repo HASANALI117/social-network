@@ -23,6 +23,7 @@ interface GlobalWebSocketContextType {
   connectionStatus: ConnectionStatus;
   onlineUserIds: string[];
   error: string | null;
+  lastMessageData: string | null; // Added to expose last raw message data
   connectWebSocket: () => void;
   disconnectWebSocket: () => void;
 }
@@ -61,6 +62,7 @@ export const GlobalWebSocketProvider: React.FC<{ children: React.ReactNode }> = 
     useState<ConnectionStatus>('idle');
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [lastMessageData, setLastMessageData] = useState<string | null>(null); // State for last message data
   const [retryCount, setRetryCount] = useState(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -151,11 +153,15 @@ export const GlobalWebSocketProvider: React.FC<{ children: React.ReactNode }> = 
         setConnectionStatus('connected');
         setRetryCount(0);
         setError(null);
+        setLastMessageData(null); // Clear last message on new connection
       };
 
       ws.onmessage = (event) => {
+        const rawData = event.data as string;
+        setLastMessageData(rawData); // Store the raw message data
+
         try {
-          const message = JSON.parse(event.data as string) as WebSocketMessage;
+          const message = JSON.parse(rawData) as WebSocketMessage;
           console.log('Global WebSocket: Message received:', message);
           if (message.type === 'online_users' && message.userIds) {
             setOnlineUserIds(prevUserIds => {
@@ -332,9 +338,10 @@ export const GlobalWebSocketProvider: React.FC<{ children: React.ReactNode }> = 
     connectionStatus,
     onlineUserIds,
     error,
+    lastMessageData, // Include in context
     connectWebSocket,
     disconnectWebSocket,
-  }), [connectionStatus, onlineUserIds, error, connectWebSocket, disconnectWebSocket]);
+  }), [connectionStatus, onlineUserIds, error, lastMessageData, connectWebSocket, disconnectWebSocket]);
 
   return (
     <GlobalWebSocketContext.Provider value={contextValue}>

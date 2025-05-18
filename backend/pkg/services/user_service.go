@@ -58,14 +58,17 @@ type UserService interface {
 
 // userService implements UserService interface
 type userService struct {
-	userRepo        repositories.UserRepository
-	postService     PostService     // Added PostService dependency
-	followerService FollowerService // Added FollowerService dependency
-	groupRepo       repositories.GroupRepository // New dependency
+	userRepo            repositories.UserRepository
+	postService         PostService     // Added PostService dependency
+	followerService     FollowerService // Added FollowerService dependency
+	groupRepo           repositories.GroupRepository // New dependency
+	// NotificationService is not directly used by UserService for creating follow request notifications.
+	// That logic will be in FollowerService. UserService might use it for other user-specific notifications in the future.
 }
 
 // NewUserService creates a new UserService
 func NewUserService(userRepo repositories.UserRepository, postService PostService, followerService FollowerService, groupRepo repositories.GroupRepository) UserService {
+	// No NotificationService needed here for now, as follow request notifications are handled by FollowerService.
 	return &userService{
 		userRepo:        userRepo,
 		postService:     postService,

@@ -27,15 +27,21 @@ type FollowerService interface {
 
 // followerService implements FollowerService
 type followerService struct {
-	followerRepo repositories.FollowerRepository
-	userRepo     repositories.UserRepository // Assuming UserRepository exists and is needed
+	followerRepo        repositories.FollowerRepository
+	userRepo            repositories.UserRepository // Assuming UserRepository exists and is needed
+	notificationService NotificationService         // Added NotificationService
 }
 
 // NewFollowerService creates a new instance of FollowerService
-func NewFollowerService(followerRepo repositories.FollowerRepository, userRepo repositories.UserRepository) FollowerService {
+func NewFollowerService(
+	followerRepo repositories.FollowerRepository,
+	userRepo repositories.UserRepository,
+	notificationService NotificationService, // Added NotificationService
+) FollowerService {
 	return &followerService{
-		followerRepo: followerRepo,
-		userRepo:     userRepo,
+		followerRepo:        followerRepo,
+		userRepo:            userRepo,
+		notificationService: notificationService, // Store NotificationService
 	}
 }
 
@@ -51,8 +57,17 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, repositories.ErrUserNotFound) { // Check for specific not found errors
 			return errors.New("target user not found")
 		}
-		log.Printf("Error checking target user: %v", err)
+		log.Printf("Error checking target user %s: %v", targetID, err)
 		return fmt.Errorf("internal server error checking target user")
+	}
+
+	requesterUser, err := s.userRepo.GetByID(requesterID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, repositories.ErrUserNotFound) {
+			return errors.New("requester user not found")
+		}
+		log.Printf("Error checking requester user %s: %v", requesterID, err)
+		return fmt.Errorf("internal server error checking requester user")
 	}
 
 	// Check if already following or request pending
@@ -81,6 +96,26 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 			return fmt.Errorf("failed to send follow request")
 		}
 		log.Printf("Follow request sent from %s to private user %s", requesterID, targetID)
+
+		// Create notification for the private user
+		if s.notificationService != nil {
+			message := fmt.Sprintf("%s wants to follow you.", requesterUser.Username)
+			_, errNotif := s.notificationService.CreateNotification(
+				nil, // Using nil context for now, consider passing from handler if needed
+				targetUser.ID,
+				models.FollowRequestNotification,
+				models.UserEntityType,
+				message,
+				requesterUser.ID,
+			)
+			if errNotif != nil {
+				log.Printf("Error creating follow request notification for user %s from %s: %v", targetUser.ID, requesterUser.ID, errNotif)
+				// Non-fatal error, proceed with follow request logic
+			} else {
+				log.Printf("Follow request notification created for user %s from %s", targetUser.ID, requesterUser.ID)
+			}
+		}
+
 	} else {
 		// Public profile: Create request and immediately accept it
 		err = s.followerRepo.CreateFollowRequest(requesterID, targetID)
@@ -120,6 +155,35 @@ func (s *followerService) AcceptFollow(accepterID, requesterID string) error {
 		log.Printf("Error accepting follow request: %v", err)
 		return fmt.Errorf("failed to accept follow request")
 	}
+
+	// Get accepter (UserB) details for the notification message
+	accepterUser, err := s.userRepo.GetByID(accepterID)
+	if err != nil {
+		log.Printf("Error fetching accepter user %s for notification: %v", accepterID, err)
+		// Non-fatal for the accept logic, but notification won't be as good or might fail.
+	}
+
+	// Create notification for the requester (UserA)
+	if s.notificationService != nil && accepterUser != nil {
+		message := fmt.Sprintf("%s accepted your follow request.", accepterUser.Username)
+		_, errNotif := s.notificationService.CreateNotification(
+			nil, // Using nil context for now
+			requesterID, // Recipient is the original requester
+			models.FollowAcceptNotification,
+			models.UserEntityType,
+			message,
+			accepterID, // Entity is the user who accepted
+		)
+		if errNotif != nil {
+			log.Printf("Error creating follow accept notification for user %s from %s: %v", requesterID, accepterID, errNotif)
+			// Non-fatal error
+		} else {
+			log.Printf("Follow accept notification created for user %s from %s", requesterID, accepterID)
+		}
+	} else if s.notificationService != nil && accepterUser == nil {
+		log.Printf("Could not create follow accept notification because accepter user %s could not be fetched.", accepterID)
+	}
+
 
 	return nil
 }

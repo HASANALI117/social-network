@@ -94,6 +94,7 @@ type groupEventService struct {
 	groupRepo              repositories.GroupRepository
 	userRepo               repositories.UserRepository
 	groupEventResponseRepo repositories.GroupEventResponseRepository // Added
+	notificationService    NotificationService
 }
 
 // NewGroupEventService creates a new GroupEventService
@@ -102,12 +103,14 @@ func NewGroupEventService(
 	groupRepo repositories.GroupRepository,
 	userRepo repositories.UserRepository,
 	groupEventResponseRepo repositories.GroupEventResponseRepository, // Added
+	notificationService NotificationService,
 ) GroupEventService {
 	return &groupEventService{
 		groupEventRepo:         groupEventRepo,
 		groupRepo:              groupRepo,
 		userRepo:               userRepo,
 		groupEventResponseRepo: groupEventResponseRepo, // Added
+		notificationService:    notificationService,
 	}
 }
 
@@ -180,6 +183,38 @@ func (s *groupEventService) Create(request *GroupEventCreateRequest) (*GroupEven
 	err = s.groupEventRepo.Create(event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event: %w", err)
+	}
+
+	// Send notifications to group members
+	if s.notificationService != nil {
+		groupMembers, err := s.groupRepo.GetMembersByGroupID(request.GroupID)
+		if err != nil {
+			fmt.Printf("Warning: Failed to get group members for event notification (event %s, group %s): %v\n", event.ID, request.GroupID, err)
+		} else {
+			group, groupErr := s.groupRepo.GetByID(request.GroupID)
+			if groupErr != nil {
+				fmt.Printf("Warning: Failed to get group details for event notification (event %s, group %s): %v\n", event.ID, request.GroupID, groupErr)
+			} else {
+				for _, member := range groupMembers {
+					// Don't notify the event creator
+					if member.UserID == request.CreatorID {
+						continue
+					}
+					message := fmt.Sprintf("A new event '%s' has been created in %s.", event.Title, group.Name)
+					_, errNotif := s.notificationService.CreateNotification(
+						nil, // Context
+						member.UserID,
+						models.GroupEventCreatedNotification,
+						models.EventEntityType,
+						message,
+						event.ID,
+					)
+					if errNotif != nil {
+						fmt.Printf("Warning: Failed to create group event created notification for member %s (event %s): %v\n", member.UserID, event.ID, errNotif)
+					}
+				}
+			}
+		}
 	}
 
 	return mapGroupEventToResponse(event), nil

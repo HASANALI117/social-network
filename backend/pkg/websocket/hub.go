@@ -1,16 +1,18 @@
-package ws
+package websocket // Changed package name
 
 import (
 	"fmt"
+	"log" // Added for logging
 	"time"
 
 	// "github.com/HASANALI117/social-network/pkg/helpers" // No longer needed
 	"github.com/HASANALI117/social-network/pkg/models" // Keep for message structs
 	"github.com/HASANALI117/social-network/pkg/repositories"
-	"github.com/HASANALI117/social-network/pkg/services"
+	"github.com/HASANALI117/social-network/pkg/services" // services.RealTimeNotifier will be implemented
 	"github.com/google/uuid" // Import UUID library
 )
 
+// Hub now needs to satisfy services.RealTimeNotifier if it's passed to NotificationService
 type Hub struct {
 	Clients         map[string]*Client
 	Broadcast       chan *Message
@@ -195,9 +197,9 @@ func (h *Hub) broadcastUserStatusChange() {
 	onlineUserIDs := make([]string, 0, len(h.Clients))
 	// Use a temporary map to safely access clients while iterating
 	clientsToSend := make(map[string]*Client)
-	for userID, client := range h.Clients {
-		onlineUserIDs = append(onlineUserIDs, userID)
-		clientsToSend[userID] = client
+	for userIDVal, client := range h.Clients { // Renamed userID to userIDVal to avoid conflict
+		onlineUserIDs = append(onlineUserIDs, userIDVal)
+		clientsToSend[userIDVal] = client
 	}
 
 	// 2. Create the payload map (this will be sent directly as interface{})
@@ -208,9 +210,9 @@ func (h *Hub) broadcastUserStatusChange() {
 
 	// 3. Broadcast the payload map directly to each client's Send channel (chan interface{})
 	fmt.Printf("📢 Broadcasting 'online_users' payload directly: %v\n", onlineUserIDs)
-	for userID, client := range clientsToSend {
+	for userIDVal, client := range clientsToSend { // Renamed userID to userIDVal
 		// Check if client still exists in the main map (could have disconnected during iteration)
-		if _, ok := h.Clients[userID]; !ok {
+		if _, ok := h.Clients[userIDVal]; !ok { // Renamed userID to userIDVal
 			continue // Skip if client disconnected
 		}
 
@@ -219,9 +221,50 @@ func (h *Hub) broadcastUserStatusChange() {
 			// Payload sent successfully
 		default:
 			// Failed to send (channel full or closed), assume client disconnected
-			fmt.Printf("⚠️ Failed to broadcast online_users to User %s - closing connection\n", userID)
-			delete(h.Clients, userID) // Remove from hub
+			fmt.Printf("⚠️ Failed to broadcast online_users to User %s - closing connection\n", userIDVal) // Renamed userID to userIDVal
+			delete(h.Clients, userIDVal) // Remove from hub // Renamed userID to userIDVal
 			close(client.Send)        // Close the channel
 		}
+	}
+}
+
+// NotifyUser implements the services.RealTimeNotifier interface.
+// This method sends a generic payload to a specific user if they are connected.
+func (h *Hub) NotifyUser(userID string, payload interface{}) error {
+	client, ok := h.Clients[userID]
+	if !ok {
+		log.Printf("NotifyUser: Client for user ID %s not found. Notification not sent.", userID)
+		return fmt.Errorf("client for user ID %s not found", userID)
+	}
+
+	// Check if client still exists in the main map (could have disconnected during iteration)
+	if _, clientStillConnected := h.Clients[userID]; !clientStillConnected {
+		log.Printf("NotifyUser: Client for user ID %s disconnected before sending. Notification not sent.", userID)
+		return fmt.Errorf("client for user ID %s disconnected before sending", userID)
+	}
+
+	// Check if the payload is a notification and structure it accordingly
+	var messageToSend interface{}
+	if notification, isNotification := payload.(*models.Notification); isNotification {
+		messageToSend = map[string]interface{}{
+			"type": "notification_created",
+			"data": notification,
+		}
+		log.Printf("NotifyUser: Sending structured notification_created message to user %s.", userID)
+	} else {
+		messageToSend = payload // Send other payloads as is
+		log.Printf("NotifyUser: Sending generic payload to user %s.", userID)
+	}
+
+	select {
+	case client.Send <- messageToSend:
+		log.Printf("NotifyUser: Successfully sent message to user %s.", userID)
+		return nil
+	default:
+		// Failed to send (channel full or closed), assume client disconnected
+		log.Printf("NotifyUser: Failed to send message to User %s - closing connection as channel is likely blocked or closed.", userID)
+		delete(h.Clients, userID)
+		close(client.Send)
+		return fmt.Errorf("failed to send message to user %s, connection closed", userID)
 	}
 }
