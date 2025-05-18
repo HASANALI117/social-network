@@ -135,7 +135,11 @@ func (h *Hub) Run() {
 					createdAt = time.Now() // Default to now if empty
 				}
 
+				// Generate a unique ID for the group message
+				newGroupMessageID := uuid.NewString()
+
 				groupMsg := &models.GroupMessage{
+					ID:        newGroupMessageID, // Assign the generated UUID
 					GroupID:   message.ReceiverID, // GroupID is in the ReceiverID field
 					SenderID:  message.SenderID,
 					Content:   message.Content,
