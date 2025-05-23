@@ -47,6 +47,7 @@ type GroupRepository interface {
 	IsAdmin(groupID, userID string) (bool, error)
 	ListGroupsByUser(userID string, limit, offset int) ([]*models.Group, error) // Added
 	GetMembersByGroupID(groupID string) ([]types.UserBasicInfo, error)          // New method
+	GetMemberIDsByGroupID(groupID string) ([]string, error)                     // New method for Hub
 
 	// Invitation Management
 	CreateInvitation(invitation *models.GroupInvitation) error
@@ -539,6 +540,34 @@ func (r *groupRepository) GetMembersByGroupID(groupID string) ([]types.UserBasic
 	}
 
 	return members, nil
+}
+// GetMemberIDsByGroupID retrieves all user IDs who are members of a group
+func (r *groupRepository) GetMemberIDsByGroupID(groupID string) ([]string, error) {
+	query := `
+        SELECT gm.user_id
+        FROM group_members gm
+        WHERE gm.group_id = ?
+    `
+	rows, err := r.db.Query(query, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list group member IDs: %w", err)
+	}
+	defer rows.Close()
+
+	var memberIDs []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, fmt.Errorf("failed to scan member ID during list: %w", err)
+		}
+		memberIDs = append(memberIDs, userID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating member ID list rows: %w", err)
+	}
+
+	return memberIDs, nil
 }
 
 // IsMember checks if a user is a member of a group

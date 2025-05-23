@@ -1,1209 +1,1164 @@
 {
-"info": {
-"_postman_id": "YOUR_COLLECTION_ID",
-"name": "Social Network API (Refactored)",
-"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-"description": "API endpoints for the refactored social network backend."
-},
-"item": [
-{
-"name": "Auth",
-"item": [
-{
-"name": "Sign Up (Create User)",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"username\": \"testuser\",\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\",\n    \"first_name\": \"Test\",\n    \"last_name\": \"User\",\n    \"dob\": \"1990-01-01\",\n    \"avatar_url\": \"\",\n    \"about_me\": \"Just a test user\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/users/",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", ""]
-},
-"description": "Creates a new user account. Equivalent to Sign Up."
-},
-"response": []
-},
-{
-"name": "Sign In",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"identifier\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/auth/signin",
-"host": ["{{baseUrl}}"],
-"path": ["api", "auth", "signin"]
-},
-"description": "Logs in a user and sets the session_token cookie."
-},
-"response": []
-},
-{
-"name": "Sign Out",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/auth/signout",
-"host": ["{{baseUrl}}"],
-"path": ["api", "auth", "signout"]
-},
-"description": "Logs out the current user by deleting the session."
-},
-"response": []
-},
-{
-"name": "Update User Privacy [Auth Required]",
-"request": {
-"method": "PUT",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"is_private\": true \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}/privacy",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}", "privacy"]
-},
-"description": "Updates the privacy setting (public/private) for the specified user. Requires authentication (TODO: implement auth check)."
-},
-"response": []
-}
-]
-},
-{
-"name": "Users",
-"item": [
-{
-"name": "List Users",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/users/?limit=10&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", ""],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Retrieves a list of users."
-},
-"response": []
-},
-{
-"name": "Get User By ID",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}"]
-},
-"description": "Retrieves details for a specific user."
-},
-"response": []
-},
-{
-"name": "Update User [Auth Required]",
-"request": {
-"method": "PUT",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"first_name\": \"UpdatedTest\",\n    \"last_name\": \"UpdatedUser\",\n    \"dob\": \"1991-02-02\",\n    \"avatar_url\": \"http://example.com/new_avatar.jpg\",\n    \"about_me\": \"Updated bio.\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}"]
-},
-"description": "Updates the profile of the currently logged-in user."
-},
-"response": []
-},
-{
-"name": "Delete User [Auth Required]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}"]
-},
-"description": "Deletes the currently logged-in user."
-},
-"response": []
-}
-]
-},
-{
-"name": "Posts",
-"item": [
-{
-"name": "Create Post [Auth Required]",
-"examples": [
-{
-"name": "Create Public Post",
-"originalRequest": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"My Public Post\",\n    \"content\": \"This post is visible to everyone!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/posts/",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"posts",
-""
-]
-}
-},
-"response": []
-},
-{
-"name": "Create Almost Private Post (Followers Only)",
-"originalRequest": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"My Almost Private Post\",\n    \"content\": \"This post is visible only to my followers.\",\n    \"image_url\": \"\",\n    \"privacy\": \"almost_private\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/posts/",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"posts",
-""
-]
-}
-},
-"response": []
-},
-{
-"name": "Create Private Post (Specific Users)",
-"originalRequest": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"My Private Post\",\n    \"content\": \"This post is visible only to specific users.\",\n    \"image_url\": \"\",\n    \"privacy\": \"private\",\n    \"allowed_user_ids\": [\n        \"REPLACE_WITH_ALLOWED_USER_ID_1\",\n        \"REPLACE_WITH_ALLOWED_USER_ID_2\"\n    ]\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/posts/",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"posts",
-""
-]
-}
-},
-"response": []
-},
-{
-"name": "Create Group Post",
-"originalRequest": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"My Group Post\",\n    \"content\": \"This post is only visible within the group.\",\n    \"image_url\": \"\",\n    \"group_id\": \"{{groupId}}\" \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/posts/",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"posts",
-""
-]
-}
-},
-"response": []
-}
-],
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": [],\n    \"group_id\": null \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/posts/",
-"host": ["{{baseUrl}}"],
-"path": ["api", "posts", ""]
-},
-"description": "Creates a new post. Requires authentication.\n\n**Post Types:**\n*   **Regular Post:** Set `privacy` (`public`, `almost_private`, `private`) and optionally `allowed_user_ids` (for `private`). Leave `group_id` as `null` or omit it.\n*   **Group Post:** Set `group_id` to the target group's ID. `privacy` and `allowed_user_ids` are ignored. Requires membership in the group.\n\nSee examples for different types."
-},
-"response": []
-},
-{
-"name": "List Posts (Feed)",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/posts/?limit=10&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "posts", ""],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Retrieves a list of posts visible to the requesting user (based on authentication and relationships).\n\n- **Anonymous:** Sees only `public` posts.\n- **Authenticated:** Sees `public` posts, their own posts, `almost_private` posts from users they follow, and `private` posts they are specifically allowed to see."
-},
-"response": []
-},
-{
-"name": "Get Post By ID [Check Auth]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/posts/{{postId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "posts", "{{postId}}"]
-},
-"description": "Retrieves details for a specific post. \n\nAccess depends on the post's privacy and the requesting user's relationship:\n- Owner can always view.\n- Anyone can view `public` posts.\n- Followers can view `almost_private` posts.\n- Specifically allowed users can view `private` posts.\n- Unauthorized users will receive a 404 Not Found."
-},
-"response": []
-},
-{
-"name": "List Posts By User [Check Auth]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/posts/user/{{userId}}?limit=10&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "posts", "user", "{{userId}}"],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Retrieves posts created by a specific user (`{{userId}}`), filtered based on the requesting user's permissions.\n\n- **Viewing Own Profile:** Sees all their own posts.\n- **Viewing Other Profile:** Sees posts based on the same rules as the main feed (public, almost_private if following, private if allowed)."
-},
-"response": []
-},
-{
-"name": "Delete Post [Auth Required]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/posts/{{postId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "posts", "{{postId}}"]
-},
-"description": "Deletes a specific post. Requires authentication and ownership.\n\n**Group Posts:** Deleting a post within a group requires the user to be the post owner OR an admin of the group."
-},
-"response": []
-}
-]
-},
-{
-"name": "Followers",
-"item": [
-{
-"name": "Follow User [Auth Required]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{targetUserId}}/follow",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{targetUserId}}", "follow"]
-},
-"description": "Sends a follow request to another user."
-},
-"response": []
-},
-{
-"name": "Unfollow User [Auth Required]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{targetUserId}}/unfollow",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{targetUserId}}", "unfollow"]
-},
-"description": "Stops following another user."
-},
-"response": []
-},
-{
-"name": "Accept Follow Request [Auth Required]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{requesterId}}/accept",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{requesterId}}", "accept"]
-},
-"description": "Accepts a follow request from another user."
-},
-"response": []
-},
-{
-"name": "Reject Follow Request [Auth Required]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{requesterId}}/reject",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{requesterId}}", "reject"]
-},
-"description": "Rejects a follow request from another user."
-},
-"response": []
-},
-{
-"name": "List Followers [Auth Required]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}/followers?limit=10&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}", "followers"],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Lists all users who follow the specified user (paginated)."
-},
-"response": []
-},
-{
-"name": "List Following [Auth Required]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/users/{{userId}}/following?limit=10&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "{{userId}}", "following"],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Lists all users that the specified user follows (paginated)."
-},
-"response": []
-},
-{
-"name": "List Pending Follow Requests [Auth Required]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/users/me/follow-requests",
-"host": ["{{baseUrl}}"],
-"path": ["api", "users", "me", "follow-requests"]
-},
-"description": "Lists all pending follow requests for the authenticated user. Returns a JSON object with 'received' and 'sent' arrays."
-},
-"response": []
-}
-]
-},
-{
-"name": "Comments",
-"item": [
-{
-"name": "Create Comment [Auth Required]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"content\": \"This is a great post!\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/posts/{{postId}}/comments",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"posts",
-"{{postId}}",
-"comments"
-]
-},
-"description": "Adds a comment to a specific post. Requires authentication and permission to view the post."
-},
-"response": []
-},
-{
-"name": "List Comments for Post [Check Auth]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/posts/{{postId}}/comments?limit=10&offset=0",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"posts",
-"{{postId}}",
-"comments"
-],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Retrieves comments for a specific post. Requires permission to view the post."
-},
-"response": []
-},
-{
-"name": "Delete Comment [Auth Required]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/comments/{{commentId}}",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"comments",
-"{{commentId}}"
-]
-},
-"description": "Deletes a specific comment. Requires authentication and ownership of the comment.\n\n**Group Post Comments:** Deleting a comment on a group post requires the user to be the comment owner OR an admin of the group."
-},
-"response": []
-}
-]
-},
-{
-"name": "Groups",
-"item": [
-{
-"name": "Create Group [Auth Required]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"name\": \"Test Group Alpha\",\n    \"description\": \"A group for testing purposes.\",\n    \"avatar_url\": \"\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", ""]
-},
-"description": "Creates a new group. Requires authentication."
-},
-"response": []
-},
-{
-"name": "List Groups [Auth Required]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/?limit=10&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", ""],
-"query": [
-{
-"key": "limit",
-"value": "10"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Retrieves a list of groups (requires auth)."
-},
-"response": []
-},
-{
-"name": "Get Group By ID [Auth Required]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}"]
-},
-"description": "Retrieves details for a specific group."
-},
-"response": []
-},
-{
-"name": "Update Group [Auth Required, Admin]",
-"request": {
-"method": "PUT",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"name\": \"Test Group Alpha (Updated)\",\n    \"description\": \"Updated description.\",\n    \"avatar_url\": \"http://example.com/group.jpg\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}"]
-},
-"description": "Updates details for a specific group. Requires admin role."
-},
-"response": []
-},
-{
-"name": "Delete Group [Auth Required, Creator]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}"]
-},
-"description": "Deletes a specific group. Requires creator role."
-},
-"response": []
-},
-{
-"name": "List Group Members [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/members",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}", "members"]
-},
-"description": "Lists members of a specific group. Requires membership."
-},
-"response": []
-},
-{
-"name": "Remove Group Member [Auth Required, Admin or Self]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/members/{{targetUserId}}",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}", "members", "{{targetUserId}}"]
-},
-"description": "Removes a user from a group. Requires admin role or self-removal."
-},
-"response": []
-},
-{
-"name": "List Group Messages [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/messages?limit=20&offset=0",
-"host": ["{{baseUrl}}"],
-"path": ["api", "groups", "{{groupId}}", "messages"],
-"query": [
-{
-"key": "limit",
-"value": "20"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Lists messages in a specific group. Requires membership. Currently stubbed."
-},
-"response": []
-},
-{
-"name": "List Group Posts [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/posts?limit=20&offset=0",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"posts"
-],
-"query": [
-{
-"key": "limit",
-"value": "20"
-},
-{
-"key": "offset",
-"value": "0"
-}
-]
-},
-"description": "Lists posts within a specific group. Requires membership in the group."
-},
-"response": []
-},
-{
-"name": "Group Events",
-"item": [
-{
-"name": "Create Event [Auth Required, Member]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"Team Meeting\",\n    \"description\": \"Discuss project progress.\",\n    \"event_time\": \"2025-05-15T14:00:00Z\" \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events"
-]
-},
-"description": "Creates a new event within a specific group. Requires the user to be a member of the group."
-},
-"response": []
-},
-{
-"name": "List Events by Group ID [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events"
-]
-},
-"description": "Retrieves a list of all events for a specific group. Requires the user to be a member of the group."
-},
-"response": []
-},
-{
-"name": "Get Event by ID [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events",
-"{{eventId}}"
-]
-},
-"description": "Retrieves detailed information for a specific event within a group, including the list of user responses and the counts of 'going'/'not_going'. Requires the user to be a member of the group."
-},
-"response": []
-},
-{
-"name": "Update Event [Auth Required, Creator]",
-"request": {
-"method": "PUT",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"title\": \"Team Meeting (Updated Location)\",\n    \"description\": \"Discuss project progress in Conference Room B.\",\n    \"event_time\": \"2025-05-15T14:30:00Z\" \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events",
-"{{eventId}}"
-]
-},
-"description": "Updates details for a specific event. Requires the user to be the creator of the event."
-},
-"response": []
-},
-{
-"name": "Delete Event [Auth Required, Creator]",
-"request": {
-"method": "DELETE",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events",
-"{{eventId}}"
-]
-},
-"description": "Deletes a specific event. Requires the user to be the creator of the event."
-},
-"response": []
-},
-{
-"name": "Respond to Event [Auth Required, Member]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"response\": \"going\" \n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events",
-"{{eventId}}",
-"responses"
-]
-},
-"description": "Sets or updates the authenticated user's response ('going' or 'not_going') to a specific event. Requires the user to be a member of the group."
-},
-"response": []
-},
-{
-"name": "List Event Responses [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events",
-"{{eventId}}",
-"responses"
-]
-},
-"description": "Retrieves a list of all user responses ('going' or 'not_going') for a specific event. Requires the user to be a member of the group."
-},
-"response": []
-},
-{
-"name": "Get Event Response Counts [Auth Required, Member]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses/counts",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"events",
-"{{eventId}}",
-"responses",
-"counts"
-]
-},
-"description": "Retrieves the counts of 'going' and 'not_going' responses for a specific event. Requires the user to be a member of the group."
-},
-"response": []
-}
-]
-}
-]
-},
-{
-"name": "Group Invitations",
-"item": [
-{
-"name": "Invite User to Group [Auth Required, Member/Admin]",
-"request": {
-"method": "POST",
-"header": [
-{
-"key": "Content-Type",
-"value": "application/json"
-}
-],
-"body": {
-"mode": "raw",
-"raw": "{\n    \"invitee_id\": \"{{targetUserId}}\"\n}"
-},
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/invitations",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"invitations"
-]
-},
-"description": "Invites a user (targetUserId) to join a specific group (groupId). Requires the sender to be a member or admin."
-},
-"response": []
-},
-{
-"name": "List Pending Invitations (For Me) [Auth Required]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/invitations/pending",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"invitations",
-"pending"
-]
-},
-"description": "Lists all pending group invitations for the currently authenticated user."
-},
-"response": []
-},
-{
-"name": "Accept Group Invitation [Auth Required]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/accept",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"invitations",
-"{{invitationId}}",
-"accept"
-]
-},
-"description": "Accepts a specific group invitation. Requires the authenticated user to be the invitee."
-},
-"response": []
-},
-{
-"name": "Reject Group Invitation [Auth Required]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/reject",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"invitations",
-"{{invitationId}}",
-"reject"
-]
-},
-"description": "Rejects a specific group invitation. Requires the authenticated user to be the invitee."
-},
-"response": []
-}
-]
-},
-{
-"name": "Group Join Requests",
-"item": [
-{
-"name": "Request to Join Group [Auth Required]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/requests",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"requests"
-]
-},
-"description": "Sends a request to join a specific group (groupId). Cannot request to join if already a member or creator."
-},
-"response": []
-},
-{
-"name": "List Pending Join Requests (For Group) [Auth Required, Admin]",
-"request": {
-"method": "GET",
-"url": {
-"raw": "{{baseUrl}}/api/groups/{{groupId}}/requests/pending",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"{{groupId}}",
-"requests",
-"pending"
-]
-},
-"description": "Lists all pending requests to join a specific group (groupId). Requires the authenticated user to be an admin of the group."
-},
-"response": []
-},
-{
-"name": "Accept Group Join Request [Auth Required, Admin]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/accept",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"requests",
-"{{requestId}}",
-"accept"
-]
-},
-"description": "Accepts a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
-},
-"response": []
-},
-{
-"name": "Reject Group Join Request [Auth Required, Admin]",
-"request": {
-"method": "POST",
-"url": {
-"raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/reject",
-"host": [
-"{{baseUrl}}"
-],
-"path": [
-"api",
-"groups",
-"requests",
-"{{requestId}}",
-"reject"
-]
-},
-"description": "Rejects a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
-},
-"response": []
-}
-]
-}
-],
-"variable": [
-{
-"key": "baseUrl",
-"value": "http://localhost:8080",
-"type": "string"
-},
-{
-"key": "userId",
-"value": "REPLACE_WITH_USER_ID",
-"type": "string"
-},
-{
-"key": "postId",
-"value": "REPLACE_WITH_POST_ID",
-"type": "string"
-},
-{
-"key": "groupId",
-"value": "REPLACE_WITH_GROUP_ID",
-"type": "string"
-},
-{
-"key": "targetUserId",
-"value": "REPLACE_WITH_TARGET_USER_ID",
-"type": "string"
-},
-{
-"key": "requesterId",
-"value": "REPLACE_WITH_REQUESTER_ID",
-"type": "string"
-},
-{
-"key": "commentId",
-"value": "REPLACE_WITH_COMMENT_ID",
-"type": "string"
-},
-{
-"key": "invitationId",
-"value": "REPLACE_WITH_INVITATION_ID",
-"type": "string"
-},
-{
-"key": "requestId",
-"value": "REPLACE_WITH_REQUEST_ID",
-"type": "string"
-},
-{
-"key": "eventId",
-"value": "REPLACE_WITH_EVENT_ID",
-"type": "string"
-}
-]
+  "info": {
+    "_postman_id": "YOUR_COLLECTION_ID",
+    "name": "Social Network API (Refactored)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "API endpoints for the refactored social network backend."
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sign Up (Create User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"testuser\",\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\",\n    \"first_name\": \"Test\",\n    \"last_name\": \"User\",\n    \"dob\": \"1990-01-01\",\n    \"avatar_url\": \"\",\n    \"about_me\": \"Just a test user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", ""]
+            },
+            "description": "Creates a new user account. Equivalent to Sign Up."
+          },
+          "response": []
+        },
+        {
+          "name": "Sign In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"identifier\": \"test@example.com\", \n    \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signin"]
+            },
+            "description": "Logs in a user and sets the session_token cookie."
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Out",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signout"]
+            },
+            "description": "Logs out the current user by deleting the session."
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Privacy [Auth Required]",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"is_private\": true \n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/privacy",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}", "privacy"]
+            },
+            "description": "Updates the privacy setting (public/private) for the specified user. Requires authentication (TODO: implement auth check)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", ""],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Retrieves a list of users."
+          },
+          "response": []
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Retrieves details for a specific user."
+          },
+          "response": []
+        },
+        {
+          "name": "Update User [Auth Required]",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"UpdatedTest\",\n    \"last_name\": \"UpdatedUser\",\n    \"dob\": \"1991-02-02\",\n    \"avatar_url\": \"http://example.com/new_avatar.jpg\",\n    \"about_me\": \"Updated bio.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Updates the profile of the currently logged-in user."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User [Auth Required]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Deletes the currently logged-in user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Posts",
+      "item": [
+        {
+          "name": "Create Post [Auth Required]",
+          "examples": [
+            {
+              "name": "Create Public Post",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"My Public Post\",\n    \"content\": \"This post is visible to everyone!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/posts/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "posts", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Almost Private Post (Followers Only)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"My Almost Private Post\",\n    \"content\": \"This post is visible only to my followers.\",\n    \"image_url\": \"\",\n    \"privacy\": \"almost_private\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/posts/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "posts", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Private Post (Specific Users)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"My Private Post\",\n    \"content\": \"This post is visible only to specific users.\",\n    \"image_url\": \"\",\n    \"privacy\": \"private\",\n    \"allowed_user_ids\": [\n        \"REPLACE_WITH_ALLOWED_USER_ID_1\",\n        \"REPLACE_WITH_ALLOWED_USER_ID_2\"\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/posts/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "posts", ""]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Group Post",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"My Group Post\",\n    \"content\": \"This post is only visible within the group.\",\n    \"image_url\": \"\",\n    \"group_id\": \"{{groupId}}\" \n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/posts/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "posts", ""]
+                }
+              },
+              "response": []
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"My Post (Default Example)\",\n    \"content\": \"This is the content of my post!\",\n    \"image_url\": \"\",\n    \"privacy\": \"public\",\n    \"allowed_user_ids\": [],\n    \"group_id\": null \n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", ""]
+            },
+            "description": "Creates a new post. Requires authentication.\n\n**Post Types:**\n*   **Regular Post:** Set `privacy` (`public`, `almost_private`, `private`) and optionally `allowed_user_ids` (for `private`). Leave `group_id` as `null` or omit it.\n*   **Group Post:** Set `group_id` to the target group's ID. `privacy` and `allowed_user_ids` are ignored. Requires membership in the group.\n\nSee examples for different types."
+          },
+          "response": []
+        },
+        {
+          "name": "List Posts (Feed)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", ""],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Retrieves a list of posts visible to the requesting user (based on authentication and relationships).\n\n- **Anonymous:** Sees only `public` posts.\n- **Authenticated:** Sees `public` posts, their own posts, `almost_private` posts from users they follow, and `private` posts they are specifically allowed to see."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Post By ID [Check Auth]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{postId}}"]
+            },
+            "description": "Retrieves details for a specific post. \n\nAccess depends on the post's privacy and the requesting user's relationship:\n- Owner can always view.\n- Anyone can view `public` posts.\n- Followers can view `almost_private` posts.\n- Specifically allowed users can view `private` posts.\n- Unauthorized users will receive a 404 Not Found."
+          },
+          "response": []
+        },
+        {
+          "name": "List Posts By User [Check Auth]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/user/{{userId}}?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "user", "{{userId}}"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Retrieves posts created by a specific user (`{{userId}}`), filtered based on the requesting user's permissions.\n\n- **Viewing Own Profile:** Sees all their own posts.\n- **Viewing Other Profile:** Sees posts based on the same rules as the main feed (public, almost_private if following, private if allowed)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Post [Auth Required]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{postId}}"]
+            },
+            "description": "Deletes a specific post. Requires authentication and ownership.\n\n**Group Posts:** Deleting a post within a group requires the user to be the post owner OR an admin of the group."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Followers",
+      "item": [
+        {
+          "name": "Follow User [Auth Required]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{targetUserId}}/follow",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{targetUserId}}", "follow"]
+            },
+            "description": "Sends a follow request to another user."
+          },
+          "response": []
+        },
+        {
+          "name": "Unfollow User [Auth Required]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{targetUserId}}/unfollow",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{targetUserId}}", "unfollow"]
+            },
+            "description": "Stops following another user."
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Follow Request [Auth Required]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{requesterId}}/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{requesterId}}", "accept"]
+            },
+            "description": "Accepts a follow request from another user."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Follow Request [Auth Required]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{requesterId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{requesterId}}", "reject"]
+            },
+            "description": "Rejects a follow request from another user."
+          },
+          "response": []
+        },
+        {
+          "name": "List Followers [Auth Required]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/followers?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}", "followers"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Lists all users who follow the specified user (paginated)."
+          },
+          "response": []
+        },
+        {
+          "name": "List Following [Auth Required]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/following?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}", "following"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Lists all users that the specified user follows (paginated)."
+          },
+          "response": []
+        },
+        {
+          "name": "List Pending Follow Requests [Auth Required]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/follow-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me", "follow-requests"]
+            },
+            "description": "Lists all pending follow requests for the authenticated user. Returns a JSON object with 'received' and 'sent' arrays."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Comments",
+      "item": [
+        {
+          "name": "Create Comment [Auth Required]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"content\": \"This is a great post!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{postId}}", "comments"]
+            },
+            "description": "Adds a comment to a specific post. Requires authentication and permission to view the post."
+          },
+          "response": []
+        },
+        {
+          "name": "List Comments for Post [Check Auth]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{postId}}/comments?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{postId}}", "comments"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Retrieves comments for a specific post. Requires permission to view the post."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Comment [Auth Required]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/comments/{{commentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comments", "{{commentId}}"]
+            },
+            "description": "Deletes a specific comment. Requires authentication and ownership of the comment.\n\n**Group Post Comments:** Deleting a comment on a group post requires the user to be the comment owner OR an admin of the group."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "Create Group [Auth Required]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Group Alpha\",\n    \"description\": \"A group for testing purposes.\",\n    \"avatar_url\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", ""]
+            },
+            "description": "Creates a new group. Requires authentication."
+          },
+          "response": []
+        },
+        {
+          "name": "List Groups [Auth Required]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", ""],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Retrieves a list of groups (requires auth)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Group By ID [Auth Required]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}"]
+            },
+            "description": "Retrieves details for a specific group."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Group [Auth Required, Admin]",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test Group Alpha (Updated)\",\n    \"description\": \"Updated description.\",\n    \"avatar_url\": \"http://example.com/group.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}"]
+            },
+            "description": "Updates details for a specific group. Requires admin role."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Group [Auth Required, Creator]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}"]
+            },
+            "description": "Deletes a specific group. Requires creator role."
+          },
+          "response": []
+        },
+        {
+          "name": "List Group Members [Auth Required, Member]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "members"]
+            },
+            "description": "Lists members of a specific group. Requires membership."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Group Member [Auth Required, Admin or Self]",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/members/{{targetUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "groups",
+                "{{groupId}}",
+                "members",
+                "{{targetUserId}}"
+              ]
+            },
+            "description": "Removes a user from a group. Requires admin role or self-removal."
+          },
+          "response": []
+        },
+        {
+          "name": "List Group Messages [Auth Required, Member]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/messages?limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "messages"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Lists messages in a specific group. Requires membership. Currently stubbed."
+          },
+          "response": []
+        },
+        {
+          "name": "List Group Posts [Auth Required, Member]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/posts?limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "posts"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Lists posts within a specific group. Requires membership in the group."
+          },
+          "response": []
+        },
+        {
+          "name": "Group Events",
+          "item": [
+            {
+              "name": "Create Event [Auth Required, Member]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"Team Meeting\",\n    \"description\": \"Discuss project progress.\",\n    \"event_time\": \"2025-05-15T14:00:00Z\" \n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "groups", "{{groupId}}", "events"]
+                },
+                "description": "Creates a new event within a specific group. Requires the user to be a member of the group."
+              },
+              "response": []
+            },
+            {
+              "name": "List Events by Group ID [Auth Required, Member]",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "groups", "{{groupId}}", "events"]
+                },
+                "description": "Retrieves a list of all events for a specific group. Requires the user to be a member of the group."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Event by ID [Auth Required, Member]",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "groups",
+                    "{{groupId}}",
+                    "events",
+                    "{{eventId}}"
+                  ]
+                },
+                "description": "Retrieves detailed information for a specific event within a group, including the list of user responses and the counts of 'going'/'not_going'. Requires the user to be a member of the group."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Event [Auth Required, Creator]",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"Team Meeting (Updated Location)\",\n    \"description\": \"Discuss project progress in Conference Room B.\",\n    \"event_time\": \"2025-05-15T14:30:00Z\" \n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "groups",
+                    "{{groupId}}",
+                    "events",
+                    "{{eventId}}"
+                  ]
+                },
+                "description": "Updates details for a specific event. Requires the user to be the creator of the event."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Event [Auth Required, Creator]",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "groups",
+                    "{{groupId}}",
+                    "events",
+                    "{{eventId}}"
+                  ]
+                },
+                "description": "Deletes a specific event. Requires the user to be the creator of the event."
+              },
+              "response": []
+            },
+            {
+              "name": "Respond to Event [Auth Required, Member]",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"response\": \"going\" \n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "groups",
+                    "{{groupId}}",
+                    "events",
+                    "{{eventId}}",
+                    "responses"
+                  ]
+                },
+                "description": "Sets or updates the authenticated user's response ('going' or 'not_going') to a specific event. Requires the user to be a member of the group."
+              },
+              "response": []
+            },
+            {
+              "name": "List Event Responses [Auth Required, Member]",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "groups",
+                    "{{groupId}}",
+                    "events",
+                    "{{eventId}}",
+                    "responses"
+                  ]
+                },
+                "description": "Retrieves a list of all user responses ('going' or 'not_going') for a specific event. Requires the user to be a member of the group."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Event Response Counts [Auth Required, Member]",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/groups/{{groupId}}/events/{{eventId}}/responses/counts",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "groups",
+                    "{{groupId}}",
+                    "events",
+                    "{{eventId}}",
+                    "responses",
+                    "counts"
+                  ]
+                },
+                "description": "Retrieves the counts of 'going' and 'not_going' responses for a specific event. Requires the user to be a member of the group."
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Group Invitations",
+      "item": [
+        {
+          "name": "Invite User to Group [Auth Required, Member/Admin]",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"invitee_id\": \"{{targetUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/invitations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "invitations"]
+            },
+            "description": "Invites a user (targetUserId) to join a specific group (groupId). Requires the sender to be a member or admin."
+          },
+          "response": []
+        },
+        {
+          "name": "List Pending Invitations (For Me) [Auth Required]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/invitations/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "invitations", "pending"]
+            },
+            "description": "Lists all pending group invitations for the currently authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Group Invitation [Auth Required]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/accept",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "groups",
+                "invitations",
+                "{{invitationId}}",
+                "accept"
+              ]
+            },
+            "description": "Accepts a specific group invitation. Requires the authenticated user to be the invitee."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Group Invitation [Auth Required]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/invitations/{{invitationId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "groups",
+                "invitations",
+                "{{invitationId}}",
+                "reject"
+              ]
+            },
+            "description": "Rejects a specific group invitation. Requires the authenticated user to be the invitee."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Group Join Requests",
+      "item": [
+        {
+          "name": "Request to Join Group [Auth Required]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "requests"]
+            },
+            "description": "Sends a request to join a specific group (groupId). Cannot request to join if already a member or creator."
+          },
+          "response": []
+        },
+        {
+          "name": "List Pending Join Requests (For Group) [Auth Required, Admin]",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/requests/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "requests", "pending"]
+            },
+            "description": "Lists all pending requests to join a specific group (groupId). Requires the authenticated user to be an admin of the group."
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Group Join Request [Auth Required, Admin]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "requests", "{{requestId}}", "accept"]
+            },
+            "description": "Accepts a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Group Join Request [Auth Required, Admin]",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/requests/{{requestId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "requests", "{{requestId}}", "reject"]
+            },
+            "description": "Rejects a specific join request (requestId). Requires the authenticated user to be an admin of the group associated with the request."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List User Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Number of notifications to retrieve (default: 20)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Number of notifications to skip (default: 0)"
+                }
+              ]
+            },
+            "description": "Retrieves notifications for the authenticated user, with pagination. Auth Required."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications", "{{notificationId}}", "read"]
+            },
+            "description": "Marks a specific notification as read for the authenticated user. Auth Required."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications", "read-all"]
+            },
+            "description": "Marks all notifications as read for the authenticated user. Auth Required."
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for managing user notifications."
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "REPLACE_WITH_USER_ID",
+      "type": "string"
+    },
+    {
+      "key": "postId",
+      "value": "REPLACE_WITH_POST_ID",
+      "type": "string"
+    },
+    {
+      "key": "groupId",
+      "value": "REPLACE_WITH_GROUP_ID",
+      "type": "string"
+    },
+    {
+      "key": "targetUserId",
+      "value": "REPLACE_WITH_TARGET_USER_ID",
+      "type": "string"
+    },
+    {
+      "key": "requesterId",
+      "value": "REPLACE_WITH_REQUESTER_ID",
+      "type": "string"
+    },
+    {
+      "key": "commentId",
+      "value": "REPLACE_WITH_COMMENT_ID",
+      "type": "string"
+    },
+    {
+      "key": "invitationId",
+      "value": "REPLACE_WITH_INVITATION_ID",
+      "type": "string"
+    },
+    {
+      "key": "requestId",
+      "value": "REPLACE_WITH_REQUEST_ID",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "REPLACE_WITH_EVENT_ID",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "REPLACE_WITH_NOTIFICATION_ID",
+      "type": "string"
+    }
+  ]
 }

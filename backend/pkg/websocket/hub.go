@@ -8,7 +8,7 @@ import (
 	// "github.com/HASANALI117/social-network/pkg/helpers" // No longer needed
 	"github.com/HASANALI117/social-network/pkg/models" // Keep for message structs
 	"github.com/HASANALI117/social-network/pkg/repositories"
-	"github.com/HASANALI117/social-network/pkg/services" // services.RealTimeNotifier will be implemented
+	// "github.com/HASANALI117/social-network/pkg/services" // services.RealTimeNotifier will be implemented - Removed as no longer used directly by Hub
 	"github.com/google/uuid" // Import UUID library
 )
 
@@ -19,7 +19,7 @@ type Hub struct {
 	Register        chan *Client
 	Unregister      chan *Client
 	chatMessageRepo repositories.ChatMessageRepository // Correct field
-	groupService    services.GroupService              // Correct field
+	groupRepo       repositories.GroupRepository       // Changed from groupService
 }
 
 type Message struct {
@@ -30,15 +30,15 @@ type Message struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-// Update NewHub signature to accept ChatMessageRepository and GroupService
-func NewHub(chatMessageRepo repositories.ChatMessageRepository, groupService services.GroupService) *Hub {
+// Update NewHub signature to accept ChatMessageRepository and GroupRepository
+func NewHub(chatMessageRepo repositories.ChatMessageRepository, groupRepo repositories.GroupRepository) *Hub {
 	return &Hub{
 		Clients:         make(map[string]*Client),
 		Broadcast:       make(chan *Message),
 		Register:        make(chan *Client),
 		Unregister:      make(chan *Client),
 		chatMessageRepo: chatMessageRepo, // Correct initialization
-		groupService:    groupService,    // Correct initialization
+		groupRepo:       groupRepo,       // Changed from groupService
 	}
 }
 
@@ -153,10 +153,10 @@ func (h *Hub) Run() {
 					fmt.Printf("❌ Error storing group message: %v\n", err)
 				}
 
-				// Use GroupService to check if sender is a member of the group
-				isMember, err := h.groupService.IsMember(message.ReceiverID, message.SenderID)
+				// Use GroupRepository to check if sender is a member of the group
+				isMember, err := h.groupRepo.IsMember(message.ReceiverID, message.SenderID)
 				if err != nil {
-					fmt.Printf("❌ Error checking group membership via service for user %s in group %s: %v\n", message.SenderID, message.ReceiverID, err)
+					fmt.Printf("❌ Error checking group membership via repository for user %s in group %s: %v\n", message.SenderID, message.ReceiverID, err)
 					continue // Skip if error checking membership
 				}
 				if !isMember {
@@ -164,22 +164,23 @@ func (h *Hub) Run() {
 					continue // Skip if not a member
 				}
 
-				// Use GroupService to get all group members, passing sender ID as requesting user
-				members, err := h.groupService.ListMembers(message.ReceiverID, message.SenderID)
+				// Use GroupRepository to get all group member IDs
+				// Assuming GetMemberIDsByGroupID returns []string, error
+				memberIDs, err := h.groupRepo.GetMemberIDsByGroupID(message.ReceiverID)
 				if err != nil {
-					fmt.Printf("❌ Error getting group members via service for group %s: %v\n", message.ReceiverID, err)
+					fmt.Printf("❌ Error getting group member IDs via repository for group %s: %v\n", message.ReceiverID, err)
 					continue
 				}
 
 				// Deliver the message to all online group members
-				for _, member := range members {
+				for _, memberID := range memberIDs {
 					// Send group message using direct channel send
-					if client, ok := h.Clients[member.ID]; ok {
+					if client, ok := h.Clients[memberID]; ok {
 						select {
 						case client.Send <- message: // Send the *Message struct
 						default:
-							fmt.Printf("⚠️ Failed to deliver group message to member %s - closing connection\n", member.ID)
-							delete(h.Clients, member.ID)
+							fmt.Printf("⚠️ Failed to deliver group message to member %s - closing connection\n", memberID)
+							delete(h.Clients, memberID)
 							close(client.Send)
 						}
 					}

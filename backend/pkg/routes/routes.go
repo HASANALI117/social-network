@@ -20,7 +20,8 @@ func Setup(dbConn *sql.DB) http.Handler {
 
 	// Initialize Websocket Hub first, as it's needed by NotificationService
 	// handlers.InitWebsocket stores the hub in handlers.WebSocketHub
-	handlers.InitWebsocket(repos.ChatMessage, nil) // GroupService might not be needed for Hub init if it's only for chat logic
+	// Initialize Websocket Hub with GroupRepository
+	handlers.InitWebsocket(repos.ChatMessage, repos.Group) // Pass GroupRepository
 	// If GroupService is truly needed for Hub's core (not just chat), this needs re-evaluation or a different Hub structure.
 	// For now, assuming NotificationService needs the Hub (RealTimeNotifier) and GroupService is for chat features within Hub.
 	// Let's assume for now that GroupService is not a direct dependency for the Hub's construction for notifications.
@@ -63,8 +64,8 @@ func Setup(dbConn *sql.DB) http.Handler {
 	// 3. Init Hub (passing the created GroupService)
 	// 4. Init all Services (passing the Hub to NotificationService, and other services as needed)
 
-	tempGroupService := services.NewGroupService(repos.Group, repos.User, repos.Post, repos.GroupEvent) // Temporary instance for Hub
-	handlers.InitWebsocket(repos.ChatMessage, tempGroupService) // Pass the temporary GroupService
+	// tempGroupService := services.NewGroupService(repos.Group, repos.User, repos.Post, repos.GroupEvent) // Temporary instance for Hub - No longer needed
+	// handlers.InitWebsocket(repos.ChatMessage, tempGroupService) // Pass the temporary GroupService - No longer needed as Hub uses GroupRepository
 
 	// Now initialize all services, including the "final" GroupService and NotificationService
 	allServices := services.InitServices(repos, handlers.WebSocketHub) // Pass the initialized Hub
