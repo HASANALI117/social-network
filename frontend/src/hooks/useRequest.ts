@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import { useUserStore } from '@/store/useUserStore';
+import { handleAutoLogout, isSessionExpiredError } from '@/utils/autoLogout';
 
 interface ApiResponse<T> {
   data: T | null;
@@ -17,6 +19,8 @@ export function useRequest<T = any>(): UseRequestReturn<T> {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const [data, setData] = useState<T | null>(null);
+  
+  const { isAuthenticated } = useUserStore();
 
   const handleRequest = useCallback(async (
     url: string, 
@@ -34,6 +38,12 @@ export function useRequest<T = any>(): UseRequestReturn<T> {
           ...options.headers,
         },
       });
+
+      // Check for 401 Unauthorized error - server is authoritative about auth status
+      if (isSessionExpiredError(response.status)) {
+        handleAutoLogout();
+        throw new Error('Session expired. Please log in again.');
+      }
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -54,7 +64,7 @@ export function useRequest<T = any>(): UseRequestReturn<T> {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const get = useCallback((url: string, onSuccess?: (data: T) => void) => {
     return handleRequest(url, { method: 'GET' }, onSuccess);

@@ -5,6 +5,7 @@ import (
 	"errors"       // Added for errors.Is
 	"fmt"
 	"log" // Added for logging
+	"strings"
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/models"
@@ -58,14 +59,17 @@ type UserService interface {
 
 // userService implements UserService interface
 type userService struct {
-	userRepo        repositories.UserRepository
-	postService     PostService     // Added PostService dependency
-	followerService FollowerService // Added FollowerService dependency
-	groupRepo       repositories.GroupRepository // New dependency
+	userRepo            repositories.UserRepository
+	postService         PostService     // Added PostService dependency
+	followerService     FollowerService // Added FollowerService dependency
+	groupRepo           repositories.GroupRepository // New dependency
+	// NotificationService is not directly used by UserService for creating follow request notifications.
+	// That logic will be in FollowerService. UserService might use it for other user-specific notifications in the future.
 }
 
 // NewUserService creates a new UserService
 func NewUserService(userRepo repositories.UserRepository, postService PostService, followerService FollowerService, groupRepo repositories.GroupRepository) UserService {
+	// No NotificationService needed here for now, as follow request notifications are handled by FollowerService.
 	return &userService{
 		userRepo:        userRepo,
 		postService:     postService,
@@ -74,11 +78,47 @@ func NewUserService(userRepo repositories.UserRepository, postService PostServic
 	}
 }
 
+// generateUsername creates a username in format: firstnameLastnameUUID[first-part]
+func (s *userService) generateUsername(firstName, lastName string) string {
+	// Clean and lowercase the names
+	cleanFirstName := strings.ToLower(strings.ReplaceAll(firstName, " ", ""))
+	cleanLastName := strings.ToLower(strings.ReplaceAll(lastName, " ", ""))
+	
+	// Generate UUID and take only the first part (before first hyphen)
+	fullUUID := uuid.New().String()
+	uuidParts := strings.Split(fullUUID, "-")
+	uuidFirstPart := uuidParts[0]
+	
+	// Combine into username format
+	username := cleanFirstName + cleanLastName + uuidFirstPart
+	
+	return username
+}
+
+// ensureUniqueUsername generates a unique username by checking against existing users
+func (s *userService) ensureUniqueUsername(firstName, lastName string) (string, error) {
+	maxAttempts := 5
+	for i := 0; i < maxAttempts; i++ {
+		username := s.generateUsername(firstName, lastName)
+		
+		// Check if username already exists
+		_, err := s.userRepo.GetByUsername(username)
+		if errors.Is(err, repositories.ErrUserNotFound) {
+			// Username doesn't exist, we can use it
+			return username, nil
+		}
+		if err != nil {
+			// Some other error occurred
+			return "", fmt.Errorf("failed to check username availability: %w", err)
+		}
+		// Username exists, try again
+	}
+	
+	return "", fmt.Errorf("failed to generate unique username after %d attempts", maxAttempts)
+}
+
 func (s *userService) Register(user *models.User) (*UserResponse, error) {
 	// Validate input
-	if user.Username == "" {
-		return nil, fmt.Errorf("username is required")
-	}
 	if user.Email == "" {
 		return nil, fmt.Errorf("email is required")
 	}
@@ -88,6 +128,20 @@ func (s *userService) Register(user *models.User) (*UserResponse, error) {
 	if len(user.Password) < 8 {
 		return nil, fmt.Errorf("password must be at least 8 characters")
 	}
+	
+	// Generate username if not provided
+	if user.Username == "" {
+		if user.FirstName == "" || user.LastName == "" {
+			return nil, fmt.Errorf("first name and last name are required for automatic username generation")
+		}
+		
+		generatedUsername, err := s.ensureUniqueUsername(user.FirstName, user.LastName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate username: %w", err)
+		}
+		user.Username = generatedUsername
+	}
+	
 	// Generate UUID for new user
 	user.ID = uuid.New().String()
 

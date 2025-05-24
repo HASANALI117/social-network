@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRequest } from '@/hooks/useRequest'; // Import ApiError
+import { useUserStore } from '@/store/useUserStore';
 import { GroupJoinRequest } from '@/types/GroupJoinRequest';
 import { UserBasicInfo } from '@/types/User';
 import { Avatar } from '@/components/ui/avatar';
@@ -17,6 +18,7 @@ interface GroupJoinRequestsTabProps {
 export default function GroupJoinRequestsTab({ groupId }: GroupJoinRequestsTabProps) {
   const [pendingJoinRequests, setPendingJoinRequests] = useState<GroupJoinRequest[]>([]);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const { isAuthenticated, hydrated } = useUserStore();
 
   const {
     isLoading,
@@ -28,7 +30,8 @@ export default function GroupJoinRequestsTab({ groupId }: GroupJoinRequestsTabPr
   const rejectRequestHook = useRequest<void>();
 
   useEffect(() => {
-    if (groupId) {
+    // Only fetch if user is authenticated, store is hydrated, and groupId is provided
+    if (groupId && isAuthenticated && hydrated) {
       fetchPendingJoinRequests(
         `/api/groups/${groupId}/requests/pending`,
         (apiResponse) => { // This is the onSuccess callback
@@ -42,8 +45,11 @@ export default function GroupJoinRequestsTab({ groupId }: GroupJoinRequestsTabPr
           }
         }
       );
+    } else if (!isAuthenticated) {
+      // Clear data if user is not authenticated
+      setPendingJoinRequests([]);
     }
-  }, [groupId, fetchPendingJoinRequests]);
+  }, [groupId, fetchPendingJoinRequests, isAuthenticated, hydrated]);
 
   const handleAccept = async (requestId: string) => {
     setProcessingRequestId(requestId);

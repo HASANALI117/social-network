@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -145,19 +146,21 @@ type GroupService interface {
 
 // groupService implements GroupService interface
 type groupService struct {
-	groupRepo repositories.GroupRepository
-	userRepo  repositories.UserRepository // Needed for checking user existence
-	postRepo  repositories.PostRepository
-	eventRepo repositories.GroupEventRepository
+	groupRepo           repositories.GroupRepository
+	userRepo            repositories.UserRepository // Needed for checking user existence
+	postRepo            repositories.PostRepository
+	eventRepo           repositories.GroupEventRepository
+	notificationService NotificationService
 }
 
 // NewGroupService creates a new GroupService
-func NewGroupService(groupRepo repositories.GroupRepository, userRepo repositories.UserRepository, postRepo repositories.PostRepository, eventRepo repositories.GroupEventRepository) GroupService {
+func NewGroupService(groupRepo repositories.GroupRepository, userRepo repositories.UserRepository, postRepo repositories.PostRepository, eventRepo repositories.GroupEventRepository, notificationService NotificationService) GroupService {
 	return &groupService{
-		groupRepo: groupRepo,
-		userRepo:  userRepo,
-		postRepo:  postRepo,
-		eventRepo: eventRepo,
+		groupRepo:           groupRepo,
+		userRepo:            userRepo,
+		postRepo:            postRepo,
+		eventRepo:           eventRepo,
+		notificationService: notificationService,
 	}
 }
 
@@ -757,7 +760,30 @@ func (s *groupService) InviteUser(groupID, inviteeID string, inviterID string) (
 		return nil, fmt.Errorf("failed to create invitation in repository: %w", err)
 	}
 
-	// 6. Map and return response (without details initially)
+	// 6. Create Notification
+	if s.notificationService != nil {
+		group, groupErr := s.groupRepo.GetByID(groupID)
+		inviter, inviterErr := s.userRepo.GetByID(inviterID)
+		if groupErr == nil && inviterErr == nil {
+			message := fmt.Sprintf("%s invited you to join %s.", inviter.Username, group.Name)
+			_, errNotif := s.notificationService.CreateNotification(
+				context.TODO(), // Using context.TODO() for now
+				inviteeID,
+				models.GroupInviteNotification,
+				models.GroupEntityType,
+				message,
+				groupID,
+			)
+			if errNotif != nil {
+				fmt.Printf("Warning: Failed to create group invite notification for invitee %s from inviter %s for group %s: %v\n", inviteeID, inviterID, groupID, errNotif)
+				// Non-fatal, proceed
+			}
+		} else {
+			fmt.Printf("Warning: Could not fetch group or inviter details for group invite notification. GroupErr: %v, InviterErr: %v\n", groupErr, inviterErr)
+		}
+	}
+
+	// 7. Map and return response (without details initially)
 	return mapInvitationToResponse(invitation, false, s.userRepo, s.groupRepo), nil
 }
 
@@ -885,7 +911,32 @@ func (s *groupService) RequestToJoin(groupID string, requesterID string) (*Group
 		return nil, fmt.Errorf("failed to create join request in repository: %w", err)
 	}
 
-	// 6. Map and return response (without details initially)
+	// 6. Create Notification for Group Creator(s)/Admin(s)
+	if s.notificationService != nil {
+		group, groupErr := s.groupRepo.GetByID(groupID)
+		requester, requesterErr := s.userRepo.GetByID(requesterID)
+		if groupErr == nil && requesterErr == nil {
+			// Assuming group.CreatorID is the one to notify.
+			// For multiple admins, this would need to fetch all admins.
+			message := fmt.Sprintf("%s wants to join your group %s.", requester.Username, group.Name)
+			_, errNotif := s.notificationService.CreateNotification(
+				context.TODO(), // Using context.TODO() for now
+				group.CreatorID, // Notify the group creator
+				models.GroupJoinRequestNotification,
+				models.UserEntityType, // Entity that performed the action
+				message,
+				requesterID, // ID of the user who made the request
+			)
+			if errNotif != nil {
+				fmt.Printf("Warning: Failed to create group join request notification for group creator %s from requester %s for group %s: %v\n", group.CreatorID, requesterID, groupID, errNotif)
+				// Non-fatal, proceed
+			}
+		} else {
+			fmt.Printf("Warning: Could not fetch group or requester details for group join request notification. GroupErr: %v, RequesterErr: %v\n", groupErr, requesterErr)
+		}
+	}
+
+	// 7. Map and return response (without details initially)
 	return mapJoinRequestToResponse(request, false, s.userRepo, s.groupRepo), nil
 }
 

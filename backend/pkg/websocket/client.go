@@ -1,4 +1,4 @@
-package ws
+package websocket // Changed package name
 
 import (
 	"log"

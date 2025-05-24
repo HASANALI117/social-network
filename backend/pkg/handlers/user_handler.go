@@ -179,7 +179,9 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) error {
 		}
 		// Check for generic validation errors (assuming service returns fmt.Errorf for now)
 		// TODO: Implement custom validation error types in service for better checking
-		if err.Error() == "username is required" || err.Error() == "email is required" || err.Error() == "password is required" || err.Error() == "password must be at least 8 characters" {
+		if err.Error() == "email is required" || err.Error() == "password is required" || err.Error() == "password must be at least 8 characters" || 
+		   strings.Contains(err.Error(), "first name and last name are required for automatic username generation") ||
+		   strings.Contains(err.Error(), "failed to generate username") {
 			return httperr.NewBadRequest(err, err.Error())
 		}
 		// Handle other errors as internal server error

@@ -21,8 +21,8 @@ var upgrader = websocket.Upgrader{
 var WebSocketHub *ws.Hub
 
 // InitWebsocket initializes the WebSocket Hub with necessary repository and service.
-func InitWebsocket(chatMessageRepo repositories.ChatMessageRepository, groupService services.GroupService) { // Changed groupRepo to groupService
-	WebSocketHub = ws.NewHub(chatMessageRepo, groupService) // Pass groupService to NewHub
+func InitWebsocket(chatMessageRepo repositories.ChatMessageRepository, groupRepo repositories.GroupRepository) { // Changed groupService to groupRepo
+	WebSocketHub = ws.NewHub(chatMessageRepo, groupRepo) // Pass groupRepo to NewHub
 	go WebSocketHub.Run()
 }
 

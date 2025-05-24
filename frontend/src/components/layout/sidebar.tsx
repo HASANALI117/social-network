@@ -1,7 +1,7 @@
-"use client"
+'use client';
 
-import { useEffect } from 'react'
-import { Avatar } from "@/components/ui/avatar"
+import { useEffect } from 'react';
+import { Avatar } from '@/components/ui/avatar';
 import {
   Sidebar,
   SidebarBody,
@@ -11,7 +11,7 @@ import {
   SidebarItem,
   SidebarLabel,
   SidebarSection,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/sidebar';
 import {
   Dropdown,
   DropdownButton,
@@ -19,42 +19,72 @@ import {
   DropdownItem,
   DropdownLabel,
   DropdownMenu,
-} from '@/components/ui/dropdown'
+} from '@/components/ui/dropdown';
 import {
   BellIcon,
   ChatBubbleLeftIcon,
   ChevronUpIcon,
   PlusIcon,
   UsersIcon,
-} from '@heroicons/react/16/solid'
+} from '@heroicons/react/16/solid';
 import {
   HomeIcon,
   PhotoIcon,
   UserCircleIcon,
   UserGroupIcon,
   UsersIcon as UsersIconOutline,
-} from '@heroicons/react/24/solid'
-import { usePathname } from 'next/navigation'
-import { AccountDropdownMenu } from './account-dropdown-menu'
-import { NotificationsDropdown } from './notifications-dropdown'
-import { Link } from "../ui/link"
-import { ChevronDownIcon, Cog8ToothIcon } from "@heroicons/react/20/solid"
-import { useUserStore } from '@/store/useUserStore'
+} from '@heroicons/react/24/solid';
+import { usePathname } from 'next/navigation';
+import { AccountDropdownMenu } from './account-dropdown-menu';
+import { NotificationsDropdown } from './notifications-dropdown';
+import { Link } from '../ui/link';
+import { ChevronDownIcon, Cog8ToothIcon } from '@heroicons/react/20/solid';
+import { useUserStore } from '@/store/useUserStore';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext';
+import { Notification } from '@/types/Notification';
 
 export function AppSidebar() {
-  const pathname = usePathname()
-  const { user, isAuthenticated } = useUserStore()
+  const pathname = usePathname();
+  const { user, isAuthenticated } = useUserStore();
+  const {
+    notifications,
+    unreadCount,
+    fetchNotifications,
+    refreshNotifications,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
+  const { messageCount } = useGlobalWebSocket();
 
   useEffect(() => {
-    useUserStore.persist.rehydrate()
-  }, [])
+    useUserStore.persist.rehydrate();
+  }, []);
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+      // Refresh notifications to ensure UI is updated
+      refreshNotifications();
+    }
+    // Navigation is handled within NotificationsDropdown
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    await markAllAsRead();
+    // Refresh notifications to ensure UI is updated
+    refreshNotifications();
+  };
 
   if (!isAuthenticated) {
     return (
       <Sidebar>
         <SidebarHeader>
           <SidebarItem href="/">
-            <Avatar src="https://ui-avatars.com/api/?name=Social+Network&background=6366f1&color=fff&bold=true" className="bg-indigo-500" />
+            <Avatar
+              src="https://ui-avatars.com/api/?name=Social+Network&background=6366f1&color=fff&bold=true"
+              className="bg-indigo-500"
+            />
             <SidebarLabel>Social Network</SidebarLabel>
           </SidebarItem>
         </SidebarHeader>
@@ -71,14 +101,17 @@ export function AppSidebar() {
           </SidebarSection>
         </SidebarBody>
       </Sidebar>
-    )
+    );
   }
 
   return (
     <Sidebar>
       <SidebarHeader>
         <SidebarItem href="/">
-          <Avatar src="https://ui-avatars.com/api/?name=Social+Network&background=6366f1&color=fff&bold=true" className="bg-indigo-500" />
+          <Avatar
+            src="https://ui-avatars.com/api/?name=Social+Network&background=6366f1&color=fff&bold=true"
+            className="bg-indigo-500"
+          />
           <SidebarLabel>Social Network</SidebarLabel>
         </SidebarItem>
       </SidebarHeader>
@@ -89,7 +122,10 @@ export function AppSidebar() {
             <HomeIcon />
             <SidebarLabel>Feed</SidebarLabel>
           </SidebarItem>
-          <SidebarItem href="/profile" current={pathname.startsWith('/profile')}>
+          <SidebarItem
+            href="/profile"
+            current={pathname.startsWith('/profile')}
+          >
             <UserCircleIcon />
             <SidebarLabel>Profile</SidebarLabel>
           </SidebarItem>
@@ -97,7 +133,10 @@ export function AppSidebar() {
             <UserGroupIcon />
             <SidebarLabel>Groups</SidebarLabel>
           </SidebarItem>
-          <SidebarItem href="/friends" current={pathname.startsWith('/friends')}>
+          <SidebarItem
+            href="/friends"
+            current={pathname.startsWith('/friends')}
+          >
             <UsersIconOutline />
             <SidebarLabel>Friends</SidebarLabel>
           </SidebarItem>
@@ -113,18 +152,29 @@ export function AppSidebar() {
             <DropdownButton as={SidebarItem} className="relative">
               <BellIcon />
               <SidebarLabel>Notifications</SidebarLabel>
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </DropdownButton>
-            <NotificationsDropdown anchor="bottom start" />
+            <NotificationsDropdown
+              anchor="bottom start"
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onNotificationClick={handleNotificationClick}
+              onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+              fetchNotifications={refreshNotifications}
+            />
           </Dropdown>
           <SidebarItem href="/messages" className="relative">
             <ChatBubbleLeftIcon />
             <SidebarLabel>Messages</SidebarLabel>
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-              2
-            </span>
+            {messageCount > 0 && (
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                {messageCount > 9 ? '9+' : messageCount}
+              </span>
+            )}
           </SidebarItem>
         </SidebarSection>
 
@@ -146,11 +196,14 @@ export function AppSidebar() {
           <Dropdown>
             <DropdownButton as={SidebarItem}>
               <span className="flex min-w-0 items-center gap-3">
-                <Avatar 
-                  src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`} 
-                  className="size-10" 
-                  square 
-                  alt={`${user.first_name} ${user.last_name}`} 
+                <Avatar
+                  src={
+                    user.avatar_url ||
+                    `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=3b82f6&color=fff&bold=true`
+                  }
+                  className="size-10"
+                  square
+                  alt={`${user.first_name} ${user.last_name}`}
                 />
                 <span className="min-w-0">
                   <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
@@ -168,5 +221,5 @@ export function AppSidebar() {
         )}
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

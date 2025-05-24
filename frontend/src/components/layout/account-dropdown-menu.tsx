@@ -43,6 +43,7 @@ export function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom 
               square
               alt={`${user.first_name} ${user.last_name}`}
               userId={user.id}
+              className="size-12"
             />
           </div>
           <div>

@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -21,4 +16,58 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Toast animations */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -200%, 0) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes leave {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -200%, 0) scale(0.6);
+  }
+}
+
+.animate-enter {
+  animation: enter 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+.animate-leave {
+  animation: leave 0.4s forwards cubic-bezier(0.06, 0.71, 0.55, 1);
+}
+
+/* Force consistent width for notifications dropdown */
+.notifications-dropdown {
+  width: 24rem !important;
+  min-width: 24rem !important;
+  max-width: 24rem !important;
+  overflow: hidden !important;
+}
+
+.notifications-dropdown .notification-item {
+  width: 100% !important;
+  max-width: 24rem !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* Ensure dropdown content takes full width */
+.notifications-dropdown > div {
+  width: 24rem !important;
+  min-width: 24rem !important;
+  max-width: 24rem !important;
+  overflow-x: hidden !important;
 }
