@@ -156,6 +156,7 @@ export function AppNavbar() {
               src={avatarUrl}
               square
               alt={`${user?.first_name} ${user?.last_name}`}
+              className="size-8"
             />
           </DropdownButton>
           <AccountDropdownMenu anchor="bottom end" />
