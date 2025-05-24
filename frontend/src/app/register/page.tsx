@@ -42,7 +42,7 @@ const formSchema = z.object({
   username: z
     .string()
     .min(3, 'Username must be at least 3 characters')
-    .optional(),
+    .or(z.literal('')),
   about_me: z
     .string()
     .max(500, 'Bio must be less than 500 characters')
