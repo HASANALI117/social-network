@@ -51,7 +51,28 @@ interface WebSocketMessage {
   // For direct messages
   sender_id?: string;
   content?: string;
-  // Add other potential message fields here
+  // For notifications
+  payload?: {
+    id: string;
+    user_id: string;
+    type: string;
+    entity_type: string;
+    message: string;
+    entity_id: string;
+    is_read: boolean;
+    created_at: string;
+  };
+  // For notification_created messages from hub
+  data?: {
+    id: string;
+    user_id: string;
+    type: string;
+    entity_type: string;
+    message: string;
+    entity_id: string;
+    is_read: boolean;
+    created_at: string;
+  };
 }
 
 export const GlobalWebSocketProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -203,16 +224,26 @@ export const GlobalWebSocketProvider: React.FC<{ children: React.ReactNode }> = 
                   <div
                     className={`${
                       t.visible ? 'animate-enter' : 'animate-leave'
-                    } max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-gray-700`}
+                    } max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-gray-700 border border-gray-600`}
                   >
                     <div className="flex-1 w-0 p-4">
                       <div className="flex items-start">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                          </div>
+                        </div>
                         <div className="ml-3 flex-1">
                           <p className="text-sm font-medium text-gray-100">
                             New Direct Message
                           </p>
-                          <p className="mt-1 text-sm text-gray-400">
+                          <p className="mt-1 text-sm text-gray-300 leading-relaxed">
                             {messageSnippet}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            From {senderDisplayName}
                           </p>
                         </div>
                       </div>
@@ -223,20 +254,157 @@ export const GlobalWebSocketProvider: React.FC<{ children: React.ReactNode }> = 
                           router.push(`/chat/${senderId}`);
                           toast.dismiss(t.id);
                         }}
-                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-400 hover:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="border border-transparent rounded-none p-3 flex items-center justify-center text-xs font-medium text-indigo-400 hover:text-indigo-300 hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-200"
+                        title="Open Chat"
                       >
-                        Open Chat
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
                       </button>
                       <button
                           onClick={() => toast.dismiss(t.id)}
-                          className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-300 hover:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="border border-transparent rounded-none rounded-r-lg p-3 flex items-center justify-center text-xs font-medium text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors duration-200"
+                          title="Dismiss"
                       >
-                          Dismiss
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     </div>
                   </div>
                 ),
                 { duration: 6000 }
+              );
+            }
+          } else if ((message.type === 'new_notification' && message.payload) || 
+                     (message.type === 'notification_created' && message.data)) {
+            // Handle notification messages from backend
+            const notificationData = message.payload || message.data;
+            if (notificationData) {
+              const getNotificationIcon = (type: string) => {
+                switch (type) {
+                  case 'follow_request':
+                    return (
+                      <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    );
+                  case 'follow_accept':
+                    return (
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    );
+                  case 'group_invite':
+                    return (
+                      <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    );
+                  case 'group_join_request':
+                    return (
+                      <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                      </svg>
+                    );
+                  case 'group_event_created':
+                    return (
+                      <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    );
+                  default:
+                    return (
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5v-6h-3l4-4 4 4h-3v6z" />
+                      </svg>
+                    );
+                }
+              };
+
+              const getNotificationAction = (type: string, entityId: string) => {
+                switch (type) {
+                  case 'follow_request':
+                    return {
+                      label: 'View Profile',
+                      path: `/profile/${entityId}`
+                    };
+                  case 'follow_accept':
+                    return {
+                      label: 'View Profile',
+                      path: `/profile/${entityId}`
+                    };
+                  case 'group_invite':
+                  case 'group_join_request':
+                  case 'group_event_created':
+                    return {
+                      label: 'View Group',
+                      path: `/groups/${entityId}`
+                    };
+                  default:
+                    return {
+                      label: 'View',
+                      path: '/notifications'
+                    };
+                }
+              };
+
+              const action = getNotificationAction(notificationData.type, notificationData.entity_id);
+              const icon = getNotificationIcon(notificationData.type);
+
+              toast.custom(
+                (t) => (
+                  <div
+                    className={`${
+                      t.visible ? 'animate-enter' : 'animate-leave'
+                    } max-w-md w-full bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-gray-700 border border-gray-600`}
+                  >
+                    <div className="flex-1 w-0 p-4">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                            {icon}
+                          </div>
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <p className="text-sm font-medium text-gray-100">
+                            New Notification
+                          </p>
+                          <p className="mt-1 text-sm text-gray-300 leading-relaxed">
+                            {notificationData.message}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {new Date(notificationData.created_at).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex border-l border-gray-700">
+                      <button
+                        onClick={() => {
+                          router.push(action.path);
+                          toast.dismiss(t.id);
+                        }}
+                        className="border border-transparent rounded-none p-3 flex items-center justify-center text-xs font-medium text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+                        title={action.label}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </button>
+                      <button
+                          onClick={() => toast.dismiss(t.id)}
+                          className="border border-transparent rounded-none rounded-r-lg p-3 flex items-center justify-center text-xs font-medium text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors duration-200"
+                          title="Dismiss"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ),
+                { duration: 8000 } // Slightly longer duration for notifications
               );
             }
           }
