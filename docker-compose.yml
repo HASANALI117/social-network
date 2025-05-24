@@ -19,12 +19,49 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    # networks: # Optional: If you use custom networks
-    #   - your_app_network
+    networks:
+      - social_network_app_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+    depends_on:
+      - backend
+    container_name: frontend_app
+    networks:
+      - social_network_app_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY_ID: ak-123456
+      MINIO_SECRET_ACCESS_KEY: sk-123456
+      MINIO_BUCKET_NAME: images
+      GIN_MODE: debug
+    depends_on:
+      - minio
+    container_name: backend_app
+    networks:
+      - social_network_app_net
 
 volumes:
   minio_data: {} # Defines the named volume for data persistence
 
-# networks: # Optional: Define your custom network if used
-#   your_app_network:
-#     driver: bridge
+networks:
+  social_network_app_net:
+    driver: bridge
