@@ -53,15 +53,23 @@ export function useNotifications() {
           setNotifications((prev) =>
             loadMore ? [...prev, ...newNotifications] : newNotifications
           );
-          setUnreadCount(data.unread_count || 0); // Ensure unread_count is also handled if potentially undefined
-          setHasMore(data.has_more || false); // Ensure has_more is also handled
-          setOffset(currentOffset + newNotifications.length);
+          setUnreadCount(data.unread_count || 0);
+          setHasMore(data.has_more || false);
+          
+          if (!loadMore) {
+            // Reset offset when fetching from beginning
+            setOffset(newNotifications.length);
+          } else {
+            setOffset(currentOffset + newNotifications.length);
+          }
         } else {
-          // Handle cases where data itself might be null or undefined, though useRequest might already guard this
+          // Handle cases where data itself might be null or undefined
           setNotifications((prev) => (loadMore ? prev : []));
           setUnreadCount(0);
           setHasMore(false);
-          // setOffset(currentOffset); // Offset might not need to change or reset depending on desired behavior
+          if (!loadMore) {
+            setOffset(0);
+          }
         }
       });
     },
@@ -99,27 +107,34 @@ export function useNotifications() {
 
         if (
           message &&
-          message.type === 'notification_created' &&
-          message.data
+          (message.type === 'notification_created' || message.type === 'new_notification') &&
+          (message.data || message.payload)
         ) {
-          const newNotification = message.data as Notification;
+          const newNotification = message.data || message.payload;
 
           console.log(
-            'WebSocket: Received new notification event.',
+            'useNotifications: Received new notification via WebSocket',
             newNotification
           );
 
-          setNotifications((prev) => [
-            newNotification,
-            ...prev.filter((n) => n.id !== newNotification.id),
-          ]);
-          setUnreadCount((prev) => prev + 1);
-          toast.success(`New notification: ${newNotification.message}`, {
-            duration: 5000,
+          // Add the new notification to the beginning of the list
+          setNotifications((prev) => {
+            // Remove any existing notification with the same ID to avoid duplicates
+            const filtered = prev.filter((n) => n.id !== newNotification.id);
+            return [newNotification, ...filtered];
           });
+          
+          // Only increment unread count if the notification is actually unread
+          if (!newNotification.is_read) {
+            setUnreadCount((prev) => prev + 1);
+          }
+
+          // Show a subtle toast notification (the main toast is handled by GlobalWebSocketContext)
+          console.log(`New notification received: ${newNotification.message}`);
         }
       } catch (error) {
-        // console.warn("WebSocket: Received message that is not a targeted notification event or failed to parse:", error);
+        // Ignore parsing errors for non-notification messages
+        console.debug('useNotifications: WebSocket message parsing error (likely not a notification):', error);
       }
     }
   }, [lastMessageData]);
@@ -194,12 +209,19 @@ export function useNotifications() {
     }
   };
 
+  const refreshNotifications = useCallback(() => {
+    // Force refresh by resetting offset and fetching from beginning
+    setOffset(0);
+    fetchNotifications(false);
+  }, [fetchNotifications]);
+
   return {
     notifications,
     unreadCount,
     isLoading: isLoadingFetch || isMarkingAsRead || isMarkingAllAsRead,
     hasMore,
     fetchNotifications,
+    refreshNotifications, // New function for manual refresh
     markAsRead,
     markAllAsRead,
     error: fetchError || markAsReadError || markAllAsReadError, // Consolidate errors

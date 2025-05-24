@@ -25,6 +25,7 @@ export function AppNavbar() {
     notifications,
     unreadCount,
     fetchNotifications,
+    refreshNotifications,
     markAsRead,
     markAllAsRead
   } = useNotifications()
@@ -40,18 +41,16 @@ export function AppNavbar() {
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.is_read) {
       await markAsRead(notification.id)
-      // The hook itself might refetch or optimistically update.
-      // If not, uncomment:
-      // fetchNotifications();
+      // Refresh notifications to ensure UI is updated
+      refreshNotifications();
     }
     // Navigation is handled within NotificationsDropdown for now
   }
 
   const handleMarkAllNotificationsAsRead = async () => {
     await markAllAsRead()
-    // The hook itself might refetch or optimistically update.
-    // If not, uncomment:
-    // fetchNotifications();
+    // Refresh notifications to ensure UI is updated
+    refreshNotifications();
   }
 
 
@@ -85,7 +84,7 @@ export function AppNavbar() {
             unreadCount={unreadCount}
             onNotificationClick={handleNotificationClick}
             onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-            fetchNotifications={fetchNotifications}
+            fetchNotifications={refreshNotifications}
           />
         </Dropdown>
         <NavbarItem href="/messages" className="relative">
@@ -118,7 +117,7 @@ export function AppNavbar() {
             unreadCount={unreadCount}
             onNotificationClick={handleNotificationClick}
             onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-            fetchNotifications={fetchNotifications}
+            fetchNotifications={refreshNotifications}
           />
         </Dropdown>
         <NavbarItem href="/messages" className="relative">

@@ -48,3 +48,25 @@ body {
 .animate-leave {
   animation: leave 0.4s forwards cubic-bezier(0.06, 0.71, 0.55, 1);
 }
+
+/* Force consistent width for notifications dropdown */
+.notifications-dropdown {
+  width: 24rem !important;
+  min-width: 24rem !important;
+  max-width: 24rem !important;
+}
+
+.notifications-dropdown .notification-item {
+  width: 24rem !important;
+  min-width: 24rem !important;
+  max-width: 24rem !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+/* Ensure dropdown content takes full width */
+.notifications-dropdown > div {
+  width: 24rem !important;
+  min-width: 24rem !important;
+  max-width: 24rem !important;
+}

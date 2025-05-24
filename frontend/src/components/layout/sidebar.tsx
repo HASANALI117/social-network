@@ -50,6 +50,7 @@ export function AppSidebar() {
     notifications,
     unreadCount,
     fetchNotifications,
+    refreshNotifications,
     markAsRead,
     markAllAsRead
   } = useNotifications()
@@ -61,12 +62,16 @@ export function AppSidebar() {
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.is_read) {
       await markAsRead(notification.id)
+      // Refresh notifications to ensure UI is updated
+      refreshNotifications();
     }
     // Navigation is handled within NotificationsDropdown
   }
 
   const handleMarkAllNotificationsAsRead = async () => {
     await markAllAsRead()
+    // Refresh notifications to ensure UI is updated
+    refreshNotifications();
   }
 
   if (!isAuthenticated) {
@@ -145,7 +150,7 @@ export function AppSidebar() {
               unreadCount={unreadCount}
               onNotificationClick={handleNotificationClick}
               onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-              fetchNotifications={fetchNotifications}
+              fetchNotifications={refreshNotifications}
             />
           </Dropdown>
           <SidebarItem href="/messages" className="relative">
