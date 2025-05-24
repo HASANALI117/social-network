@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context" // Added for context
 	"database/sql" // Added for sql.ErrNoRows
 	"errors"
 	"fmt"
@@ -12,8 +13,8 @@ import (
 
 // FollowerService defines the interface for follower business logic
 type FollowerService interface {
-	RequestFollow(requesterID, targetID string) error
-	AcceptFollow(accepterID, requesterID string) error
+	RequestFollow(ctx context.Context, requesterID, targetID string) error
+	AcceptFollow(ctx context.Context, accepterID, requesterID string) error
 	RejectFollow(rejecterID, requesterID string) error
 	Unfollow(unfollowerID, targetID string) error
 	ListFollowers(userID string, limit, offset int) ([]models.User, error) // Added pagination
@@ -46,7 +47,7 @@ func NewFollowerService(
 }
 
 // RequestFollow handles the logic for sending a follow request
-func (s *followerService) RequestFollow(requesterID, targetID string) error {
+func (s *followerService) RequestFollow(ctx context.Context, requesterID, targetID string) error {
 	if requesterID == targetID {
 		return errors.New("cannot follow yourself")
 	}
@@ -101,7 +102,7 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 		if s.notificationService != nil {
 			message := fmt.Sprintf("%s wants to follow you.", requesterUser.Username)
 			_, errNotif := s.notificationService.CreateNotification(
-				nil, // Using nil context for now, consider passing from handler if needed
+				ctx, // Pass the context here
 				targetUser.ID,
 				models.FollowRequestNotification,
 				models.UserEntityType,
@@ -138,7 +139,7 @@ func (s *followerService) RequestFollow(requesterID, targetID string) error {
 }
 
 // AcceptFollow handles the logic for accepting a follow request
-func (s *followerService) AcceptFollow(accepterID, requesterID string) error {
+func (s *followerService) AcceptFollow(ctx context.Context, accepterID, requesterID string) error {
 	// Check if a pending request exists from requester to accepter
 	request, err := s.followerRepo.FindFollow(requesterID, accepterID)
 	if err != nil {
@@ -167,7 +168,7 @@ func (s *followerService) AcceptFollow(accepterID, requesterID string) error {
 	if s.notificationService != nil && accepterUser != nil {
 		message := fmt.Sprintf("%s accepted your follow request.", accepterUser.Username)
 		_, errNotif := s.notificationService.CreateNotification(
-			nil, // Using nil context for now
+			ctx, // Pass the context here
 			requesterID, // Recipient is the original requester
 			models.FollowAcceptNotification,
 			models.UserEntityType,

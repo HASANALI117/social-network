@@ -18,7 +18,7 @@ type RealTimeNotifier interface {
 }
 
 type NotificationService interface {
-	CreateNotification(ctx context.Context, recipientID string, nType models.NotificationType, eType models.EntityType, message string, entityID string) (*models.Notification, error)
+	CreateNotification(ctx context.Context, userID string, notificationType models.NotificationType, entityType models.EntityType, message string, entityID string) (*models.Notification, error)
 	GetUserNotifications(ctx context.Context, userID string, limit, offset int) ([]*models.Notification, error)
 	MarkNotificationAsRead(ctx context.Context, notificationID string, userID string) error
 	MarkAllUserNotificationsAsRead(ctx context.Context, userID string) error
@@ -35,16 +35,16 @@ func NewNotificationService(repo repositories.NotificationRepository, notifier R
 	return &notificationService{repo: repo, notifier: notifier}
 }
 
-func (s *notificationService) CreateNotification(ctx context.Context, recipientID string, nType models.NotificationType, eType models.EntityType, message string, entityID string) (*models.Notification, error) {
+func (s *notificationService) CreateNotification(ctx context.Context, userID string, notificationType models.NotificationType, entityType models.EntityType, message string, entityID string) (*models.Notification, error) {
 	notification := &models.Notification{
-		UserID:     recipientID,
-		Type:       nType,
-		EntityType: eType,
+		UserID:     userID,
+		Type:       notificationType,
+		EntityType: entityType,
 		Message:    message,
 		EntityID:   entityID,
 	}
 
-	err := s.repo.Create(ctx, notification)
+	err := s.repo.Create(ctx, notification) // Pass the context here
 	if err != nil {
 		log.Printf("Error creating notification in service: %v", err)
 		return nil, err
@@ -67,13 +67,13 @@ func (s *notificationService) CreateNotification(ctx context.Context, recipientI
 					"created_at":  notification.CreatedAt.Format(time.RFC3339),
 				},
 			}
-			err := s.notifier.NotifyUser(recipientID, payload)
+			err := s.notifier.NotifyUser(userID, payload) // Changed from recipientID
 			if err != nil {
-				log.Printf("Error sending real-time notification to user %s: %v", recipientID, err)
+				log.Printf("Error sending real-time notification to user %s: %v", userID, err)
 			}
 		}()
 	} else {
-		log.Printf("RealTimeNotifier is not initialized, cannot send real-time notification for user %s", recipientID)
+		log.Printf("RealTimeNotifier is not initialized, cannot send real-time notification for user %s", userID)
 	}
 
 	return notification, nil

@@ -3,12 +3,15 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/HASANALI117/social-network/pkg/models"
 	"github.com/google/uuid"
 )
+
+const sqliteTimestampLayout = "2006-01-02 15:04:05.999999999Z07:00"
 
 type NotificationRepository interface {
 	Create(ctx context.Context, notification *models.Notification) error
@@ -23,6 +26,7 @@ type notificationRepository struct {
 }
 
 func NewNotificationRepository(db *sql.DB) NotificationRepository {
+log.Printf("NEW_NOTIFICATION_REPO: DB instance for storage: %p", db)
 	return &notificationRepository{db: db}
 }
 
@@ -33,6 +37,12 @@ func (r *notificationRepository) Create(ctx context.Context, notification *model
 
 	query := `INSERT INTO notifications (id, user_id, type, entity_type, message, entity_id, is_read, created_at)
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	log.Printf("NOTIFICATION_REPO_CREATE: DB Stats: %+v", r.db.Stats())
+log.Printf("NOTIFICATION_REPO_CREATE: Context error before PingContext: %v", ctx.Err())
+	if errPing := r.db.PingContext(ctx); errPing != nil {
+		log.Printf("NOTIFICATION_REPO_CREATE: CRITICAL - DB Ping failed: %v. DB instance: %p", errPing, r.db)
+		// Consider returning a specific error here if ping fails, for now, just log.
+	}
 	_, err := r.db.ExecContext(ctx, query, notification.ID, notification.UserID, notification.Type, notification.EntityType, notification.Message, notification.EntityID, notification.IsRead, notification.CreatedAt)
 	if err != nil {
 		log.Printf("Error creating notification: %v", err)
@@ -57,9 +67,34 @@ func (r *notificationRepository) GetByUserID(ctx context.Context, userID string,
 	notifications := make([]*models.Notification, 0)
 	for rows.Next() {
 		var n models.Notification
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.EntityType, &n.Message, &n.EntityID, &n.IsRead, &n.CreatedAt); err != nil {
+		var createdAtStr string
+		// Ensure other fields are scanned into their respective notification struct fields.
+		err := rows.Scan(
+			&n.ID,
+			&n.UserID,
+			&n.Type,
+			&n.EntityType,
+			&n.Message,
+			&n.EntityID,
+			&n.IsRead,
+			&createdAtStr, // Scan into intermediate string
+		)
+		if err != nil {
 			log.Printf("Error scanning notification row: %v", err)
 			return nil, err
+		}
+
+		if createdAtStr != "" {
+			parsedTime, parseErr := time.Parse(sqliteTimestampLayout, createdAtStr)
+			if parseErr != nil {
+				log.Printf("Error parsing created_at string '%s' with layout '%s': %v", createdAtStr, sqliteTimestampLayout, parseErr)
+				// Return an error as per instruction
+				return nil, fmt.Errorf("parsing created_at for notification %s: %w", n.ID, parseErr)
+			}
+			n.CreatedAt = parsedTime
+		} else {
+			// Handle empty createdAtStr if necessary, perhaps set to zero time or based on application logic
+			n.CreatedAt = time.Time{} // Default to zero time if string is empty
 		}
 		notifications = append(notifications, &n)
 	}

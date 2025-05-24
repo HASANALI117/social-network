@@ -72,7 +72,7 @@ func (h *FollowerHandler) HandleFollowRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = h.service.RequestFollow(requesterID, targetID)
+	err = h.service.RequestFollow(r.Context(), requesterID, targetID)
 	if err != nil {
 		log.Printf("Error in HandleFollowRequest service call: %v", err)
 		if err.Error() == "already following this user" || err.Error() == "follow request already pending" || err.Error() == "cannot follow yourself" {
@@ -106,7 +106,7 @@ func (h *FollowerHandler) HandleAcceptRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = h.service.AcceptFollow(accepterID, requesterID)
+	err = h.service.AcceptFollow(r.Context(), accepterID, requesterID)
 	if err != nil {
 		log.Printf("Error in HandleAcceptRequest service call: %v", err)
 		if err.Error() == "no pending follow request found from this user" {

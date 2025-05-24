@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -766,7 +767,7 @@ func (s *groupService) InviteUser(groupID, inviteeID string, inviterID string) (
 		if groupErr == nil && inviterErr == nil {
 			message := fmt.Sprintf("%s invited you to join %s.", inviter.Username, group.Name)
 			_, errNotif := s.notificationService.CreateNotification(
-				nil, // Using nil context for now
+				context.TODO(), // Using context.TODO() for now
 				inviteeID,
 				models.GroupInviteNotification,
 				models.GroupEntityType,
@@ -919,7 +920,7 @@ func (s *groupService) RequestToJoin(groupID string, requesterID string) (*Group
 			// For multiple admins, this would need to fetch all admins.
 			message := fmt.Sprintf("%s wants to join your group %s.", requester.Username, group.Name)
 			_, errNotif := s.notificationService.CreateNotification(
-				nil, // Using nil context for now
+				context.TODO(), // Using context.TODO() for now
 				group.CreatorID, // Notify the group creator
 				models.GroupJoinRequestNotification,
 				models.UserEntityType, // Entity that performed the action

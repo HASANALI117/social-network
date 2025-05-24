@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -202,7 +203,7 @@ func (s *groupEventService) Create(request *GroupEventCreateRequest) (*GroupEven
 					}
 					message := fmt.Sprintf("A new event '%s' has been created in %s.", event.Title, group.Name)
 					_, errNotif := s.notificationService.CreateNotification(
-						nil, // Context
+						context.TODO(), // Context
 						member.UserID,
 						models.GroupEventCreatedNotification,
 						models.EventEntityType,

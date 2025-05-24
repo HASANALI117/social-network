@@ -23,6 +23,11 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
+// Ping the database to ensure connection is live
+	if err := database.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+	log.Printf("MAIN: DB instance initialized and pinged successfully: %p", database)
 
 	// Setup HTTP routes
 	handler := routes.Setup(database)
