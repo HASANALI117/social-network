@@ -36,11 +36,18 @@ export default function GroupDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isMember, setIsMember] = useState<boolean>(false);
 
-  const { user: currentUser } = useUserStore();
+  const { user: currentUser, isAuthenticated, hydrated } = useUserStore();
   const { get: fetchGroupRequest, error: groupApiError } = useRequest<Group>();
   // Removed old invite UI state and hooks
 
   const loadGroupDetails = useCallback(async (id: string) => {
+    // Don't load group details if user is not authenticated
+    if (!isAuthenticated || !hydrated) {
+      console.log('GroupDetailPage: Skipping loadGroupDetails - user not authenticated or store not hydrated');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGroup(null);
@@ -73,16 +80,22 @@ export default function GroupDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchGroupRequest, groupApiError]);
+  }, [fetchGroupRequest, groupApiError, isAuthenticated, hydrated]);
 
   useEffect(() => {
-    if (groupId) {
+    // Only load group details if user is authenticated, store is hydrated, and groupId is provided
+    if (groupId && isAuthenticated && hydrated) {
       loadGroupDetails(groupId);
-    } else {
+    } else if (!isAuthenticated) {
+      // Clear group data if user is not authenticated
+      setGroup(null);
+      setIsMember(false);
+      setIsLoading(false);
+    } else if (!groupId) {
       setError("Group ID is missing.");
       setIsLoading(false);
     }
-  }, [groupId, loadGroupDetails]);
+  }, [groupId, loadGroupDetails, isAuthenticated, hydrated]);
   
   useEffect(() => {
     if (groupApiError && !isLoading && !group) {

@@ -42,10 +42,17 @@ export default function GroupsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTabKey, setActiveTabKey] = useState<ActiveTab>('explore'); // Renamed for clarity
 
-  const { user } = useUserStore();
+  const { user, isAuthenticated, hydrated } = useUserStore();
   const { get: fetchGroupsRequest, error: fetchGroupsError } = useRequest<GroupsApiResponse>();
 
   const loadGroups = useCallback(async (currentSearchTerm?: string, tabKeyToLoad: ActiveTab = activeTabKey) => {
+    // Don't load groups if user is not authenticated
+    if (!isAuthenticated || !hydrated) {
+      console.log('GroupsPage: Skipping loadGroups - user not authenticated or store not hydrated');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     let url = '/api/groups';
@@ -85,17 +92,25 @@ export default function GroupsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchGroupsRequest, fetchGroupsError, user?.id, activeTabKey]);
+  }, [fetchGroupsRequest, fetchGroupsError, user?.id, activeTabKey, isAuthenticated, hydrated]);
 
   const debouncedLoadGroups = useCallback(debounce(loadGroups, 400), [loadGroups]);
 
   useEffect(() => {
-    if (activeTabKey === 'explore') {
-      debouncedLoadGroups(searchTerm, 'explore');
-    } else if (activeTabKey === 'my-groups') {
-      loadGroups(undefined, 'my-groups');
+    // Only load groups if user is authenticated and store is hydrated
+    if (isAuthenticated && hydrated) {
+      if (activeTabKey === 'explore') {
+        debouncedLoadGroups(searchTerm, 'explore');
+      } else if (activeTabKey === 'my-groups') {
+        loadGroups(undefined, 'my-groups');
+      }
+    } else {
+      // Clear groups if user is not authenticated
+      setExploreGroups([]);
+      setMyGroups([]);
+      setIsLoading(false);
     }
-  }, [searchTerm, activeTabKey, debouncedLoadGroups, loadGroups]);
+  }, [searchTerm, activeTabKey, debouncedLoadGroups, loadGroups, isAuthenticated, hydrated]);
 
   useEffect(() => {
     if (fetchGroupsError) {

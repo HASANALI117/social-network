@@ -3,8 +3,7 @@ import { toast } from 'react-hot-toast';
 import { useRequest } from '@/hooks/useRequest';
 import { Notification, NotificationsResponse } from '@/types/Notification';
 import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext'; // For real-time updates
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+import { useUserStore } from '@/store/useUserStore';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -13,50 +12,79 @@ export function useNotifications() {
   const [offset, setOffset] = useState<number>(0);
   const limit = 20; // Or make configurable
 
+  const { isAuthenticated, hydrated } = useUserStore();
   const { lastMessageData } = useGlobalWebSocket();
 
   const {
     data: fetchedNotificationsData,
     error: fetchError,
     isLoading: isLoadingFetch,
-    get: getNotificationsRequest
+    get: getNotificationsRequest,
   } = useRequest<NotificationsResponse>();
 
   const {
     error: markAsReadError,
     isLoading: isMarkingAsRead,
-    post: markAsReadRequest
+    post: markAsReadRequest,
   } = useRequest<Notification>(); // Assuming API returns the updated notification
 
   const {
     error: markAllAsReadError,
     isLoading: isMarkingAllAsRead,
-    post: markAllAsReadRequest
+    post: markAllAsReadRequest,
   } = useRequest<{ message: string }>(); // Assuming API returns a success message
 
-  const fetchNotifications = useCallback(async (loadMore = false) => {
-    const currentOffset = loadMore ? offset : 0;
-    const url = `${API_BASE_URL}/notifications?limit=${limit}&offset=${currentOffset}`;
-
-    getNotificationsRequest(url, (data) => {
-      if (data) {
-        const newNotifications = data.notifications;
-        setNotifications(prev => loadMore ? [...prev, ...newNotifications] : newNotifications);
-        setUnreadCount(data.unread_count);
-        setHasMore(data.has_more);
-        setOffset(currentOffset + newNotifications.length);
+  const fetchNotifications = useCallback(
+    async (loadMore = false) => {
+      // Don't fetch if user is not authenticated
+      if (!isAuthenticated || !hydrated) {
+        console.log('useNotifications: Skipping fetch - user not authenticated or store not hydrated');
+        return;
       }
-    });
-  }, [offset, limit, getNotificationsRequest]);
+
+      const currentOffset = loadMore ? offset : 0;
+      const url = `/api/notifications?limit=${limit}&offset=${currentOffset}`;
+
+      getNotificationsRequest(url, (data) => {
+        if (data) {
+          const newNotifications = Array.isArray(data.notifications)
+            ? data.notifications
+            : [];
+          setNotifications((prev) =>
+            loadMore ? [...prev, ...newNotifications] : newNotifications
+          );
+          setUnreadCount(data.unread_count || 0); // Ensure unread_count is also handled if potentially undefined
+          setHasMore(data.has_more || false); // Ensure has_more is also handled
+          setOffset(currentOffset + newNotifications.length);
+        } else {
+          // Handle cases where data itself might be null or undefined, though useRequest might already guard this
+          setNotifications((prev) => (loadMore ? prev : []));
+          setUnreadCount(0);
+          setHasMore(false);
+          // setOffset(currentOffset); // Offset might not need to change or reset depending on desired behavior
+        }
+      });
+    },
+    [offset, limit, getNotificationsRequest, isAuthenticated, hydrated]
+  );
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    // Only fetch notifications if user is authenticated and store is hydrated
+    if (isAuthenticated && hydrated) {
+      fetchNotifications();
+    } else {
+      // Clear notifications if user is not authenticated
+      setNotifications([]);
+      setUnreadCount(0);
+      setHasMore(false);
+      setOffset(0);
+    }
+  }, [isAuthenticated, hydrated, fetchNotifications]);
 
   useEffect(() => {
     if (fetchError) {
-      console.error("Failed to fetch notifications:", fetchError);
-      toast.error(fetchError.message || "Could not load notifications.");
+      console.error('Failed to fetch notifications:', fetchError);
+      toast.error(fetchError.message || 'Could not load notifications.');
     }
   }, [fetchError]);
 
@@ -64,16 +92,31 @@ export function useNotifications() {
   useEffect(() => {
     if (lastMessageData) {
       try {
-        const message = typeof lastMessageData === 'string' ? JSON.parse(lastMessageData) : lastMessageData;
+        const message =
+          typeof lastMessageData === 'string'
+            ? JSON.parse(lastMessageData)
+            : lastMessageData;
 
-        if (message && message.type === "notification_created" && message.data) {
+        if (
+          message &&
+          message.type === 'notification_created' &&
+          message.data
+        ) {
           const newNotification = message.data as Notification;
 
-          console.log('WebSocket: Received new notification event.', newNotification);
-          
-          setNotifications(prev => [newNotification, ...prev.filter(n => n.id !== newNotification.id)]);
-          setUnreadCount(prev => prev + 1);
-          toast.success(`New notification: ${newNotification.message}`, { duration: 5000 });
+          console.log(
+            'WebSocket: Received new notification event.',
+            newNotification
+          );
+
+          setNotifications((prev) => [
+            newNotification,
+            ...prev.filter((n) => n.id !== newNotification.id),
+          ]);
+          setUnreadCount((prev) => prev + 1);
+          toast.success(`New notification: ${newNotification.message}`, {
+            duration: 5000,
+          });
         }
       } catch (error) {
         // console.warn("WebSocket: Received message that is not a targeted notification event or failed to parse:", error);
@@ -81,44 +124,72 @@ export function useNotifications() {
     }
   }, [lastMessageData]);
 
-
   const markAsRead = async (notificationId: string) => {
-    const url = `${API_BASE_URL}/notifications/${notificationId}/read`;
+    // Don't attempt to mark as read if user is not authenticated
+    if (!isAuthenticated) {
+      console.log('useNotifications: Skipping markAsRead - user not authenticated');
+      return;
+    }
+
+    const url = `/api/notifications/${notificationId}/read`;
     try {
       await markAsReadRequest(url, {}, (updatedNotification) => {
         if (updatedNotification) {
-          setNotifications(prev =>
-            prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+          setNotifications((prev) =>
+            prev.map((n) =>
+              n.id === notificationId ? { ...n, is_read: true } : n
+            )
           );
           // Optimistically decrement or refetch unread count
-          const notification = notifications.find(n => n.id === notificationId);
+          const notification = notifications.find(
+            (n) => n.id === notificationId
+          );
           if (notification && !notification.is_read) {
-            setUnreadCount(prev => Math.max(0, prev - 1));
+            setUnreadCount((prev) => Math.max(0, prev - 1));
           }
           // Or use updatedNotification.unread_count if the API provides it
         }
       });
     } catch (error) {
       // Error is handled by the useRequest hook's error state
-      console.error(`Failed to mark notification ${notificationId} as read:`, markAsReadError);
-      toast.error(markAsReadError?.message || "Failed to mark notification as read.");
+      console.error(
+        `Failed to mark notification ${notificationId} as read:`,
+        markAsReadError
+      );
+      toast.error(
+        markAsReadError?.message || 'Failed to mark notification as read.'
+      );
       throw markAsReadError || error;
     }
   };
 
   const markAllAsRead = async () => {
-    const url = `${API_BASE_URL}/notifications/read-all`;
+    // Don't attempt to mark all as read if user is not authenticated
+    if (!isAuthenticated) {
+      console.log('useNotifications: Skipping markAllAsRead - user not authenticated');
+      return;
+    }
+
+    const url = `/api/notifications/read-all`;
     try {
       await markAllAsReadRequest(url, {}, (response) => {
         if (response) {
-          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+          setNotifications((prev) =>
+            prev.map((n) => ({ ...n, is_read: true }))
+          );
           setUnreadCount(0);
           // toast.success(response.message || "All notifications marked as read.");
         }
       });
     } catch (error) {
-      console.error("Failed to mark all notifications as read:", markAllAsReadError);
-      toast.error(markAllAsReadError?.message || "Failed to mark all notifications as read.");
+      console.error(
+        'Failed to mark all notifications as read:',
+        markAllAsReadError
+      );
+      toast.error(
+        markAllAsReadError?.message ||
+          'Failed to mark all notifications as read.'
+      );
       throw markAllAsReadError || error;
     }
   };

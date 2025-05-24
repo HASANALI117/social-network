@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRequest } from '../../hooks/useRequest';
+import { useUserStore } from '../../store/useUserStore';
 import { Post } from '../../types/Post';
 import PostCard from '../../components/common/PostCard';
 import { Button } from '../../components/ui/button';
@@ -24,9 +25,18 @@ export default function PostsPage() {
   const [nextPageOffset, setNextPageOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
+  const { isAuthenticated, hydrated } = useUserStore();
   const { get: fetchPostsRequest, error: fetchHookError } = useRequest<PostsApiResponse>();
 
   const loadPosts = useCallback(async (currentOffset: number) => {
+    // Don't load posts if user is not authenticated
+    if (!isAuthenticated || !hydrated) {
+      console.log('PostsPage: Skipping loadPosts - user not authenticated or store not hydrated');
+      setIsLoadingInitial(false);
+      setIsFetchingMore(false);
+      return;
+    }
+
     if (currentOffset === 0) {
       setIsLoadingInitial(true);
     } else {
@@ -57,11 +67,21 @@ export default function PostsPage() {
         setIsFetchingMore(false);
       }
     }
-  }, [fetchPostsRequest, fetchHookError]);
+  }, [fetchPostsRequest, fetchHookError, isAuthenticated, hydrated]);
 
   useEffect(() => {
-    loadPosts(0); // Initial load
-  }, [loadPosts]); // loadPosts will re-run if fetchPostsRequest or fetchHookError changes
+    // Only load posts if user is authenticated and store is hydrated
+    if (isAuthenticated && hydrated) {
+      loadPosts(0); // Initial load
+    } else {
+      // Clear posts if user is not authenticated
+      setPosts([]);
+      setNextPageOffset(0);
+      setHasMore(true);
+      setIsLoadingInitial(false);
+      setIsFetchingMore(false);
+    }
+  }, [loadPosts, isAuthenticated, hydrated]);
 
   // Effect to handle errors from the useRequest hook if they occur outside a loadPosts call
   useEffect(() => {

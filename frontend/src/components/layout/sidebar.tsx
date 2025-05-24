@@ -40,14 +40,34 @@ import { NotificationsDropdown } from './notifications-dropdown'
 import { Link } from "../ui/link"
 import { ChevronDownIcon, Cog8ToothIcon } from "@heroicons/react/20/solid"
 import { useUserStore } from '@/store/useUserStore'
+import { useNotifications } from '@/hooks/useNotifications'
+import { Notification } from '@/types/Notification'
 
 export function AppSidebar() {
   const pathname = usePathname()
   const { user, isAuthenticated } = useUserStore()
+  const {
+    notifications,
+    unreadCount,
+    fetchNotifications,
+    markAsRead,
+    markAllAsRead
+  } = useNotifications()
 
   useEffect(() => {
     useUserStore.persist.rehydrate()
   }, [])
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id)
+    }
+    // Navigation is handled within NotificationsDropdown
+  }
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    await markAllAsRead()
+  }
 
   if (!isAuthenticated) {
     return (
@@ -113,11 +133,20 @@ export function AppSidebar() {
             <DropdownButton as={SidebarItem} className="relative">
               <BellIcon />
               <SidebarLabel>Notifications</SidebarLabel>
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </DropdownButton>
-            <NotificationsDropdown anchor="bottom start" />
+            <NotificationsDropdown
+              anchor="bottom start"
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onNotificationClick={handleNotificationClick}
+              onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+              fetchNotifications={fetchNotifications}
+            />
           </Dropdown>
           <SidebarItem href="/messages" className="relative">
             <ChatBubbleLeftIcon />

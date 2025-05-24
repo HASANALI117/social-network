@@ -15,8 +15,6 @@ import { formatDistanceToNow } from 'date-fns' // For relative timestamps
 import { useRequest } from '@/hooks/useRequest';
 import { Notification } from '@/types/Notification'; // Import from centralized types
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
-
 interface NotificationsDropdownProps {
   anchor: 'top start' | 'bottom start' | 'bottom end'
   notifications: Notification[]
@@ -165,20 +163,20 @@ export function NotificationsDropdown({
     switch (notification.type) {
       case 'follow_request':
         return {
-          acceptUrl: `${API_BASE_URL}/followers/accept/${notification.entity_id}`,
-          declineUrl: `${API_BASE_URL}/followers/reject/${notification.entity_id}`
+          acceptUrl: `/api/followers/accept/${notification.entity_id}`,
+          declineUrl: `/api/followers/reject/${notification.entity_id}`,
         };
       case 'group_invite':
         // Assuming notification.id is the invitationId for group invites
         return {
-          acceptUrl: `${API_BASE_URL}/groups/invitations/${notification.id}/accept`,
-          declineUrl: `${API_BASE_URL}/groups/invitations/${notification.id}/reject`
+          acceptUrl: `/api/groups/invitations/${notification.id}/accept`,
+          declineUrl: `/api/groups/invitations/${notification.id}/reject`,
         };
       case 'group_join_request':
         // Assuming notification.id is the requestId for group join requests
         return {
-          acceptUrl: `${API_BASE_URL}/groups/join-requests/${notification.id}/accept`,
-          declineUrl: `${API_BASE_URL}/groups/join-requests/${notification.id}/reject`
+          acceptUrl: `/api/groups/join-requests/${notification.id}/accept`,
+          declineUrl: `/api/groups/join-requests/${notification.id}/reject`,
         };
       default:
         return {};
@@ -188,7 +186,7 @@ export function NotificationsDropdown({
   return (
     <DropdownMenu className="min-w-96 max-h-96 overflow-y-auto" anchor={anchor}> {/* Increased min-width */}
       <DropdownHeader className="flex justify-between items-center p-3 border-b"> {/* Increased padding */}
-        <DropdownLabel className="text-lg font-semibold">Notifications</DropdownLabel>
+        <h3 className="text-lg font-semibold">Notifications</h3>
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAllRead}

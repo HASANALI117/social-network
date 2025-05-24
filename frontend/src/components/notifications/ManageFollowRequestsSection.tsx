@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { UserSummary } from '@/types/User';
 import { useRequest } from '@/hooks/useRequest';
+import { useUserStore } from '@/store/useUserStore';
 import FollowRequestList from './FollowRequestList';
 import { Tab } from '@headlessui/react'; // Using Headless UI for tabs
 
@@ -18,22 +19,36 @@ interface FollowRequestsResponse {
 
 const ManageFollowRequestsSection: React.FC = () => {
   const { get, post, del, isLoading, error } = useRequest<{ received: UserSummary[], sent: UserSummary[] | null }>();
+  const { isAuthenticated, hydrated } = useUserStore();
   const [receivedRequests, setReceivedRequests] = useState<UserSummary[]>([]);
   const [sentRequests, setSentRequests] = useState<UserSummary[]>([]);
   const [loadingActionUserId, setLoadingActionUserId] = useState<string | null>(null);
 
   const fetchFollowRequests = useCallback(() => {
+    // Don't fetch if user is not authenticated
+    if (!isAuthenticated || !hydrated) {
+      console.log('ManageFollowRequestsSection: Skipping fetch - user not authenticated or store not hydrated');
+      return;
+    }
+
     get('/api/users/me/follow-requests', (data) => {
       if (data) {
         setReceivedRequests(data.received || []);
         setSentRequests(data.sent || []); // Handle null for sent
       }
     });
-  }, [get]);
+  }, [get, isAuthenticated, hydrated]);
 
   useEffect(() => {
-    fetchFollowRequests();
-  }, [fetchFollowRequests]);
+    // Only fetch if user is authenticated and store is hydrated
+    if (isAuthenticated && hydrated) {
+      fetchFollowRequests();
+    } else {
+      // Clear data if user is not authenticated
+      setReceivedRequests([]);
+      setSentRequests([]);
+    }
+  }, [isAuthenticated, hydrated, fetchFollowRequests]);
 
   // requesterId is the id of the user who sent the request
   const handleAccept = async (requesterId: string) => {
