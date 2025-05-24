@@ -54,14 +54,14 @@ body {
   width: 24rem !important;
   min-width: 24rem !important;
   max-width: 24rem !important;
+  overflow: hidden !important;
 }
 
 .notifications-dropdown .notification-item {
-  width: 24rem !important;
-  min-width: 24rem !important;
+  width: 100% !important;
   max-width: 24rem !important;
   box-sizing: border-box !important;
-  display: block !important;
+  overflow: hidden !important;
 }
 
 /* Ensure dropdown content takes full width */
@@ -69,4 +69,5 @@ body {
   width: 24rem !important;
   min-width: 24rem !important;
   max-width: 24rem !important;
+  overflow-x: hidden !important;
 }

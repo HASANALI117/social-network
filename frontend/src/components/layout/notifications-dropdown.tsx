@@ -330,8 +330,7 @@ export function NotificationsDropdown({
                 )}
 
                 <div 
-                  className="flex items-start gap-3 cursor-pointer group" 
-                  style={{ width: '384px', padding: '16px', boxSizing: 'border-box' }}
+                  className="flex items-start gap-3 cursor-pointer group p-4" 
                   onClick={() => !isProcessing && handleItemClick(notification)}
                 >
                   {/* Notification Icon */}
@@ -376,7 +375,7 @@ export function NotificationsDropdown({
 
                 {/* Action Buttons */}
                 {canPerformAction && (
-                  <div style={{ width: '384px', paddingLeft: '16px', paddingRight: '16px', paddingBottom: '16px', boxSizing: 'border-box' }} className="flex space-x-2 justify-end">
+                  <div className="w-full px-4 pb-4 flex space-x-2 justify-end">
                     {acceptUrl && (
                       <button
                         onClick={(e) => {
@@ -407,7 +406,7 @@ export function NotificationsDropdown({
                 )}
               </div>
               {index < filteredNotifications.length - 1 && (
-                <div className="border-b border-zinc-100 dark:border-zinc-800" style={{ width: '384px', maxWidth: '384px' }} />
+                <div className="w-full border-b border-zinc-100 dark:border-zinc-800" />
               )}
             </Fragment>
           )
