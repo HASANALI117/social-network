@@ -40,7 +40,6 @@ export function CreateGroupEventForm({
       title,
       description,
       event_time: new Date(eventTime).toISOString(),
-      options: [{ text: "Going" }, { text: "Not Going" }],
     };
     const createdEvent = await post(
       `/api/groups/${groupId}/events`,
@@ -48,7 +47,6 @@ export function CreateGroupEventForm({
       (apiResponseEvent: GroupEvent) => {
         const newEventForState = {
           ...apiResponseEvent,
-          options: Array.isArray(apiResponseEvent) ? apiResponseEvent : [],
         };
         onEventCreated(newEventForState);
         setIsOpen(false);

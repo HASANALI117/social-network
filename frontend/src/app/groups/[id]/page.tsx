@@ -162,13 +162,6 @@ export default function GroupDetailPage() {
                 handleLeaveGroup={handleLeaveGroup}
               // Old invite props removed
               />
-              <div className="mt-4"> {/* Added margin for spacing */}
-                <Link href={`/groups/${groupId}/chat`} passHref>
-                  <Button color="blue"> {/* Example styling, adjust as needed */}
-                    Chat
-                  </Button>
-                </Link>
-              </div>
             </>
           )}
         </section>
