@@ -1,5 +1,5 @@
 # Use a Golang base image
-FROM golang:1.23.8-alpine3.20
+FROM golang:1.24-alpine3.21
 
 # Set the working directory
 WORKDIR /app
@@ -16,8 +16,14 @@ RUN go mod download
 # Copy the rest of the backend source code
 COPY . .
 
+# Build with verbose output to see any errors
+RUN go build -v -o main ./cmd/server/main.go
+
+# Ensure the binary is executable
+RUN chmod +x main
+
 # Expose the application port
 EXPOSE 8080
 
 # Command to run the application
-CMD ["go", "run", "./cmd/server/main.go"]
+CMD ["./main"]
