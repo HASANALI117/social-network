@@ -1,0 +1,50 @@
+# Binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+main
+__debug_bin
+tmp/
+
+# Test binaries
+*.test
+*.prof
+*.out
+
+# Go development
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+
+# Go dependencies - don't ignore these!
+# We need go.mod and go.sum for the build
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Temporary databases
+*.db
+*.sqlite
+
+# Deployment scripts
+scripts/deploy/
+
+# Misc
+README.md
+LICENSE
+docs/
