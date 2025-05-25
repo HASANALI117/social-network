@@ -1,12 +1,13 @@
 // frontend/src/app/chat/[id]/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/useUserStore';
 import { useRequest } from '@/hooks/useRequest';
 import { Message } from '@/types/Message';
 import { UserProfile } from '@/types/User'; // For fetching target user details
+import { useGlobalWebSocket, MessageCallback } from '@/contexts/GlobalWebSocketContext'; // Added import
 
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
@@ -26,6 +27,12 @@ export default function ChatPage() {
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const hydrated = useUserStore((state) => state.hydrated);
 
+  const {
+    sendMessage: globalSendMessage,
+    subscribeToDirectMessages,
+    connectionStatus,
+  } = useGlobalWebSocket(); // Added global WebSocket context
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -34,12 +41,7 @@ export default function ChatPage() {
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const [isWsConnected, setIsWsConnected] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const webSocketRef = useRef<WebSocket | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3; // Max number of retry attempts
-  const RETRY_DELAY = 3000; // Initial delay in ms, increases with each retry
 
   // For checking if chat is allowed (simplified frontend check, backend enforces)
   const [canChat, setCanChat] = useState(true); // Assume true initially, update based on targetUser profile
@@ -137,117 +139,62 @@ export default function ChatPage() {
     }
   }, [targetUserId, currentUserId, fetchMessageHistory, hydrated]); // fetchMessageHistory depends on messagesRequest.get
 
-  // WebSocket connection
+  // Subscribe to messages via Global WebSocket Context
   useEffect(() => {
-    // Ensure all dependencies for connection are met
     if (!currentUserId || !targetUserId || !hydrated || !isAuthenticated) {
-      console.log('WebSocket connection prerequisites not met (currentUser, targetUserId, hydrated, or isAuthenticated missing).');
-      // If there's an existing WebSocket connection, close it as prerequisites are no longer met.
-      if (webSocketRef.current) {
-        console.log('Closing existing WebSocket due to unmet prerequisites.');
-        webSocketRef.current.onclose = null; // Prevent onclose handler from firing during this cleanup
-        webSocketRef.current.onerror = null; // Prevent onerror handler from firing
-        webSocketRef.current.close();
-        webSocketRef.current = null;
-        setIsWsConnected(false); // Update connection status
-      }
-      return; // Do not attempt to connect
+      return;
     }
 
-    // Function to setup WebSocket connection
-    const setupWebSocket = () => {
-      const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host);
-      const wsUrl = `${wsScheme}//${wsHost}/ws?id=${currentUserId}`;
+    const handleNewMessage: MessageCallback = (rawMessage) => { // Renamed to rawMessage for clarity
+      console.log('Global WebSocket message received in ChatPage:', rawMessage);
 
-      console.log(`Attempting to connect to WebSocket: ${wsUrl} (Attempt: ${retryCount + 1}/${MAX_RETRIES + 1})`);
-      const ws = new WebSocket(wsUrl);
-      webSocketRef.current = ws;
+      if (
+        rawMessage.type === 'direct' &&
+        rawMessage.sender_id && // sender_id is on WebSocketMessage
+        rawMessage.receiver_id // receiver_id is on WebSocketMessage
+      ) {
+        // Cast to Message type after confirming it's a direct message
+        // Assumes the backend sends a payload compatible with the Message type for direct messages
+        const incomingDirectMessage = rawMessage as Message;
 
-      ws.onopen = () => {
-        console.log('WebSocket connected successfully.');
-        setIsWsConnected(true);
-        setRetryCount(0); // Reset retry count on successful connection
-        toast.success('Chat connected!');
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const rawMessageData = JSON.parse(event.data as string) as Message;
-          console.log('WebSocket message received:', rawMessageData);
-
-          if (rawMessageData.type === 'direct' &&
-              ((rawMessageData.sender_id === currentUserId && rawMessageData.receiver_id === targetUserId) ||
-               (rawMessageData.sender_id === targetUserId && rawMessageData.receiver_id === currentUserId))) {
-            
-            const messageWithAvatar: Message = {
-              ...rawMessageData,
-              sender_avatar_url: rawMessageData.sender_id === currentUserId
-                ? currentUserAvatarUrl
-                : rawMessageData.sender_id === targetUserId
-                  ? targetUser?.avatar_url
-                  : undefined,
-            };
-            setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
-          }
-        } catch (e) {
-          console.error('Error processing WebSocket message:', e);
+        if (
+          ((incomingDirectMessage.sender_id === currentUserId && incomingDirectMessage.receiver_id === targetUserId) ||
+           (incomingDirectMessage.sender_id === targetUserId && incomingDirectMessage.receiver_id === currentUserId))
+        ) {
+          const messageWithAvatar: Message = {
+            id: incomingDirectMessage.id || Math.random().toString(36).substring(2, 15), // Now uses casted type
+            type: 'direct',
+            sender_id: incomingDirectMessage.sender_id,
+            receiver_id: incomingDirectMessage.receiver_id,
+            content: incomingDirectMessage.content || '', // content is on Message type
+            created_at: incomingDirectMessage.created_at || new Date().toISOString(), // Now uses casted type
+            sender_username: incomingDirectMessage.sender_id === currentUserId ? currentUserUsername : targetUser?.username,
+            sender_avatar_url: incomingDirectMessage.sender_id === currentUserId
+              ? currentUserAvatarUrl
+              : targetUser?.avatar_url,
+            // Add other fields if present in incomingDirectMessage and Message type
+          };
+          setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
         }
-      };
-
-      ws.onerror = (errorEvent) => {
-        console.error('WebSocket error event. Check browser console for more details. Event:', errorEvent);
-        setIsWsConnected(false);
-        
-        if (retryCount < MAX_RETRIES) {
-          const delay = RETRY_DELAY * (retryCount + 1);
-          console.log(`WebSocket connection error. Retrying in ${delay / 1000}s... (Attempt ${retryCount + 1})`);
-          toast.error(`Chat connection error. Retrying (attempt ${retryCount + 1})...`);
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, delay);
-        } else {
-          console.error('WebSocket connection failed after max retries.');
-          setError('Failed to connect to chat server after multiple attempts. Real-time updates disabled.');
-          toast.error('Failed to connect to chat after multiple retries.');
-        }
-      };
-
-      ws.onclose = (closeEvent) => {
-        console.log(`WebSocket disconnected. Code: ${closeEvent.code}, Reason: "${closeEvent.reason}", Clean: ${closeEvent.wasClean}`);
-        setIsWsConnected(false);
-        // Note: Retries for initial connection failures are handled in onerror.
-        // This onclose might indicate an established connection was lost.
-        // If !closeEvent.wasClean and webSocketRef.current === ws (meaning it's not an old, cleaned-up instance),
-        // one might consider further retry logic here, but it can get complex.
-        // For now, we rely on onerror for connection retries.
-        if (!closeEvent.wasClean && webSocketRef.current === ws) {
-             // toast.error('Chat disconnected unexpectedly.'); // Optional: notify user
-        }
-      };
-    };
-
-    // Attempt to setup WebSocket
-    setupWebSocket();
-
-    // Cleanup function: This runs when dependencies change or component unmounts.
-    return () => {
-      if (webSocketRef.current) {
-        console.log('Cleaning up WebSocket connection (useEffect cleanup).');
-        // Remove event listeners to prevent them from firing after cleanup
-        webSocketRef.current.onopen = null;
-        webSocketRef.current.onmessage = null;
-        webSocketRef.current.onerror = null;
-        webSocketRef.current.onclose = null;
-        
-        webSocketRef.current.close();
-        webSocketRef.current = null; // Ensure the ref is cleared
       }
     };
-  }, [currentUserId, currentUserAvatarUrl, targetUserId, hydrated, isAuthenticated, targetUser, retryCount]); // Added retryCount and other currentUser properties
+
+    // Using subscribeToDirectMessages as it seems more appropriate for a 1-on-1 chat page.
+    // This assumes subscribeToDirectMessages will call the callback for all direct messages
+    // and we filter client-side.
+    // Alternatively, if subscribeToMessages(chatId, callback) is designed for direct chats
+    // where chatId can be targetUserId, that could be used.
+    // For now, using the more general direct message subscription and filtering.
+    const unsubscribe = subscribeToDirectMessages(handleNewMessage);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUserId, targetUserId, hydrated, isAuthenticated, currentUserAvatarUrl, currentUserUsername, targetUser, subscribeToDirectMessages]);
+
 
   const handleSendMessage = (content: string) => {
-    if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
+    if (connectionStatus !== 'connected') {
       toast.error('Not connected to chat server. Please wait or try refreshing.');
       return;
     }
@@ -257,25 +204,23 @@ export default function ChatPage() {
     }
 
     setIsSendingMessage(true);
-    const message: Message = {
+    const message: Partial<Message> & { type: string, sender_id: string, receiver_id: string, content: string } = {
       type: 'direct',
-      sender_id: currentUserId!, // currentUserId is checked above
+      sender_id: currentUserId!,
       receiver_id: targetUserId,
       content: content,
       created_at: new Date().toISOString(),
-      // Optional: Add sender_username and sender_avatar_url if available client-side
-      // Or rely on backend to populate these if needed for the receiver
-      sender_username: currentUserUsername!, // Assuming username is also guaranteed if id is present
-      sender_avatar_url: currentUserAvatarUrl // Can be null/undefined if user has no avatar
+      sender_username: currentUserUsername!,
+      sender_avatar_url: currentUserAvatarUrl
     };
 
     try {
-      webSocketRef.current.send(JSON.stringify(message));
-      // Optimistically add to UI. New messages are appended to the end.
-      // The message object already includes sender_avatar_url from currentUser.
-      // This will be displayed at the bottom.
+      globalSendMessage(message);
+      // Optimistic UI update can still be done here if desired,
+      // though the message will also arrive via the subscription.
+      // For simplicity, we'll rely on the subscription to update the message list.
     } catch (e) {
-      console.error('Failed to send message via WebSocket:', e);
+      console.error('Failed to send message via Global WebSocket:', e);
       toast.error('Failed to send message.');
     } finally {
       setIsSendingMessage(false);
