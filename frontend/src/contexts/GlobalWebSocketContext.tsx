@@ -275,7 +275,7 @@ export const GlobalWebSocketProvider: React.FC<{
               subscriptionsRef.current['direct'].forEach((cb) => cb(message));
             }
 
-            if (pathname !== currentChatPath) {
+            if (!pathname.startsWith('/chat/')) {
               const senderDisplayName = message.sender_id; // Placeholder
               const messageSnippet =
                 message.content.substring(0, 50) +
