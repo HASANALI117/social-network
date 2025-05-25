@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/useUserStore';
 import { useRequest } from '@/hooks/useRequest';
@@ -8,7 +8,7 @@ import { Message } from '@/types/Message';
 import { Group } from '@/types/Group';
 import { UserBasicInfo } from '@/types/User';
 
-import { useGlobalWebSocket } from '@/contexts/GlobalWebSocketContext';
+import { useGlobalWebSocket, WebSocketMessage } from '@/contexts/GlobalWebSocketContext';
 import ChatHeader from '@/components/chat/ChatHeader';
 import MessageList from '@/components/chat/MessageList';
 import MessageInput from '@/components/chat/MessageInput';
@@ -54,17 +54,12 @@ export default function GroupChatPage() {
   const [onlineMemberCount, setOnlineMemberCount] = useState<number | undefined>(undefined);
   const [totalMemberCount, setTotalMemberCount] = useState<number | undefined>(undefined);
 
-  const [isWsConnected, setIsWsConnected] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const webSocketRef = useRef<WebSocket | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 3000;
 
   const messagesRequest = useRequest<Message[]>();
   const groupRequest = useRequest<Group>();
   const membersRequest = useRequest<ApiGroupMembersResponse>(); // Use the new interface
-  const { onlineUserIds } = useGlobalWebSocket();
+  const { onlineUserIds, sendMessage, subscribeToGroupMessages, connectionStatus } = useGlobalWebSocket();
 
   useEffect(() => {
     useUserStore.persist.rehydrate();
@@ -192,125 +187,101 @@ export default function GroupChatPage() {
     }
   }, [groupId, currentUserId, fetchMessageHistory, hydrated, groupMembers]); // Added groupMembers dependency
 
-  // WebSocket connection
+  // Subscribe to group messages via Global WebSocket Context
   useEffect(() => {
-    if (!currentUserId || !groupId || !hydrated || !isAuthenticated) {
-      console.log('WebSocket connection prerequisites not met.');
-      if (webSocketRef.current) {
-        webSocketRef.current.onclose = null;
-        webSocketRef.current.onerror = null;
-        webSocketRef.current.close();
-        webSocketRef.current = null;
-        setIsWsConnected(false);
-      }
+    if (!groupId || !currentUserId || !hydrated || !isAuthenticated || groupMembers.size === 0) {
       return;
     }
 
-    const setupWebSocket = () => {
-      const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_URL || (window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host);
-      const wsUrl = `${wsScheme}//${wsHost}/ws?id=${currentUserId}`;
+    const handleNewMessage = (rawMessage: WebSocketMessage) => {
+      console.log('Global WebSocket message received for group chat:', rawMessage);
+      // Ensure the message is for this group
+      console.log('[GroupChatPage] Comparing for message processing:');
+      console.log('[GroupChatPage] rawMessage.type:', rawMessage.type, '(Expected: "group")');
+      console.log('[GroupChatPage] rawMessage.receiver_id:', rawMessage.receiver_id);
+      console.log('[GroupChatPage] page groupId:', groupId);
+      console.log('[GroupChatPage] Comparison result (type === "group"):', rawMessage.type === 'group');
+      console.log('[GroupChatPage] Comparison result (receiver_id === groupId):', rawMessage.receiver_id === groupId);
 
-      console.log(`Attempting to connect to WebSocket: ${wsUrl} (Attempt: ${retryCount + 1}/${MAX_RETRIES + 1})`);
-      const ws = new WebSocket(wsUrl);
-      webSocketRef.current = ws;
+      if (rawMessage.type === 'group' && rawMessage.receiver_id === groupId) {
+        console.log('[GroupChatPage] Entered message processing block.');
 
-      ws.onopen = () => {
-        console.log('WebSocket connected successfully.');
-        setIsWsConnected(true);
-        setRetryCount(0);
-        toast.success('Chat connected!');
-      };
+        // Check for essential fields before processing
+        if (rawMessage.sender_id && rawMessage.content && rawMessage.created_at) {
+          console.log('[GroupChatPage] rawMessage.sender_id:', rawMessage.sender_id);
 
-      ws.onmessage = (event) => {
-        try {
-          const rawMessageData = JSON.parse(event.data as string) as Message;
-          console.log('WebSocket message received:', rawMessageData);
+          const senderInfo = groupMembers.get(rawMessage.sender_id);
+          console.log('[GroupChatPage] senderInfo from groupMembers:', senderInfo);
 
-          if (rawMessageData.type === 'group' && rawMessageData.receiver_id === groupId) {
-            const senderInfo = groupMembers.get(rawMessageData.sender_id);
-            console.log('[WebSocket] Looking up sender_id:', rawMessageData.sender_id, 'Found info:', senderInfo); // Log WebSocket message enrichment
-            const messageWithAvatar: Message = {
-              ...rawMessageData,
-              sender_username: rawMessageData.sender_id === currentUserId ? currentUserUsername : senderInfo?.username,
-              sender_avatar_url: rawMessageData.sender_id === currentUserId
-                ? currentUserAvatarUrl
-                : senderInfo?.avatar_url
-            };
-            setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
-          }
-        } catch (e) {
-          console.error('Error processing WebSocket message:', e);
-        }
-      };
+          console.log('[GroupChatPage] rawMessage.content:', rawMessage.content);
+          console.log('[GroupChatPage] rawMessage.created_at:', rawMessage.created_at);
+          console.log('[GroupChatPage] rawMessage.id (if expected):', rawMessage.id);
 
-      ws.onerror = (errorEvent) => {
-        console.error('WebSocket error event:', errorEvent);
-        setIsWsConnected(false);
-        
-        if (retryCount < MAX_RETRIES) {
-          const delay = RETRY_DELAY * (retryCount + 1);
-          console.log(`WebSocket connection error. Retrying in ${delay / 1000}s... (Attempt ${retryCount + 1})`);
-          toast.error(`Chat connection error. Retrying (attempt ${retryCount + 1})...`);
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, delay);
+          const messageWithAvatar: Message = {
+            id: rawMessage.id || Math.random().toString(36).substring(2, 15),
+            type: 'group',
+            sender_id: rawMessage.sender_id,
+            receiver_id: rawMessage.receiver_id,
+            content: rawMessage.content,
+            created_at: rawMessage.created_at,
+            sender_username: rawMessage.sender_id === currentUserId ? currentUserUsername : senderInfo?.username,
+            sender_avatar_url: rawMessage.sender_id === currentUserId
+              ? currentUserAvatarUrl
+              : senderInfo?.avatar_url,
+          };
+          console.log('[GroupChatPage] Constructed messageWithAvatar:', messageWithAvatar);
+
+          console.log('[GroupChatPage] About to call setMessages.');
+          setMessages(prevMessages => [...prevMessages, messageWithAvatar]);
         } else {
-          console.error('WebSocket connection failed after max retries.');
-          setError('Failed to connect to chat server after multiple attempts. Real-time updates disabled.');
-          toast.error('Failed to connect to chat after multiple retries.');
+          console.log('[GroupChatPage] Message for this group received, but missing essential fields (sender_id, content, created_at, or id). Message:', rawMessage);
         }
-      };
-
-      ws.onclose = (closeEvent) => {
-        console.log(`WebSocket disconnected. Code: ${closeEvent.code}, Reason: "${closeEvent.reason}", Clean: ${closeEvent.wasClean}`);
-        setIsWsConnected(false);
-        if (!closeEvent.wasClean && webSocketRef.current === ws) {
-          // Handle unclean disconnection if needed
-        }
-      };
-    };
-
-    setupWebSocket();
-
-    return () => {
-      if (webSocketRef.current) {
-        console.log('Cleaning up WebSocket connection.');
-        webSocketRef.current.onopen = null;
-        webSocketRef.current.onmessage = null;
-        webSocketRef.current.onerror = null;
-        webSocketRef.current.onclose = null;
-        webSocketRef.current.close();
-        webSocketRef.current = null;
+      } else if (rawMessage.type === 'group_message_echo' && rawMessage.group_id === groupId && rawMessage.sender_id === currentUserId) {
+        // Handle echo for the sender if needed, or rely on optimistic update
+        // For now, we assume optimistic update handles the sender's view,
+        // and this echo confirms delivery or provides the server-assigned ID.
+        // If not doing optimistic updates, this is where you'd add the message.
+        console.log('Received echo for sent group message:', rawMessage);
       }
     };
-  }, [currentUserId, groupId, hydrated, isAuthenticated, currentUserAvatarUrl, currentUserUsername, retryCount, groupMembers]);
+
+    const unsubscribe = subscribeToGroupMessages(groupId, handleNewMessage);
+    console.log(`Subscribed to group messages for group ID: ${groupId}`);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+        console.log(`Unsubscribed from group messages for group ID: ${groupId}`);
+      }
+    };
+  }, [groupId, currentUserId, hydrated, isAuthenticated, groupMembers, subscribeToGroupMessages, currentUserUsername, currentUserAvatarUrl]);
+
 
   const handleSendMessage = (content: string) => {
-    if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
+    if (connectionStatus !== 'connected') {
       toast.error('Not connected to chat server. Please wait or try refreshing.');
       return;
     }
     if (!currentUserId || !groupId) {
-      toast.error('User information missing.');
+      toast.error('User or group information missing.');
       return;
     }
 
     setIsSendingMessage(true);
-    const message: Message = {
-      type: 'group',
+    const messageToSend = { // Structure according to GlobalWebSocketContext's expected format
+      type: 'group', // This should match what GlobalWebSocketContext expects
       sender_id: currentUserId,
-      receiver_id: groupId,
+      receiver_id: groupId, // Ensure this is populated correctly
       content: content,
-      created_at: new Date().toISOString(),
-      sender_username: currentUserUsername!,
-      sender_avatar_url: currentUserAvatarUrl
+      // created_at will likely be set by the server or context
     };
 
     try {
-      webSocketRef.current.send(JSON.stringify(message));
+      sendMessage(messageToSend);
+      // If sendMessage is async and returns a promise, you might want to await it
+      // and handle success/failure.
     } catch (e) {
-      console.error('Failed to send message via WebSocket:', e);
+      console.error('Failed to send message via Global WebSocket:', e);
       toast.error('Failed to send message.');
     } finally {
       setIsSendingMessage(false);

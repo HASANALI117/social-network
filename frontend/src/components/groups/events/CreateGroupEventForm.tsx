@@ -32,12 +32,10 @@ export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEve
       title,
       description,
       event_time: new Date(eventTime).toISOString(),
-      options: [{ text: 'Going' }, { text: 'Not Going' }],
     };
     const createdEvent = await post(`/api/groups/${groupId}/events`, payload, (apiResponseEvent: GroupEvent) => {
       const newEventForState = {
-        ...apiResponseEvent,
-        options: Array.isArray(apiResponseEvent.options) ? apiResponseEvent.options : []
+        ...apiResponseEvent
       };
       onEventCreated(newEventForState);
       setIsOpen(false);
