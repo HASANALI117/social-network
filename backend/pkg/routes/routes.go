@@ -4,13 +4,10 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/HASANALI117/social-network/docs"
 	"github.com/HASANALI117/social-network/pkg/handlers"
 	"github.com/HASANALI117/social-network/pkg/httperr"
 	"github.com/HASANALI117/social-network/pkg/repositories" // Import repositories for Init
 	"github.com/HASANALI117/social-network/pkg/services"     // Import services for Init
-	// "github.com/HASANALI117/social-network/pkg/websocket" // No longer directly needed here, hub is accessed via handlers
-	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // Setup sets up all API routes
@@ -70,18 +67,12 @@ func Setup(dbConn *sql.DB) http.Handler {
 	// Now initialize all services, including the "final" GroupService and NotificationService
 	allServices := services.InitServices(repos, handlers.WebSocketHub) // Pass the initialized Hub
 
-	// This will ensure the swagger docs are registered
-	docs.SwaggerInfo.BasePath = "/api"
-
 	// --- Dependency Injection (Handlers) ---
 	// Repositories and Services are already initialized above
 	controllers := handlers.InitHandlers(allServices) // Initialize all handlers with all services
 	// --- End Dependency Injection ---
 
 	mux := http.NewServeMux()
-
-	// Swagger Documentation
-	mux.HandleFunc("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 
 	// Websocket routes - Pass the AuthService instance
 	mux.HandleFunc("/ws", handlers.HandleWebSocket(allServices.Auth)) // Pass AuthService from allServices

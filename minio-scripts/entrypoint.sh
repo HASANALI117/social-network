@@ -17,7 +17,7 @@ until curl -sf "http://localhost:9000/minio/health/ready"; do
     HEALTH_ATTEMPT_COUNT=$((HEALTH_ATTEMPT_COUNT + 1))
     if [ "$HEALTH_ATTEMPT_COUNT" -ge "$MAX_HEALTH_ATTEMPTS" ]; then
         echo "MinIO server did not become healthy after $MAX_HEALTH_ATTEMPTS attempts. Terminating."
-        kill $MINIO_PID # Attempt to kill the background MinIO server
+        kill $MINIO_PID             # Attempt to kill the background MinIO server
         wait $MINIO_PID 2>/dev/null # Wait for it to terminate
         exit 1
     fi

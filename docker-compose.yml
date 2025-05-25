@@ -3,8 +3,8 @@ services:
     image: minio/minio:latest
     container_name: minio_local_storage
     ports:
-      - "9000:9000"  # S3 API port
-      - "9001:9001"  # MinIO Console port
+      - "9000:9000" # S3 API port
+      - "9001:9001" # MinIO Console port
     volumes:
       - minio_data:/data # Persist data using a named volume
       - ./minio-scripts:/minio-scripts # Mount the setup scripts
@@ -19,12 +19,44 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    # networks: # Optional: If you use custom networks
-    #   - your_app_network
+    networks:
+      - social_network_app_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - backend
+    container_name: frontend_app
+    networks:
+      - social_network_app_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY_ID: ak-123456
+      MINIO_SECRET_ACCESS_KEY: sk-123456
+      MINIO_BUCKET_NAME: images
+      GIN_MODE: debug
+    depends_on:
+      - minio
+    container_name: backend_app
+    networks:
+      - social_network_app_net
 
 volumes:
   minio_data: {} # Defines the named volume for data persistence
 
-# networks: # Optional: Define your custom network if used
-#   your_app_network:
-#     driver: bridge
+networks:
+  social_network_app_net:
+    driver: bridge
