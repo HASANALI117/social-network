@@ -17,9 +17,3 @@ migrate-force:
 mc: migrate-create
 mu: migrate-up
 md: migrate-down
-
-# Generate Swagger documentation
-swagger:
-	@swag init -g cmd/server/main.go
-
-sw: swagger
