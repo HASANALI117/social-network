@@ -1,23 +1,31 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { useRequest } from '@/hooks/useRequest';
-import { GroupEvent } from '@/types/GroupEvent';
-import { Dialog, DialogTitle, DialogBody, DialogActions } from '@/components/ui/dialog';
-import { Button as HeadlessButton } from '@headlessui/react'; // For Dialog close
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useRequest } from "@/hooks/useRequest";
+import { GroupEvent } from "@/types/GroupEvent";
+import {
+  Dialog,
+  DialogTitle,
+  DialogBody,
+  DialogActions,
+} from "@/components/ui/dialog";
+import { Button as HeadlessButton } from "@headlessui/react"; // For Dialog close
 
 interface CreateGroupEventFormProps {
   groupId: string;
   onEventCreated: (event: GroupEvent) => void;
 }
 
-export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEventFormProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [eventTime, setEventTime] = useState('');
+export function CreateGroupEventForm({
+  groupId,
+  onEventCreated,
+}: CreateGroupEventFormProps) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [eventTime, setEventTime] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
   const { post, error: apiError, isLoading } = useRequest<GroupEvent>();
@@ -25,26 +33,30 @@ export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEve
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !eventTime) {
-      alert('Title and Event Time are required.');
+      alert("Title and Event Time are required.");
       return;
     }
     const payload = {
       title,
       description,
       event_time: new Date(eventTime).toISOString(),
-      options: [{ text: 'Going' }, { text: 'Not Going' }],
+      options: [{ text: "Going" }, { text: "Not Going" }],
     };
-    const createdEvent = await post(`/api/groups/${groupId}/events`, payload, (apiResponseEvent: GroupEvent) => {
-      const newEventForState = {
-        ...apiResponseEvent,
-        options: Array.isArray(apiResponseEvent.options) ? apiResponseEvent.options : []
-      };
-      onEventCreated(newEventForState);
-      setIsOpen(false);
-      setTitle('');
-      setDescription('');
-      setEventTime('');
-    });
+    const createdEvent = await post(
+      `/api/groups/${groupId}/events`,
+      payload,
+      (apiResponseEvent: GroupEvent) => {
+        const newEventForState = {
+          ...apiResponseEvent,
+          options: Array.isArray(apiResponseEvent) ? apiResponseEvent : [],
+        };
+        onEventCreated(newEventForState);
+        setIsOpen(false);
+        setTitle("");
+        setDescription("");
+        setEventTime("");
+      }
+    );
     // Optionally handle createdEvent if needed, e.g. for further immediate actions
   };
 
@@ -56,7 +68,10 @@ export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEve
         <DialogBody>
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="title"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Event Title
               </label>
               <Input
@@ -67,7 +82,10 @@ export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEve
               />
             </div>
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="description"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Description
               </label>
               <Textarea
@@ -77,7 +95,10 @@ export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEve
               />
             </div>
             <div>
-              <label htmlFor="eventTime" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="eventTime"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Day/Time
               </label>
               <Input
@@ -104,7 +125,7 @@ export function CreateGroupEventForm({ groupId, onEventCreated }: CreateGroupEve
             Cancel
           </HeadlessButton>
           <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'Create Event'}
+            {isLoading ? "Creating..." : "Create Event"}
           </Button>
         </DialogActions>
       </Dialog>
