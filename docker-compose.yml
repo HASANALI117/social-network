@@ -3,8 +3,8 @@ services:
     image: minio/minio:latest
     container_name: minio_local_storage
     ports:
-      - "9000:9000"  # S3 API port
-      - "9001:9001"  # MinIO Console port
+      - "9000:9000" # S3 API port
+      - "9001:9001" # MinIO Console port
     volumes:
       - minio_data:/data # Persist data using a named volume
       - ./minio-scripts:/minio-scripts # Mount the setup scripts
@@ -28,11 +28,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       - backend
     container_name: frontend_app
@@ -45,8 +42,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-    volumes:
-      - ./backend:/app
     environment:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY_ID: ak-123456
