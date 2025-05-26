@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	dbPath     = "pkg/db/social_network.db"
+	dbPath     = "/app/data/social_network.db"
 	migrations = "file://pkg/db/migrations/sqlite"
 )
 

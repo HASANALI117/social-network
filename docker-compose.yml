@@ -26,13 +26,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: frontend_app
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
     depends_on:
       - backend
-    container_name: frontend_app
     networks:
       - social_network_app_net
 
@@ -40,8 +40,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: backend_app
     ports:
       - "8080:8080"
+    volumes:
+      - backend_data:/app/data # Persist backend data
     environment:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY_ID: ak-123456
@@ -50,12 +53,12 @@ services:
       GIN_MODE: debug
     depends_on:
       - minio
-    container_name: backend_app
     networks:
       - social_network_app_net
 
 volumes:
   minio_data: {} # Defines the named volume for data persistence
+  backend_data: {}
 
 networks:
   social_network_app_net:
