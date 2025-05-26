@@ -11,7 +11,9 @@ out
 # Environment files
 .env*.local
 .env*.development
-.env*.production
+# Allow production env files
+!.env.production
+!.env
 
 # Testing
 coverage

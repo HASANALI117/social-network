@@ -4,7 +4,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "http",
-        hostname: "minio_local_storage",
+        hostname: "localhost",
         port: "9000", // As per the error message
         pathname: "/images/uploads/**",
       },

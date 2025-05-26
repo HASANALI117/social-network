@@ -10,6 +10,7 @@ COPY next.config.mjs ./
 COPY tsconfig.json ./
 COPY postcss.config.mjs ./
 COPY tailwind.config.ts ./
+COPY .env.production ./
 
 # Install dependencies
 RUN npm install
