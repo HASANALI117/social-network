@@ -30,7 +30,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: production
+      # NODE_ENV: production
+      NEXT_PUBLIC_MINIO_ENDPOINT: http://localhost:9000
+      NEXT_PUBLIC_MINIO_ACCESS_KEY: ak-123456 # Replace with your actual key
+      NEXT_PUBLIC_MINIO_SECRET_KEY: sk-123456 # Replace with your actual secret
+      NEXT_PUBLIC_MINIO_BUCKET_NAME: images
+      NEXT_PUBLIC_MINIO_REGION: us-east-1
+      NEXT_PUBLIC_WEBSOCKET_URL: localhost:8080
     depends_on:
       - backend
     networks:
