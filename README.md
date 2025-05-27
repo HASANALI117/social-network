@@ -2,6 +2,8 @@
 
 A full-stack social network application built with Go backend and Next.js frontend, featuring real-time messaging, group management, post sharing, and comprehensive user interactions.
 
+![Social Network Home Page](./assets/home.png)
+
 ## 🚀 Features
 
 ### Core Functionality
@@ -83,7 +85,7 @@ social-network/
 
 ### Backend Technologies
 
-- **Go 1.21+**: Core backend language
+- **Go**: Core backend language
 - **SQLite**: Embedded database
 - **WebSockets**: Real-time communication
 - **MinIO**: S3-compatible object storage
@@ -110,38 +112,21 @@ social-network/
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/your-username/social-network.git
+   git clone https://github.com/HASANALI117/social-network.git
    cd social-network
    ```
 
-2. **Environment Configuration**
-   Create a .env file in the root directory:
-
-   ```env
-   # Database
-   DB_PATH=./database.db
-
-   # MinIO Configuration
-   MINIO_ROOT_USER=ak-123456
-   MINIO_ROOT_PASSWORD=sk-123456
-   MINIO_BUCKET_NAME=images
-
-   # Application Settings
-   NEXT_PUBLIC_API_URL=http://localhost:8080
-   NEXT_PUBLIC_WEBSOCKET_URL=localhost:8080
-   NEXT_PUBLIC_MINIO_ENDPOINT=http://localhost:9000
-   ```
-
-3. **Start the application**
+2. **Start the application**
 
    ```bash
    docker-compose up --build
    ```
 
-4. **Access the application**
+3. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8080
    - MinIO Console: http://localhost:9001
+   - Default MinIO credentials: `ak-123456` / `sk-123456`
 
 ### Development Setup
 
@@ -152,7 +137,7 @@ For development with hot reload:
    ```bash
    cd backend
    go mod download
-   make dev  # Uses Air for hot reload
+   air  # Uses Air for hot reload
    ```
 
 2. **Frontend development**
@@ -231,26 +216,11 @@ NEXT_PUBLIC_MINIO_BUCKET_NAME=images
 
 The application runs with the following services:
 
-- **backend_app**: Go backend server (port 8080)
-- **frontend_app**: Next.js frontend (port 3000)
-- **minio_local_storage**: MinIO object storage (port 9000)
-- **nginx**: Reverse proxy and load balancer (port 80)
+- **minio**: MinIO object storage (ports 9000, 9001)
+- **frontend**: Next.js frontend application (port 3000)
+- **backend**: Go backend server (port 8080)
 
 ## 🧪 Testing
-
-### Backend Testing
-
-```bash
-cd backend
-go test ./...
-```
-
-### Frontend Testing
-
-```bash
-cd frontend
-npm test
-```
 
 ### API Testing
 
@@ -306,25 +276,3 @@ The application uses SQLite with the following main tables:
 ## 📄 License
 
 This project is part of the 01-edu curriculum. See the [original project requirements](https://github.com/01-edu/public/blob/master/subjects/social-network/README.md) for educational context.
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-1. **Port conflicts**: Ensure ports 3000, 8080, 9000, and 9001 are available
-2. **Docker issues**: Try `docker-compose down && docker-compose up --build`
-3. **Database issues**: Check database migrations in migrations
-4. **MinIO connectivity**: Verify MinIO container is healthy and accessible
-
-### Logs and Debugging
-
-```bash
-# View all service logs
-docker-compose logs
-
-# View specific service logs
-docker-compose logs backend_app
-docker-compose logs frontend_app
-```
-
-For additional support, please refer to the project documentation or create an issue in the repository.
